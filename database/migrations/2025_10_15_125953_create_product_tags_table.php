@@ -33,7 +33,6 @@ return new class extends Migration
             // Indexes
             $table->index('slug');
             $table->index('status_key_code');
-            $table->index('sort_order');
         });
 
         // Product-Tag Pivot Table (Many-to-Many)

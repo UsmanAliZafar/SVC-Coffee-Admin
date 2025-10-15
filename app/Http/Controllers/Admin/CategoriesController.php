@@ -18,7 +18,7 @@ class CategoriesController extends Controller
      */
     public function index()
     {
-        $statusList = SystemStatus::where('module', 'category')->get();
+        $statusList = SystemStatus::where('module', 'categories')->get();
         $parentCategories = ProductsCategories::roots()->active()->ordered()->get();
 
         return view('admin.categories.index', compact('statusList', 'parentCategories'));
