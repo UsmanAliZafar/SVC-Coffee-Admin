@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('system_statuses', function (Blueprint $table) {
             // Primary UUID
-            $table->$table->bigInteger('votes')->nullable()->default(12);('id')->primary();
+            $table->uuid('id')->primary();
 
             // Module Information
             $table->string('module', 100)->comment('Module name: orders, products, categories, customers, etc.');
@@ -50,19 +50,7 @@ return new class extends Migration
 
             // Additional Metadata
             $table->json('metadata')->nullable()->comment('Additional flexible data');
-
             // Audit Fields
-            $table->uuid('created_by')->nullable();
-            $table->uuid('updated_by')->nullable();
-            $table->foreign('created_by')
-                  ->references('id')
-                  ->on('admin_users')
-                  ->onDelete('set null');
-            $table->foreign('updated_by')
-                  ->references('id')
-                  ->on('admin_users')
-                  ->onDelete('set null');
-
             // Timestamps
             $table->timestamps();
             $table->softDeletes();

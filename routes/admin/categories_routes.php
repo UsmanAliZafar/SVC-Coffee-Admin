@@ -1,7 +1,7 @@
 <?php
-// routes/admin/categories_routes.php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\CategoriesController;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,73 +13,45 @@ Route::prefix('categories')->name('categories.')->group(function () {
 
     // List all categories
     Route::middleware('admin.permission:categories.read')->group(function () {
-        Route::get('/', function () {
-            return view('admin.categories.index');
-        })->name('index');
+        // Main index page
+        Route::get('/', [CategoriesController::class, 'index'])->name('index');
 
-        Route::get('/ajax-data', function () {
-            // AJAX endpoint for datatables
-        })->name('data');
+        // Ajax DataTable data
+        Route::get('/ajax-data', [CategoriesController::class, 'getData'])->name('data');
 
-        Route::get('/tree', function () {
-            return view('admin.categories.tree');
-        })->name('tree');
+        // Tree view
+        Route::get('/tree', [CategoriesController::class, 'tree'])->name('tree');
 
-        Route::get('/empty', function () {
-            return view('admin.categories.empty');
-        })->name('empty');
+        // Empty categories
+        Route::get('/empty', [CategoriesController::class, 'empty'])->name('empty');
 
-        Route::get('/inactive', function () {
-            return view('admin.categories.inactive');
-        })->name('inactive');
-
-        Route::get('/featured', function () {
-            return view('admin.categories.featured');
-        })->name('featured');
-
-        Route::get('/{id}', function ($id) {
-            return view('admin.categories.show', compact('id'));
-        })->name('show');
+        // Show single category
+        Route::get('/{id}', [CategoriesController::class, 'show'])->name('show');
     });
 
     // Create category
     Route::middleware('admin.permission:categories.create')->group(function () {
-        Route::get('/create', function () {
-            return view('admin.categories.create');
-        })->name('create');
-
-        Route::post('/', function () {
-            // Store logic
-        })->name('store');
+        Route::get('/create', [CategoriesController::class, 'create'])->name('create');
+        Route::post('/', [CategoriesController::class, 'store'])->name('store');
     });
 
     // Update category
     Route::middleware('admin.permission:categories.update')->group(function () {
-        Route::get('/{id}/edit', function ($id) {
-            return view('admin.categories.edit', compact('id'));
-        })->name('edit');
+        Route::get('/{id}/edit', [CategoriesController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [CategoriesController::class, 'update'])->name('update');
 
-        Route::put('/{id}', function ($id) {
-            // Update logic
-        })->name('update');
+        // Reorder categories
+        Route::post('/reorder', [CategoriesController::class, 'reorder'])->name('reorder');
 
-        Route::post('/reorder', function () {
-            // Reorder categories
-        })->name('reorder');
+        // Toggle status
+        Route::post('/{id}/toggle-status', [CategoriesController::class, 'toggleStatus'])->name('toggle-status');
 
-        Route::post('/{id}/toggle-status', function ($id) {
-            // Toggle active/inactive status
-        })->name('toggle-status');
-
-        Route::post('/{id}/toggle-featured', function ($id) {
-            // Toggle featured status
-        })->name('toggle-featured');
+        // Toggle featured
+        Route::post('/{id}/toggle-featured', [CategoriesController::class, 'toggleFeatured'])->name('toggle-featured');
     });
 
     // Delete category
     Route::middleware('admin.permission:categories.delete')->group(function () {
-        Route::delete('/{id}', function ($id) {
-            // Delete logic
-        })->name('destroy');
+        Route::delete('/{id}', [CategoriesController::class, 'destroy'])->name('destroy');
     });
 });

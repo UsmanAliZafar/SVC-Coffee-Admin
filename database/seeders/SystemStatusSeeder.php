@@ -536,6 +536,23 @@ class SystemStatusSeeder extends Seeder
 
         // Insert or update each status
         foreach ($allStatuses as $statusData) {
+            // Ensure array fields are properly handled
+            $statusData['allowed_transitions'] = isset($statusData['allowed_transitions'])
+                ? json_encode($statusData['allowed_transitions'])
+                : null;
+
+            $statusData['required_permissions'] = isset($statusData['required_permissions'])
+                ? json_encode($statusData['required_permissions'])
+                : null;
+
+            $statusData['automation_triggers'] = isset($statusData['automation_triggers'])
+                ? json_encode($statusData['automation_triggers'])
+                : null;
+
+            $statusData['metadata'] = isset($statusData['metadata'])
+                ? json_encode($statusData['metadata'])
+                : null;
+
             // Check if status already exists by key_code
             $existingStatus = SystemStatus::where('key_code', $statusData['key_code'])->first();
 

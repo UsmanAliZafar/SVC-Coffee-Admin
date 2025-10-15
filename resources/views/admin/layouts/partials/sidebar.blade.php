@@ -37,20 +37,44 @@
             @if(auth('admin')->user()->hasPermission('categories.read'))
                 <li class="nav-item has-dropdown">
                     <a class="nav-link {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}"
-                       href="#"
-                       data-tooltip="Categories">
+                    href="{{ route('admin.categories.index') }}"
+                    data-tooltip="Categories">
                         <i class="bi bi-tags"></i>
                         <span class="nav-text">Categories</span>
                         <i class="bi bi-chevron-down dropdown-arrow"></i>
                     </a>
                     <ul class="submenu">
-                        @if(auth('admin')->user()->hasPermission('categories.create'))
-                        <li><a href="#"><i class="bi bi-tag-fill"></i> Add Category</a></li>
-                        @endif
                         @if(auth('admin')->user()->hasPermission('categories.read'))
-                        <li><a href="#"><i class="bi bi-diagram-3"></i> Category Tree</a></li>
-                        <li><a href="#"><i class="bi bi-folder-x text-muted"></i> Empty</a></li>
-                        <li><a href="#"><i class="bi bi-sort-numeric-up"></i> Reorder</a></li>
+                        <li>
+                            <a href="{{ route('admin.categories.index') }}"
+                            class="{{ request()->routeIs('admin.categories.index') ? 'active' : '' }}">
+                                <i class="bi bi-list-ul"></i> All Categories
+                            </a>
+                        </li>
+                        @endif
+
+                        @if(auth('admin')->user()->hasPermission('categories.create'))
+                        <li>
+                            <a href="{{ route('admin.categories.create') }}"
+                            class="{{ request()->routeIs('admin.categories.create') ? 'active' : '' }}">
+                                <i class="bi bi-tag-fill"></i> Add Category
+                            </a>
+                        </li>
+                        @endif
+
+                        @if(auth('admin')->user()->hasPermission('categories.read'))
+                        <li>
+                            <a href="{{ route('admin.categories.tree') }}"
+                            class="{{ request()->routeIs('admin.categories.tree') ? 'active' : '' }}">
+                                <i class="bi bi-diagram-3"></i> Category Tree
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.categories.empty') }}"
+                            class="{{ request()->routeIs('admin.categories.empty') ? 'active' : '' }}">
+                                <i class="bi bi-folder-x text-muted"></i> Empty Categories
+                            </a>
+                        </li>
                         @endif
                     </ul>
                 </li>
