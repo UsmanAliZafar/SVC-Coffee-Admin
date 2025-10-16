@@ -65,6 +65,8 @@ return new class extends Migration
             // Visibility & Settings
             $table->json('visibility_settings')->nullable()->comment('Advanced visibility rules');
             $table->boolean('track_inventory')->default(true)->comment('Enable inventory tracking');
+            $table->integer('stock_quantity')->default(0);
+            $table->integer('low_stock_threshold')->default(10);
 
             // Publishing
             $table->timestamp('published_at')->nullable();

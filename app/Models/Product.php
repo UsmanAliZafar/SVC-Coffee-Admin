@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Product extends Model
@@ -43,13 +44,18 @@ class Product extends Model
         'name',
         'slug',
         'sku',
+        'barcode',
         'short_description',
         'description',
+        'category_id',
         'product_type',
+        'vendor_id',
+        'curency',
         'price',
         'sale_price',
         'cost_price',
         'discount_percentage',
+        'main_image',
         'status_key_code',
         'is_featured',
         'show_on_home',
@@ -59,23 +65,16 @@ class Product extends Model
         'meta_keywords',
         'canonical_url',
         'structured_data',
-        'weight',
-        'length',
-        'width',
-        'height',
         'attributes',
         'specifications',
-        'views_count',
-        'sales_count',
-        'wishlist_count',
-        'rating_average',
-        'reviews_count',
         'is_available',
         'requires_login',
         'available_from',
         'available_until',
         'visibility_settings',
         'track_inventory',
+        'stock_quantity',
+        'low_stock_threshold',
         'published_at',
         'created_by',
         'updated_by',
@@ -89,21 +88,14 @@ class Product extends Model
         'sale_price' => 'decimal:2',
         'cost_price' => 'decimal:2',
         'discount_percentage' => 'decimal:2',
-        'weight' => 'decimal:2',
-        'length' => 'decimal:2',
-        'width' => 'decimal:2',
-        'height' => 'decimal:2',
         'is_featured' => 'boolean',
         'show_on_home' => 'boolean',
         'is_available' => 'boolean',
         'requires_login' => 'boolean',
         'track_inventory' => 'boolean',
         'sort_order' => 'integer',
-        'views_count' => 'integer',
-        'sales_count' => 'integer',
-        'wishlist_count' => 'integer',
-        'reviews_count' => 'integer',
-        'rating_average' => 'decimal:2',
+        'stock_quantity' => 'integer',
+        'low_stock_threshold' => 'integer',
         'attributes' => 'array',
         'specifications' => 'array',
         'structured_data' => 'array',
@@ -117,27 +109,94 @@ class Product extends Model
     ];
 
     /**
+     * The attributes that should be hidden for arrays.
+     */
+    protected $hidden = [
+        'created_by',
+        'updated_by',
+    ];
+
+    /**
      * Boot the model.
      */
     protected static function boot()
     {
         parent::boot();
 
-        // Auto-generate UUID on creating
         static::creating(function ($model) {
+            // Auto-generate UUID
             if (empty($model->id)) {
                 $model->id = (string) Str::uuid();
             }
 
-            // Auto-generate slug if not provided
-            if (empty($model->slug)) {
+            // Auto-generate slug from name
+            if (empty($model->slug) && !empty($model->name)) {
                 $model->slug = Str::slug($model->name);
             }
 
-            // Auto-generate SKU if not provided
+            // Auto-generate SKU
             if (empty($model->sku)) {
-                $model->sku = strtoupper(Str::random(10));
+                $model->sku = 'PRD-' . strtoupper(Str::random(8));
             }
+
+            // Auto-generate barcode
+            if (empty($model->barcode)) {
+                $model->barcode = 'BAR' . time() . rand(1000, 9999);
+            }
+
+            // Set default product type
+            if (empty($model->product_type)) {
+                $model->product_type = 'simple';
+            }
+
+            // Set default status
+            if (empty($model->status_key_code)) {
+                $model->status_key_code = 'PRODUCT_DRAFT';
+            }
+
+            // Set default stock values
+            if (!isset($model->stock_quantity)) {
+                $model->stock_quantity = 0;
+            }
+            if (!isset($model->low_stock_threshold)) {
+                $model->low_stock_threshold = 10;
+            }
+
+            // Set created_by
+            if (auth('admin')->check() && empty($model->created_by)) {
+                $model->created_by = auth('admin')->id();
+            }
+        });
+
+        static::updating(function ($model) {
+            // Update slug if name changed
+            if ($model->isDirty('name') && empty($model->slug)) {
+                $model->slug = Str::slug($model->name);
+            }
+
+            // Set updated_by
+            if (auth('admin')->check()) {
+                $model->updated_by = auth('admin')->id();
+            }
+        });
+
+        // Clean up related data on delete
+        static::deleting(function ($model) {
+            // Delete all product images
+            foreach ($model->images as $image) {
+                if ($image->image_path && Storage::disk('public')->exists($image->image_path)) {
+                    Storage::disk('public')->delete($image->image_path);
+                }
+                $image->delete();
+            }
+
+            // Delete main image
+            if ($model->main_image && Storage::disk('public')->exists($model->main_image)) {
+                Storage::disk('public')->delete($model->main_image);
+            }
+
+            // Detach tags
+            $model->tags()->detach();
         });
     }
 
@@ -146,7 +205,7 @@ class Product extends Model
      */
     public function getRouteKeyName(): string
     {
-        return 'slug';
+        return 'id';
     }
 
     // ==================== RELATIONSHIPS ====================
@@ -160,101 +219,72 @@ class Product extends Model
     }
 
     /**
-     * Get categories (Many-to-Many via pivot table)
-     * Assumes you have a product_category pivot table
+     * Get the category of the product
      */
-    public function categories(): BelongsToMany
+    public function category(): BelongsTo
     {
-        return $this->belongsToMany(
-            ProductCategory::class,
-            'product_category',
-            'product_id',
-            'category_id'
-        )->withTimestamps();
+        return $this->belongsTo(ProductsCategories::class, 'category_id');
     }
 
     /**
-     * Get images (Many-to-Many via pivot table)
-     * Assumes you have a product_image pivot table or media table
+     * Get the vendor of the product
+     */
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(Vendor::class, 'vendor_id');
+    }
+
+    /**
+     * Get all images of the product
      */
     public function images(): HasMany
     {
-        return $this->hasMany(ProductImage::class)->ordered();
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order');
     }
 
     /**
-     * Get primary/featured image
+     * Get the primary/featured image
      */
     public function primaryImage()
     {
-        return $this->images()->wherePivot('is_primary', true)->first();
+        return $this->images()->where('is_primary', true)->first();
     }
 
     /**
-     * Get product variants
+     * Get all variants of the product
      */
     public function variants(): HasMany
     {
-        return $this->hasMany(ProductVariant::class);
+        return $this->hasMany(ProductVariant::class)->orderBy('sort_order');
     }
 
     /**
-     * Get active variants
+     * Get only active variants
      */
     public function activeVariants(): HasMany
     {
-        return $this->variants()->whereHas('status', function ($query) {
-            $query->where('is_active', true);
-        });
+        return $this->variants()->where('status_key_code', 'VARIANT_ACTIVE');
     }
 
     /**
-     * Get coffee machine details (if product is coffee machine)
+     * Get the default variant
      */
-    public function coffeeMachine(): HasOne
+    public function defaultVariant()
     {
-        return $this->hasOne(CoffeeMachine::class);
+        return $this->variants()->where('is_default', true)->first();
     }
 
     /**
-     * Get coffee bean details (if product is coffee bean)
+     * Get all tags of the product
      */
-    public function coffeeBean(): HasOne
+    public function tags(): BelongsToMany
     {
-        return $this->hasOne(CoffeeBean::class);
-    }
-
-    /**
-     * Get spare part details (if product is spare part)
-     */
-    public function sparePart(): HasOne
-    {
-        return $this->hasOne(SparePart::class);
-    }
-
-    /**
-     * Get inventory records (warehouse-wise)
-     * Assumes you have a product_inventory table
-     */
-    public function inventory(): HasMany
-    {
-        return $this->hasMany(ProductInventory::class);
-    }
-
-    /**
-     * Get bulk pricing tiers
-     */
-    public function bulkPricing(): HasMany
-    {
-        return $this->hasMany(BulkPricing::class)->orderBy('min_quantity');
-    }
-
-    /**
-     * Get product attributes
-     */
-    public function productAttributes(): HasMany
-    {
-        return $this->hasMany(ProductAttribute::class)->orderBy('sort_order');
+        return $this->belongsToMany(
+            ProductTag::class,
+            'product_tag',
+            'product_id',
+            'tag_id'
+        )->withTimestamps();
     }
 
     /**
@@ -272,7 +302,7 @@ class Product extends Model
     }
 
     /**
-     * Get reviews
+     * Get product reviews
      */
     public function reviews(): HasMany
     {
@@ -280,7 +310,7 @@ class Product extends Model
     }
 
     /**
-     * Creator admin user
+     * Get creator admin user
      */
     public function creator(): BelongsTo
     {
@@ -288,7 +318,7 @@ class Product extends Model
     }
 
     /**
-     * Updater admin user
+     * Get updater admin user
      */
     public function updater(): BelongsTo
     {
@@ -298,7 +328,7 @@ class Product extends Model
     // ==================== SCOPES ====================
 
     /**
-     * Scope: Get products by type
+     * Scope: Filter by product type
      */
     public function scopeByType($query, string $type)
     {
@@ -306,37 +336,35 @@ class Product extends Model
     }
 
     /**
-     * Scope: Get coffee machines
+     * Scope: Get only simple products
      */
-    public function scopeCoffeeMachines($query)
+    public function scopeSimple($query)
     {
-        return $query->where('product_type', 'coffee_machine');
+        return $query->where('product_type', 'simple');
     }
 
     /**
-     * Scope: Get coffee beans
-     */
-    public function scopeCoffeeBeans($query)
-    {
-        return $query->where('product_type', 'coffee_bean');
-    }
-
-    /**
-     * Scope: Get spare parts
-     */
-    public function scopeSpareParts($query)
-    {
-        return $query->where('product_type', 'spare_part');
-    }
-
-    /**
-     * Scope: Get active products (using status)
+     * Scope: Get only active products
      */
     public function scopeActive($query)
     {
-        return $query->whereHas('status', function ($q) {
-            $q->where('is_active', true);
-        });
+        return $query->where('status_key_code', 'PRODUCT_ACTIVE');
+    }
+
+    /**
+     * Scope: Get only draft products
+     */
+    public function scopeDraft($query)
+    {
+        return $query->where('status_key_code', 'PRODUCT_DRAFT');
+    }
+
+    /**
+     * Scope: Get only inactive products
+     */
+    public function scopeInactive($query)
+    {
+        return $query->where('status_key_code', 'PRODUCT_INACTIVE');
     }
 
     /**
@@ -357,7 +385,7 @@ class Product extends Model
     }
 
     /**
-     * Scope: Get products shown on home
+     * Scope: Get products shown on homepage
      */
     public function scopeShowOnHome($query)
     {
@@ -381,6 +409,36 @@ class Product extends Model
     }
 
     /**
+     * Scope: Get products in stock
+     */
+    public function scopeInStock($query)
+    {
+        return $query->where(function($q) {
+            $q->where('track_inventory', false)
+              ->orWhere('stock_quantity', '>', 0);
+        });
+    }
+
+    /**
+     * Scope: Get out of stock products
+     */
+    public function scopeOutOfStock($query)
+    {
+        return $query->where('track_inventory', true)
+                    ->where('stock_quantity', '<=', 0);
+    }
+
+    /**
+     * Scope: Get low stock products
+     */
+    public function scopeLowStock($query)
+    {
+        return $query->where('track_inventory', true)
+                    ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                    ->where('stock_quantity', '>', 0);
+    }
+
+    /**
      * Scope: Order by sort order
      */
     public function scopeOrdered($query)
@@ -397,6 +455,7 @@ class Product extends Model
         return $query->where(function ($q) use ($search) {
             $q->where('name', 'like', "%{$search}%")
               ->orWhere('sku', 'like', "%{$search}%")
+              ->orWhere('barcode', 'like', "%{$search}%")
               ->orWhere('description', 'like', "%{$search}%")
               ->orWhere('short_description', 'like', "%{$search}%");
         });
@@ -410,10 +469,35 @@ class Product extends Model
         return $query->whereBetween('price', [$min, $max]);
     }
 
+    /**
+     * Scope: Filter by category
+     */
+    public function scopeByCategory($query, $categoryId)
+    {
+        return $query->where('category_id', $categoryId);
+    }
+
+    /**
+     * Scope: Filter by vendor
+     */
+    public function scopeByVendor($query, $vendorId)
+    {
+        return $query->where('vendor_id', $vendorId);
+    }
+
+    /**
+     * Scope: Products on sale
+     */
+    public function scopeOnSale($query)
+    {
+        return $query->whereNotNull('sale_price')
+                    ->whereColumn('sale_price', '<', 'price');
+    }
+
     // ==================== HELPER METHODS ====================
 
     /**
-     * Get final selling price (considers sale price)
+     * Get final selling price
      */
     public function getFinalPrice(): float
     {
@@ -451,11 +535,14 @@ class Product extends Model
     }
 
     /**
-     * Get total stock across all warehouses
+     * Get total stock quantity
      */
     public function getTotalStock(): int
     {
-        return $this->inventory()->sum('quantity');
+        if (!$this->track_inventory) {
+            return PHP_INT_MAX;
+        }
+        return $this->stock_quantity;
     }
 
     /**
@@ -466,7 +553,43 @@ class Product extends Model
         if (!$this->track_inventory) {
             return true;
         }
-        return $this->getTotalStock() > 0;
+        return $this->stock_quantity > 0;
+    }
+
+    /**
+     * Check if product is low on stock
+     */
+    public function isLowStock(): bool
+    {
+        if (!$this->track_inventory) {
+            return false;
+        }
+        return $this->stock_quantity > 0 && $this->stock_quantity <= $this->low_stock_threshold;
+    }
+
+    /**
+     * Add stock quantity
+     */
+    public function addStock(int $quantity): void
+    {
+        $this->increment('stock_quantity', $quantity);
+    }
+
+    /**
+     * Reduce stock quantity
+     */
+    public function reduceStock(int $quantity): void
+    {
+        $newQuantity = max(0, $this->stock_quantity - $quantity);
+        $this->update(['stock_quantity' => $newQuantity]);
+    }
+
+    /**
+     * Set stock quantity
+     */
+    public function setStock(int $quantity): void
+    {
+        $this->update(['stock_quantity' => max(0, $quantity)]);
     }
 
     /**
@@ -475,41 +598,37 @@ class Product extends Model
     public function getProductTypeLabel(): string
     {
         return match($this->product_type) {
-            'coffee_machine' => 'Coffee Machine',
-            'coffee_bean' => 'Coffee Bean',
-            'spare_part' => 'Spare Part',
-            default => 'Unknown',
+            'simple' => 'Simple Product',
+            'variable' => 'Variable Product',
+            'grouped' => 'Grouped Product',
+            'external' => 'External/Affiliate Product',
+            default => ucfirst($this->product_type),
         };
     }
 
     /**
-     * Increment views count
+     * Get main image URL
      */
-    public function incrementViews(): void
+    public function getMainImageUrl(): string
     {
-        $this->increment('views_count');
-    }
+        if ($this->main_image) {
+            if (Str::startsWith($this->main_image, ['http://', 'https://'])) {
+                return $this->main_image;
+            }
 
-    /**
-     * Increment sales count
-     */
-    public function incrementSales(int $quantity = 1): void
-    {
-        $this->increment('sales_count', $quantity);
-    }
+            if (Storage::disk('public')->exists($this->main_image)) {
+                return asset('storage/' . $this->main_image);
+            }
+        }
 
-    /**
-     * Update rating average
-     */
-    public function updateRating(): void
-    {
-        $average = $this->reviews()->avg('rating');
-        $count = $this->reviews()->count();
+        // Try to get primary image from gallery
+        $primaryImage = $this->primaryImage();
+        if ($primaryImage) {
+            return $primaryImage->getImageUrl();
+        }
 
-        $this->update([
-            'rating_average' => $average ?? 0,
-            'reviews_count' => $count,
-        ]);
+        // Return placeholder
+        return asset('images/placeholders/product-placeholder.jpg');
     }
 
     /**
@@ -517,7 +636,7 @@ class Product extends Model
      */
     public function getFormattedPrice(): string
     {
-        return '$' . number_format($this->price, 2);
+        return $this->curency . ' ' . number_format($this->price, 2);
     }
 
     /**
@@ -525,7 +644,15 @@ class Product extends Model
      */
     public function getFormattedSalePrice(): string
     {
-        return $this->sale_price ? '$' . number_format($this->sale_price, 2) : '';
+        return $this->sale_price ? $this->curency . ' ' . number_format($this->sale_price, 2) : '';
+    }
+
+    /**
+     * Get formatted final price
+     */
+    public function getFormattedFinalPrice(): string
+    {
+        return $this->curency . ' ' . number_format($this->getFinalPrice(), 2);
     }
 
     /**
@@ -553,7 +680,92 @@ class Product extends Model
             return false;
         }
 
+        if (!$this->isInStock()) {
+            return false;
+        }
+
         return true;
     }
 
+    /**
+     * Get status badge HTML
+     */
+    public function getStatusBadge(): string
+    {
+        return match($this->status_key_code) {
+            'PRODUCT_ACTIVE' => '<span class="badge bg-success">Active</span>',
+            'PRODUCT_DRAFT' => '<span class="badge bg-warning">Draft</span>',
+            'PRODUCT_INACTIVE' => '<span class="badge bg-secondary">Inactive</span>',
+            'PRODUCT_PENDING' => '<span class="badge bg-info">Pending</span>',
+            default => '<span class="badge bg-light text-dark">Unknown</span>',
+        };
+    }
+
+    /**
+     * Get stock status badge HTML
+     */
+    public function getStockBadge(): string
+    {
+        if (!$this->track_inventory) {
+            return '<span class="badge bg-info">Not Tracked</span>';
+        }
+
+        $stock = $this->stock_quantity;
+
+        if ($stock <= 0) {
+            return '<span class="badge bg-danger">Out of Stock</span>';
+        } elseif ($this->isLowStock()) {
+            return '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
+        } else {
+            return '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
+        }
+    }
+
+    /**
+     * Activate the product
+     */
+    public function activate(): bool
+    {
+        return $this->update(['status_key_code' => 'PRODUCT_ACTIVE']);
+    }
+
+    /**
+     * Deactivate the product
+     */
+    public function deactivate(): bool
+    {
+        return $this->update(['status_key_code' => 'PRODUCT_INACTIVE']);
+    }
+
+    /**
+     * Publish the product
+     */
+    public function publish(): bool
+    {
+        return $this->update(['published_at' => now()]);
+    }
+
+    /**
+     * Unpublish the product
+     */
+    public function unpublish(): bool
+    {
+        return $this->update(['published_at' => null]);
+    }
+
+    /**
+     * Toggle featured status
+     */
+    public function toggleFeatured(): bool
+    {
+        return $this->update(['is_featured' => !$this->is_featured]);
+    }
+
+    /**
+     * Toggle homepage visibility
+     */
+    public function toggleHomepage(): bool
+    {
+        return $this->update(['show_on_home' => !$this->show_on_home]);
+    }
 }

@@ -40,9 +40,6 @@ class ProductTag extends Model
     protected $fillable = [
         'name',
         'slug',
-        'description',
-        'color',
-        'sort_order',
         'status_key_code',
         'created_by',
         'updated_by',
@@ -52,7 +49,6 @@ class ProductTag extends Model
      * The attributes that should be cast.
      */
     protected $casts = [
-        'sort_order' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -74,6 +70,28 @@ class ProductTag extends Model
             // Auto-generate slug if not provided
             if (empty($model->slug)) {
                 $model->slug = Str::slug($model->name);
+            }
+
+            // Set default status
+            if (empty($model->status_key_code)) {
+                $model->status_key_code = 'TAG_ACTIVE';
+            }
+
+            // Set created_by if admin is authenticated
+            if (auth('admin')->check() && empty($model->created_by)) {
+                $model->created_by = auth('admin')->id();
+            }
+        });
+
+        // Update slug when name changes
+        static::updating(function ($model) {
+            if ($model->isDirty('name') && empty($model->slug)) {
+                $model->slug = Str::slug($model->name);
+            }
+
+            // Set updated_by if admin is authenticated
+            if (auth('admin')->check()) {
+                $model->updated_by = auth('admin')->id();
             }
         });
     }
@@ -132,18 +150,23 @@ class ProductTag extends Model
      */
     public function scopeActive($query)
     {
-        return $query->whereHas('status', function ($q) {
-            $q->where('is_active', true);
-        });
+        return $query->where('status_key_code', 'TAG_ACTIVE');
     }
 
     /**
-     * Scope: Order by sort order
+     * Scope: Get inactive tags
+     */
+    public function scopeInactive($query)
+    {
+        return $query->where('status_key_code', 'TAG_INACTIVE');
+    }
+
+    /**
+     * Scope: Order by name
      */
     public function scopeOrdered($query)
     {
-        return $query->orderBy('sort_order', 'asc')
-                    ->orderBy('name', 'asc');
+        return $query->orderBy('name', 'asc');
     }
 
     /**
@@ -151,10 +174,25 @@ class ProductTag extends Model
      */
     public function scopeSearch($query, $search)
     {
-        return $query->where(function ($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('description', 'like', "%{$search}%");
-        });
+        return $query->where('name', 'like', "%{$search}%");
+    }
+
+    /**
+     * Scope: With product count
+     */
+    public function scopeWithProductCount($query)
+    {
+        return $query->withCount('products');
+    }
+
+    /**
+     * Scope: Popular tags (tags with most products)
+     */
+    public function scopePopular($query, $limit = 10)
+    {
+        return $query->withCount('products')
+                    ->orderBy('products_count', 'desc')
+                    ->limit($limit);
     }
 
     // ==================== HELPER METHODS ====================
@@ -168,14 +206,80 @@ class ProductTag extends Model
     }
 
     /**
-     * Get badge HTML with color styling
+     * Get active products count
      */
-    public function getBadgeHtml(): string
+    public function getActiveProductsCount(): int
     {
-        return sprintf(
-            '<span class="badge" style="background-color: %s; color: #fff;">%s</span>',
-            $this->color,
-            $this->name
-        );
+        return $this->products()
+                    ->where('status_key_code', 'PRODUCT_ACTIVE')
+                    ->count();
+    }
+
+    /**
+     * Get status badge HTML
+     */
+    public function getStatusBadge(): string
+    {
+        return match($this->status_key_code) {
+            'TAG_ACTIVE' => '<span class="badge bg-success">Active</span>',
+            'TAG_INACTIVE' => '<span class="badge bg-secondary">Inactive</span>',
+            default => '<span class="badge bg-light">Unknown</span>',
+        };
+    }
+
+    /**
+     * Check if tag is active
+     */
+    public function isActive(): bool
+    {
+        return $this->status_key_code === 'TAG_ACTIVE';
+    }
+
+    /**
+     * Check if tag is inactive
+     */
+    public function isInactive(): bool
+    {
+        return $this->status_key_code === 'TAG_INACTIVE';
+    }
+
+    /**
+     * Activate the tag
+     */
+    public function activate(): bool
+    {
+        return $this->update(['status_key_code' => 'TAG_ACTIVE']);
+    }
+
+    /**
+     * Deactivate the tag
+     */
+    public function deactivate(): bool
+    {
+        return $this->update(['status_key_code' => 'TAG_INACTIVE']);
+    }
+
+    /**
+     * Check if tag has products
+     */
+    public function hasProducts(): bool
+    {
+        return $this->products()->exists();
+    }
+
+    /**
+     * Get tag display name
+     */
+    public function getDisplayName(): string
+    {
+        return ucfirst($this->name);
+    }
+
+    /**
+     * Get tag URL
+     */
+    public function getUrl(): string
+    {
+        return route('tags.show', $this->slug);
     }
 }

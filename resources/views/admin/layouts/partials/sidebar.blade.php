@@ -12,22 +12,23 @@
 
             {{-- Products Management --}}
             @if(auth('admin')->user()->hasPermission('products.read'))
-                <li class="nav-item has-dropdown">
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.products.*') ? 'open' : '' }}">
                     <a class="nav-link {{ request()->routeIs('admin.products.*') ? 'active' : '' }}"
-                       href="{{ route('admin.products.index') }}"
-                       data-tooltip="Products">
+                    href="{{ route('admin.products.index') }}"
+                    data-tooltip="Products">
                         <i class="bi bi-box"></i>
                         <span class="nav-text">Products</span>
                         <i class="bi bi-chevron-down dropdown-arrow"></i>
                     </a>
                     <ul class="submenu">
                         @if(auth('admin')->user()->hasPermission('products.create'))
-                        <li><a href="#"><i class="bi bi-plus-square"></i> Add Product</a></li>
+                        <li><a href="{{ route('admin.products.create') }}"><i class="bi bi-plus-square"></i> Add Product</a></li>
                         @endif
                         @if(auth('admin')->user()->hasPermission('products.read'))
-                        <li><a href="#"><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock</a></li>
-                        <li><a href="#"><i class="bi bi-eye-slash text-danger"></i> Inactive</a></li>
-                        <li><a href="#"><i class="bi bi-star text-success"></i> Featured</a></li>
+                        <li><a href="{{ route('admin.products.index') }}"><i class="bi bi-list-ul"></i> All Products</a></li>
+                        <li><a href="{{ route('admin.products.low-stock') }}"><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock</a></li>
+                        <li><a href="{{ route('admin.products.inactive') }}"><i class="bi bi-eye-slash text-danger"></i> Inactive</a></li>
+                        <li><a href="{{ route('admin.products.featured') }}"><i class="bi bi-star text-success"></i> Featured</a></li>
                         @endif
                     </ul>
                 </li>

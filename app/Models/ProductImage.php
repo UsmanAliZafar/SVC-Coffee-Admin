@@ -70,6 +70,12 @@ class ProductImage extends Model
             if (empty($model->id)) {
                 $model->id = (string) Str::uuid();
             }
+
+            // Set default sort order if not provided
+            if (is_null($model->sort_order)) {
+                $maxOrder = static::where('product_id', $model->product_id)->max('sort_order');
+                $model->sort_order = $maxOrder ? $maxOrder + 1 : 0;
+            }
         });
 
         // When setting primary image, unset others
@@ -83,8 +89,8 @@ class ProductImage extends Model
 
         // Delete image file when model is deleted
         static::deleted(function ($model) {
-            if ($model->image_path && Storage::exists($model->image_path)) {
-                Storage::delete($model->image_path);
+            if ($model->image_path && Storage::disk('public')->exists($model->image_path)) {
+                Storage::disk('public')->delete($model->image_path);
             }
         });
     }
@@ -110,12 +116,28 @@ class ProductImage extends Model
     }
 
     /**
+     * Scope: Get secondary images
+     */
+    public function scopeSecondary($query)
+    {
+        return $query->where('is_primary', false);
+    }
+
+    /**
      * Scope: Order by sort order
      */
     public function scopeOrdered($query)
     {
         return $query->orderBy('sort_order', 'asc')
                     ->orderBy('created_at', 'asc');
+    }
+
+    /**
+     * Scope: Get images by product
+     */
+    public function scopeByProduct($query, $productId)
+    {
+        return $query->where('product_id', $productId);
     }
 
     // ==================== HELPER METHODS ====================
@@ -126,9 +148,19 @@ class ProductImage extends Model
     public function getImageUrl(): string
     {
         if ($this->image_path) {
-            return Storage::url($this->image_path);
+            // If starts with http, return as is (external URL)
+            if (Str::startsWith($this->image_path, ['http://', 'https://'])) {
+                return $this->image_path;
+            }
+
+            // Check if file exists in storage
+            if (Storage::disk('public')->exists($this->image_path)) {
+                return asset('storage/' . $this->image_path);
+            }
         }
-        return asset('images/no-image.png');
+
+        // Return placeholder image
+        return asset('images/placeholders/product-image-placeholder.jpg');
     }
 
     /**
@@ -137,8 +169,17 @@ class ProductImage extends Model
     public function getThumbnailUrl(int $width = 300, int $height = 300): string
     {
         // Implement thumbnail generation logic here
-        // This is a placeholder - adjust based on your thumbnail strategy
+        // For now, return the regular image URL
+        // You can use intervention/image package for dynamic thumbnails
         return $this->getImageUrl();
+    }
+
+    /**
+     * Get full storage path
+     */
+    public function getFullPath(): string
+    {
+        return storage_path('app/public/' . $this->image_path);
     }
 
     /**
@@ -155,5 +196,171 @@ class ProductImage extends Model
     public function isPrimary(): bool
     {
         return $this->is_primary;
+    }
+
+    /**
+     * Check if image file exists
+     */
+    public function exists(): bool
+    {
+        return $this->image_path && Storage::disk('public')->exists($this->image_path);
+    }
+
+    /**
+     * Get file size in bytes
+     */
+    public function getFileSize(): ?int
+    {
+        if ($this->image_path && Storage::disk('public')->exists($this->image_path)) {
+            return Storage::disk('public')->size($this->image_path);
+        }
+        return null;
+    }
+
+    /**
+     * Get formatted file size (KB, MB, etc.)
+     */
+    public function getFormattedFileSize(): string
+    {
+        $size = $this->getFileSize();
+
+        if (!$size) {
+            return 'Unknown';
+        }
+
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $power = $size > 0 ? floor(log($size, 1024)) : 0;
+
+        return number_format($size / pow(1024, $power), 2) . ' ' . $units[$power];
+    }
+
+    /**
+     * Get MIME type
+     */
+    public function getMimeType(): ?string
+    {
+        if ($this->image_path && Storage::disk('public')->exists($this->image_path)) {
+            return Storage::disk('public')->mimeType($this->image_path);
+        }
+        return null;
+    }
+
+    /**
+     * Get file extension
+     */
+    public function getExtension(): ?string
+    {
+        if ($this->image_path) {
+            return pathinfo($this->image_path, PATHINFO_EXTENSION);
+        }
+        return null;
+    }
+
+    /**
+     * Check if file is an image
+     */
+    public function isImage(): bool
+    {
+        $mimeType = $this->getMimeType();
+        return $mimeType && Str::startsWith($mimeType, 'image/');
+    }
+
+    /**
+     * Get image dimensions [width, height]
+     */
+    public function getDimensions(): ?array
+    {
+        if ($this->exists() && $this->isImage()) {
+            try {
+                $fullPath = $this->getFullPath();
+                $imageSize = getimagesize($fullPath);
+
+                if ($imageSize) {
+                    return [
+                        'width' => $imageSize[0],
+                        'height' => $imageSize[1],
+                    ];
+                }
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get formatted dimensions
+     */
+    public function getFormattedDimensions(): string
+    {
+        $dimensions = $this->getDimensions();
+
+        if ($dimensions) {
+            return $dimensions['width'] . ' × ' . $dimensions['height'] . ' px';
+        }
+
+        return 'Unknown';
+    }
+
+    /**
+     * Delete image file from storage
+     */
+    public function deleteFile(): bool
+    {
+        if ($this->image_path && Storage::disk('public')->exists($this->image_path)) {
+            return Storage::disk('public')->delete($this->image_path);
+        }
+        return false;
+    }
+
+    /**
+     * Update sort order
+     */
+    public function updateSortOrder(int $order): bool
+    {
+        return $this->update(['sort_order' => $order]);
+    }
+
+    /**
+     * Move up in sort order
+     */
+    public function moveUp(): bool
+    {
+        if ($this->sort_order > 0) {
+            return $this->update(['sort_order' => $this->sort_order - 1]);
+        }
+        return false;
+    }
+
+    /**
+     * Move down in sort order
+     */
+    public function moveDown(): bool
+    {
+        return $this->update(['sort_order' => $this->sort_order + 1]);
+    }
+
+    /**
+     * Get alt text with fallback
+     */
+    public function getAltText(): string
+    {
+        return $this->alt_text ?: ($this->product ? $this->product->name : 'Product Image');
+    }
+
+    /**
+     * Get caption with fallback
+     */
+    public function getCaption(): string
+    {
+        return $this->caption ?: '';
+    }
+
+    /**
+     * Get display name
+     */
+    public function getDisplayName(): string
+    {
+        return $this->image_name ?: basename($this->image_path);
     }
 }

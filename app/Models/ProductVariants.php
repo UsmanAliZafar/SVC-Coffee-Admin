@@ -87,7 +87,18 @@ class ProductVariant extends Model
 
             // Auto-generate SKU if not provided
             if (empty($model->sku)) {
-                $model->sku = strtoupper(Str::random(12));
+                $model->sku = 'VAR-' . strtoupper(Str::random(10));
+            }
+
+            // Set default status
+            if (empty($model->status_key_code)) {
+                $model->status_key_code = 'VARIANT_ACTIVE';
+            }
+
+            // Set default sort order if not provided
+            if (is_null($model->sort_order)) {
+                $maxOrder = static::where('product_id', $model->product_id)->max('sort_order');
+                $model->sort_order = $maxOrder ? $maxOrder + 1 : 0;
             }
         });
 
@@ -100,20 +111,12 @@ class ProductVariant extends Model
             }
         });
 
-        // Delete image file when model is deleted
+        // Delete variant image when model is deleted
         static::deleted(function ($model) {
-            if ($model->image_path && Storage::exists($model->image_path)) {
-                Storage::delete($model->image_path);
+            if ($model->image_path && Storage::disk('public')->exists($model->image_path)) {
+                Storage::disk('public')->delete($model->image_path);
             }
         });
-    }
-
-    /**
-     * Get the route key for the model.
-     */
-    public function getRouteKeyName(): string
-    {
-        return 'id';
     }
 
     // ==================== RELATIONSHIPS ====================
@@ -135,7 +138,7 @@ class ProductVariant extends Model
     }
 
     /**
-     * Get inventory records for this variant (warehouse-wise)
+     * Get inventory records for this variant
      */
     public function inventory(): HasMany
     {
@@ -149,9 +152,15 @@ class ProductVariant extends Model
      */
     public function scopeActive($query)
     {
-        return $query->whereHas('status', function ($q) {
-            $q->where('is_active', true);
-        });
+        return $query->where('status_key_code', 'VARIANT_ACTIVE');
+    }
+
+    /**
+     * Scope: Get inactive variants
+     */
+    public function scopeInactive($query)
+    {
+        return $query->where('status_key_code', 'VARIANT_INACTIVE');
     }
 
     /**
@@ -172,11 +181,42 @@ class ProductVariant extends Model
     }
 
     /**
-     * Scope: Filter by variant name
+     * Scope: Get variants by product
      */
-    public function scopeByVariantName($query, string $name)
+    public function scopeByProduct($query, $productId)
     {
-        return $query->where('variant_name', $name);
+        return $query->where('product_id', $productId);
+    }
+
+    /**
+     * Scope: Search variants
+     */
+    public function scopeSearch($query, $search)
+    {
+        return $query->where(function ($q) use ($search) {
+            $q->where('variant_name', 'like', "%{$search}%")
+              ->orWhere('variant_value', 'like', "%{$search}%")
+              ->orWhere('sku', 'like', "%{$search}%");
+        });
+    }
+
+    /**
+     * Scope: Get variants in stock
+     */
+    public function scopeInStock($query)
+    {
+        return $query->whereHas('inventory', function ($q) {
+            $q->where('quantity', '>', 0);
+        });
+    }
+
+    /**
+     * Scope: Get variants on sale
+     */
+    public function scopeOnSale($query)
+    {
+        return $query->whereNotNull('sale_price')
+                    ->whereColumn('sale_price', '<', 'price');
     }
 
     // ==================== HELPER METHODS ====================
@@ -220,42 +260,6 @@ class ProductVariant extends Model
     }
 
     /**
-     * Get variant display name (combines name and value)
-     */
-    public function getDisplayName(): string
-    {
-        return "{$this->variant_name}: {$this->variant_value}";
-    }
-
-    /**
-     * Get image URL
-     */
-    public function getImageUrl(): string
-    {
-        if ($this->image_path) {
-            return Storage::url($this->image_path);
-        }
-        // Fallback to product's primary image
-        return $this->product->primaryImage?->getImageUrl() ?? asset('images/no-image.png');
-    }
-
-    /**
-     * Set as default variant
-     */
-    public function setAsDefault(): bool
-    {
-        return $this->update(['is_default' => true]);
-    }
-
-    /**
-     * Check if this is the default variant
-     */
-    public function isDefault(): bool
-    {
-        return $this->is_default;
-    }
-
-    /**
      * Get total stock across all warehouses
      */
     public function getTotalStock(): int
@@ -268,10 +272,41 @@ class ProductVariant extends Model
      */
     public function isInStock(): bool
     {
-        if (!$this->product->track_inventory) {
-            return true;
-        }
         return $this->getTotalStock() > 0;
+    }
+
+    /**
+     * Get image URL with fallback
+     */
+    public function getImageUrl(): string
+    {
+        if ($this->image_path) {
+            // If starts with http, return as is (external URL)
+            if (Str::startsWith($this->image_path, ['http://', 'https://'])) {
+                return $this->image_path;
+            }
+
+            // Check if file exists in storage
+            if (Storage::disk('public')->exists($this->image_path)) {
+                return asset('storage/' . $this->image_path);
+            }
+        }
+
+        // Fallback to product's primary image
+        if ($this->product) {
+            $primaryImage = $this->product->primaryImage();
+            if ($primaryImage) {
+                return $primaryImage->getImageUrl();
+            }
+
+            // Fallback to product's main_image
+            if ($this->product->main_image) {
+                return $this->product->getMainImageUrl();
+            }
+        }
+
+        // Final fallback to placeholder
+        return asset('images/placeholders/variant-placeholder.jpg');
     }
 
     /**
@@ -279,7 +314,8 @@ class ProductVariant extends Model
      */
     public function getFormattedPrice(): string
     {
-        return '$' . number_format($this->price, 2);
+        $currency = $this->product->curency ?? 'USD';
+        return $currency . ' ' . number_format($this->price, 2);
     }
 
     /**
@@ -287,6 +323,188 @@ class ProductVariant extends Model
      */
     public function getFormattedSalePrice(): string
     {
-        return $this->sale_price ? '$' . number_format($this->sale_price, 2) : '';
+        if (!$this->sale_price) {
+            return '';
+        }
+        $currency = $this->product->curency ?? 'USD';
+        return $currency . ' ' . number_format($this->sale_price, 2);
+    }
+
+    /**
+     * Get formatted final price
+     */
+    public function getFormattedFinalPrice(): string
+    {
+        $currency = $this->product->curency ?? 'USD';
+        return $currency . ' ' . number_format($this->getFinalPrice(), 2);
+    }
+
+    /**
+     * Get full variant name (name: value)
+     */
+    public function getFullName(): string
+    {
+        return $this->variant_name . ': ' . $this->variant_value;
+    }
+
+    /**
+     * Get display name
+     */
+    public function getDisplayName(): string
+    {
+        return ucfirst($this->variant_value);
+    }
+
+    /**
+     * Get dimensions as string
+     */
+    public function getDimensions(): ?string
+    {
+        if ($this->length && $this->width && $this->height) {
+            return $this->length . ' × ' . $this->width . ' × ' . $this->height . ' cm';
+        }
+        return null;
+    }
+
+    /**
+     * Get weight with unit
+     */
+    public function getFormattedWeight(): ?string
+    {
+        if ($this->weight) {
+            return $this->weight . ' kg';
+        }
+        return null;
+    }
+
+    /**
+     * Check if variant is active
+     */
+    public function isActive(): bool
+    {
+        return $this->status_key_code === 'VARIANT_ACTIVE';
+    }
+
+    /**
+     * Check if variant is default
+     */
+    public function isDefault(): bool
+    {
+        return $this->is_default;
+    }
+
+    /**
+     * Set as default variant
+     */
+    public function setAsDefault(): bool
+    {
+        return $this->update(['is_default' => true]);
+    }
+
+    /**
+     * Activate the variant
+     */
+    public function activate(): bool
+    {
+        return $this->update(['status_key_code' => 'VARIANT_ACTIVE']);
+    }
+
+    /**
+     * Deactivate the variant
+     */
+    public function deactivate(): bool
+    {
+        return $this->update(['status_key_code' => 'VARIANT_INACTIVE']);
+    }
+
+    /**
+     * Get status badge HTML
+     */
+    public function getStatusBadge(): string
+    {
+        return match($this->status_key_code) {
+            'VARIANT_ACTIVE' => '<span class="badge bg-success">Active</span>',
+            'VARIANT_INACTIVE' => '<span class="badge bg-secondary">Inactive</span>',
+            'VARIANT_OUT_OF_STOCK' => '<span class="badge bg-danger">Out of Stock</span>',
+            default => '<span class="badge bg-light">Unknown</span>',
+        };
+    }
+
+    /**
+     * Get stock status badge
+     */
+    public function getStockBadge(): string
+    {
+        $stock = $this->getTotalStock();
+
+        if ($stock <= 0) {
+            return '<span class="badge bg-danger">Out of Stock</span>';
+        } elseif ($stock < 10) {
+            return '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
+        } else {
+            return '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
+        }
+    }
+
+    /**
+     * Update sort order
+     */
+    public function updateSortOrder(int $order): bool
+    {
+        return $this->update(['sort_order' => $order]);
+    }
+
+    /**
+     * Move up in sort order
+     */
+    public function moveUp(): bool
+    {
+        if ($this->sort_order > 0) {
+            return $this->update(['sort_order' => $this->sort_order - 1]);
+        }
+        return false;
+    }
+
+    /**
+     * Move down in sort order
+     */
+    public function moveDown(): bool
+    {
+        return $this->update(['sort_order' => $this->sort_order + 1]);
+    }
+
+    /**
+     * Delete variant image from storage
+     */
+    public function deleteImage(): bool
+    {
+        if ($this->image_path && Storage::disk('public')->exists($this->image_path)) {
+            return Storage::disk('public')->delete($this->image_path);
+        }
+        return false;
+    }
+
+    /**
+     * Check if variant has physical dimensions
+     */
+    public function hasPhysicalDimensions(): bool
+    {
+        return !is_null($this->length) && !is_null($this->width) && !is_null($this->height);
+    }
+
+    /**
+     * Check if variant has weight
+     */
+    public function hasWeight(): bool
+    {
+        return !is_null($this->weight);
+    }
+
+    /**
+     * Get shipping weight (with fallback to product weight)
+     */
+    public function getShippingWeight(): ?float
+    {
+        return $this->weight ?? $this->product->weight ?? null;
     }
 }

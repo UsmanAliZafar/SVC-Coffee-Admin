@@ -40,6 +40,7 @@ class PermissionSeeder extends Seeder
             'admin_users' => ['create', 'read', 'update', 'delete'],
             'roles' => ['create', 'read', 'update', 'delete'],
             'permissions' => ['read', 'update'],
+            'tags' => ['create', 'read', 'update', 'delete'],
         ];
 
         // Create permissions
