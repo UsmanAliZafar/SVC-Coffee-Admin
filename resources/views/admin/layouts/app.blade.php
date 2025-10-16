@@ -30,6 +30,18 @@
     </div>
 
     @include('admin.layouts.partials.scripts')
+    {{-- SPA Implementation Script --}}
+    {{-- <script>
+        // Set CSRF token for all AJAX requests
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+    </script> --}}
+
+    {{-- Include the SPA script (from artifact spa_implementation) --}}
+    {{-- <script src="{{ asset('admin/js/spa.js') }}"></script> --}}
     @stack('scripts')
 </body>
 </html>

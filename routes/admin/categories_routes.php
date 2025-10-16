@@ -11,6 +11,12 @@ use App\Http\Controllers\Admin\CategoriesController;
 
 Route::prefix('categories')->name('categories.')->group(function () {
 
+    // Create category - MUST BE BEFORE /{id} routes
+    Route::middleware('admin.permission:categories.create')->group(function () {
+        Route::get('/create', [CategoriesController::class, 'create'])->name('create');
+        Route::post('/', [CategoriesController::class, 'store'])->name('store');
+    });
+
     // List all categories
     Route::middleware('admin.permission:categories.read')->group(function () {
         // Main index page
@@ -24,15 +30,6 @@ Route::prefix('categories')->name('categories.')->group(function () {
 
         // Empty categories
         Route::get('/empty', [CategoriesController::class, 'empty'])->name('empty');
-
-        // Show single category
-        Route::get('/{id}', [CategoriesController::class, 'show'])->name('show');
-    });
-
-    // Create category
-    Route::middleware('admin.permission:categories.create')->group(function () {
-        Route::get('/create', [CategoriesController::class, 'create'])->name('create');
-        Route::post('/', [CategoriesController::class, 'store'])->name('store');
     });
 
     // Update category
@@ -53,5 +50,10 @@ Route::prefix('categories')->name('categories.')->group(function () {
     // Delete category
     Route::middleware('admin.permission:categories.delete')->group(function () {
         Route::delete('/{id}', [CategoriesController::class, 'destroy'])->name('destroy');
+    });
+
+    // Show single category - MUST BE LAST
+    Route::middleware('admin.permission:categories.read')->group(function () {
+        Route::get('/{id}', [CategoriesController::class, 'show'])->name('show');
     });
 });

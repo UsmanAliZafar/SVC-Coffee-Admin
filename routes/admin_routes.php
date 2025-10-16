@@ -27,12 +27,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
         // Dashboard
-        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
-        Route::get('dashboard', [DashboardController::class, 'index']);
+        Route::get('/', [DashboardController::class, 'index']);
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        //
 
         // Load Module Routes
-        require __DIR__ . '/admin/products_routes.php';
         require __DIR__ . '/admin/categories_routes.php';
+        require __DIR__ . '/admin/products_routes.php';
         require __DIR__ . '/admin/inventory_routes.php';
         require __DIR__ . '/admin/orders_routes.php';
         require __DIR__ . '/admin/customers_routes.php';

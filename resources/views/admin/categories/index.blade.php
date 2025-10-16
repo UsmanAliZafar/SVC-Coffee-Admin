@@ -3,8 +3,6 @@
 @section('title', 'Categories Management')
 
 @push('styles')
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
 <style>
     .filter-card {
         background: #f8f9fa;
@@ -106,7 +104,7 @@
                 <select id="statusFilter" class="form-select">
                     <option value="">All Statuses</option>
                     @foreach($statusList as $status)
-                        <option value="{{ $status->key_code }}">{{ $status->title }}</option>
+                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -190,12 +188,6 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
 $(document).ready(function() {
     // Initialize DataTable
@@ -226,7 +218,18 @@ $(document).ready(function() {
         pageLength: 25,
         responsive: true,
         language: {
-            processing: '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>'
+            processing: `
+                <div class="datatable-loading-container">
+                    <div class="bars-loader">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div class="datatable-loading-text">Loading Products Categories...</div>
+                </div>
+            `
         },
         drawCallback: function() {
             updateStatistics();

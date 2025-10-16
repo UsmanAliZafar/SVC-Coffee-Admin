@@ -191,7 +191,7 @@
                         <select class="form-select" id="status_key_code" name="status_key_code" required>
                             @foreach($statusList as $status)
                                 <option value="{{ $status->key_code }}" {{ $status->key_code === 'CATEGORY_ACTIVE' ? 'selected' : '' }}>
-                                    {{ $status->title }}
+                                    {{ $status->name }}
                                 </option>
                             @endforeach
                         </select>

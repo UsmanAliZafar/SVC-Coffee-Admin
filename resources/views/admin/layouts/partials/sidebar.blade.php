@@ -13,7 +13,7 @@
             {{-- Products Management --}}
             @if(auth('admin')->user()->hasPermission('products.read'))
                 <li class="nav-item has-dropdown">
-                    <a class="nav-link {{ request()->routeIs('admin.products.*') || request()->routeIs('admin.categories.*') ? 'active' : '' }}"
+                    <a class="nav-link {{ request()->routeIs('admin.products.*') ? 'active' : '' }}"
                        href="{{ route('admin.products.index') }}"
                        data-tooltip="Products">
                         <i class="bi bi-box"></i>
@@ -35,7 +35,7 @@
 
             {{-- Categories Management --}}
             @if(auth('admin')->user()->hasPermission('categories.read'))
-                <li class="nav-item has-dropdown">
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.categories.*') ? 'open' : '' }}">
                     <a class="nav-link {{ request()->routeIs('admin.categories.*') ? 'active' : '' }}"
                     href="{{ route('admin.categories.index') }}"
                     data-tooltip="Categories">
@@ -79,6 +79,7 @@
                     </ul>
                 </li>
             @endif
+            {{-- Categories Management --}}
 
             {{-- Inventory Management --}}
             @if(auth('admin')->user()->hasPermission('inventory.read'))

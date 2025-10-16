@@ -123,7 +123,8 @@ class CategoriesController extends Controller
      */
     public function create()
     {
-        $statusList = SystemStatus::where('type', 'category')->get();
+        // dd(1);
+        $statusList = SystemStatus::where('module', 'categories')->get();
         $parentCategories = ProductsCategories::getFlatList();
 
         return view('admin.categories.create', compact('statusList', 'parentCategories'));
@@ -393,7 +394,7 @@ class CategoriesController extends Controller
         $categories = ProductsCategories::where('products_count', 0)
             ->with(['parent', 'status'])
             ->ordered()
-            ->get();
+            ->paginate(20);
 
         return view('admin.categories.empty', compact('categories'));
     }
