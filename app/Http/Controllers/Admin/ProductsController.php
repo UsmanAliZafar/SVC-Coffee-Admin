@@ -465,7 +465,6 @@ class ProductsController extends Controller
             'images',
             'variants',
             'tags',
-            'inventory',
             'creator',
             'updater'
         ])->findOrFail($id);

@@ -64,17 +64,23 @@
         cursor: pointer;
         z-index: 10;
     }
-    .set-primary {
+    .set-primary-btn {
         position: absolute;
         bottom: 5px;
-        left: 5px;
+        left: 50%;
+        transform: translateX(-50%);
         background: #5B914C;
         color: white;
         border: none;
+        padding: 5px 10px;
         border-radius: 4px;
-        padding: 3px 8px;
         font-size: 0.75rem;
         cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .image-preview-container:hover .set-primary-btn {
+        opacity: 1;
     }
     .primary-badge {
         position: absolute;
@@ -84,7 +90,7 @@
         color: #000;
         padding: 3px 8px;
         border-radius: 4px;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: bold;
     }
     .dropzone-area {
@@ -100,31 +106,96 @@
         background: #e9ecef;
         border-color: #4a7a3d;
     }
-    .variant-row {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        border: 1px solid #ddd;
+    .dropzone-area.dragover {
+        background: #d4edda;
+        border-color: #28a745;
     }
     .ck-editor__editable {
         min-height: 300px;
     }
-    .info-badge {
-        background: #e7f3ff;
-        border: 1px solid #b3d7ff;
-        border-radius: 8px;
+    .tags-container {
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 5px;
+        min-height: 42px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        cursor: text;
+    }
+    .tag-item {
+        display: inline-flex;
+        align-items: center;
+        background: #5B914C;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+    }
+    .tag-item .remove-tag {
+        margin-left: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        background: none;
+        border: none;
+        color: white;
+        padding: 0;
+        font-size: 1.2rem;
+    }
+    .tag-suggestions {
+        position: absolute;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        width: 100%;
+        display: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .tag-suggestion-item {
+        padding: 10px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .tag-suggestion-item:hover {
+        background: #f8f9fa;
+    }
+    .tag-input {
+        border: none;
+        outline: none;
+        flex: 1;
+        min-width: 120px;
+        padding: 5px;
+    }
+    .add-btn-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        background: #5B914C;
+        color: white;
+        border-radius: 50%;
+        cursor: pointer;
+        margin-left: 10px;
+        transition: all 0.2s;
+    }
+    .add-btn-icon:hover {
+        background: #4a7a3d;
+        transform: scale(1.1);
+    }
+    .product-info-badge {
+        background: #e9ecef;
         padding: 15px;
+        border-radius: 8px;
         margin-bottom: 20px;
     }
-    .info-badge .info-label {
-        font-weight: 600;
-        color: #666;
+    .product-info-badge .badge {
         font-size: 0.85rem;
-    }
-    .info-badge .info-value {
-        font-size: 0.95rem;
-        color: #333;
+        padding: 6px 12px;
+        margin-right: 5px;
     }
 </style>
 @endpush
@@ -154,24 +225,29 @@
     </div>
 
     <!-- Product Info Badge -->
-    <div class="info-badge">
-        <div class="row">
-            <div class="col-md-3">
-                <div class="info-label">Product ID</div>
-                <div class="info-value">{{ $product->id }}</div>
+    <div class="product-info-badge">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Product ID:</strong> <code>{{ $product->id }}</code>
+                <span class="ms-3"><strong>SKU:</strong> <code>{{ $product->sku }}</code></span>
+                @if($product->barcode)
+                <span class="ms-3"><strong>Barcode:</strong> <code>{{ $product->barcode }}</code></span>
+                @endif
             </div>
-            <div class="col-md-3">
-                <div class="info-label">Created By</div>
-                <div class="info-value">{{ $product->creator ? $product->creator->name : 'N/A' }}</div>
+            <div>
+                {!! $product->getStatusBadge() !!}
+                {!! $product->getStockBadge() !!}
+                @if($product->is_featured)
+                <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> Featured</span>
+                @endif
             </div>
-            <div class="col-md-3">
-                <div class="info-label">Created At</div>
-                <div class="info-value">{{ $product->created_at->format('M d, Y H:i') }}</div>
-            </div>
-            <div class="col-md-3">
-                <div class="info-label">Last Updated</div>
-                <div class="info-value">{{ $product->updated_at->format('M d, Y H:i') }}</div>
-            </div>
+        </div>
+        <div class="mt-2 text-muted small">
+            <i class="bi bi-clock"></i> Created: {{ $product->created_at->format('M d, Y H:i') }}
+            | Last Updated: {{ $product->updated_at->format('M d, Y H:i') }}
+            @if($product->creator)
+            | By: {{ $product->creator->name }}
+            @endif
         </div>
     </div>
 
@@ -197,12 +273,12 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Slug</label>
                             <input type="text" name="slug" id="productSlug" class="form-control" value="{{ $product->slug }}">
-                            <div class="form-text">Leave empty to auto-generate from product name</div>
+                            <div class="form-text">URL-friendly version of the name</div>
                             <div class="invalid-feedback"></div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label required-field">SKU</label>
-                            <input type="text" name="sku" class="form-control" value="{{ $product->sku }}" required>
+                            <input type="text" name="sku" id="productSku" class="form-control" value="{{ $product->sku }}" required>
                             <div class="invalid-feedback"></div>
                         </div>
                     </div>
@@ -211,6 +287,15 @@
                         <label class="form-label">Barcode</label>
                         <input type="text" name="barcode" class="form-control" value="{{ $product->barcode }}">
                         <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Product Type</label>
+                        <select name="product_type" class="form-select">
+                            @foreach($productTypes as $key => $label)
+                                <option value="{{ $key }}" {{ $product->product_type === $key ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     <div class="mb-3">
@@ -232,99 +317,47 @@
                         <label class="form-label">Main Image</label>
                         <input type="file" name="main_image" id="mainImage" class="form-control" accept="image/*">
                         <div class="form-text">Upload new image to replace current (max 2MB)</div>
-
-                        @if($product->main_image)
-                        <div id="currentMainImage" class="mt-2">
+                        <div id="mainImagePreview" class="mt-2">
+                            @if($product->main_image)
                             <div class="image-preview-container">
                                 <img src="{{ $product->getMainImageUrl() }}" class="image-preview" alt="Main Image">
-                                <span class="primary-badge">Current Main Image</span>
+                                <button type="button" class="remove-image" onclick="removeMainImage()">
+                                    <i class="bi bi-x"></i>
+                                </button>
                             </div>
+                            @endif
                         </div>
-                        @endif
-
-                        <div id="mainImagePreview" class="mt-2"></div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Gallery Images</label>
-
-                        @if($product->images->count() > 0)
-                        <div class="mb-3">
-                            <label class="form-text d-block mb-2">Current Gallery Images</label>
-                            <div id="existingGallery">
-                                @foreach($product->images as $image)
-                                <div class="image-preview-container" data-image-id="{{ $image->id }}">
-                                    <img src="{{ $image->getImageUrl() }}" class="image-preview" alt="Gallery Image">
-                                    @if($image->is_primary)
-                                        <span class="primary-badge"><i class="bi bi-star-fill"></i> Primary</span>
-                                    @else
-                                        <button type="button" class="set-primary" onclick="setPrimaryImage({{ $image->id }})">
-                                            <i class="bi bi-star"></i> Set Primary
-                                        </button>
-                                    @endif
-                                    <button type="button" class="remove-image" onclick="deleteGalleryImage({{ $image->id }})">
-                                        <i class="bi bi-x"></i>
-                                    </button>
-                                </div>
-                                @endforeach
-                            </div>
-                        </div>
-                        @endif
-
                         <div class="dropzone-area" id="dropzoneArea">
                             <i class="bi bi-cloud-upload" style="font-size: 3rem; color: #5B914C;"></i>
                             <p class="mb-2"><strong>Click to upload</strong> or drag and drop</p>
-                            <p class="text-muted mb-0">PNG, JPG, GIF up to 2MB each</p>
+                            <p class="text-muted mb-0">PNG, JPG, GIF, WEBP up to 2MB each</p>
                         </div>
                         <input type="file" name="images[]" id="galleryImages" class="d-none" accept="image/*" multiple>
-                        <div id="galleryPreview" class="mt-3"></div>
-                    </div>
-                </div>
 
-                <!-- Variants (for Variable Products) -->
-                @if($product->product_type === 'variable')
-                <div class="form-section" id="variantsSection">
-                    <h5 class="section-title"><i class="bi bi-layers"></i> Product Variants</h5>
-
-                    @if($product->variants->count() > 0)
-                    <div class="mb-3">
-                        <label class="form-text d-block mb-2">Existing Variants</label>
-                        @foreach($product->variants as $variant)
-                        <div class="variant-row">
-                            <div class="row align-items-center">
-                                <div class="col-md-3">
-                                    <strong>{{ $variant->getFullName() }}</strong>
-                                </div>
-                                <div class="col-md-2">
-                                    <small class="text-muted">SKU: {{ $variant->sku }}</small>
-                                </div>
-                                <div class="col-md-2">
-                                    <strong>{{ $variant->getFormattedPrice() }}</strong>
-                                </div>
-                                <div class="col-md-2">
-                                    {!! $variant->getStockBadge() !!}
-                                </div>
-                                <div class="col-md-3 text-end">
-                                    <a href="{{ route('admin.products.variants.edit', [$product->id, $variant->id]) }}" class="btn btn-sm btn-primary">
-                                        <i class="bi bi-pencil"></i> Edit
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteVariant({{ $variant->id }})">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
+                        <div id="galleryPreview" class="mt-3">
+                            @foreach($product->images as $image)
+                            <div class="image-preview-container" data-id="{{ $image->id }}">
+                                @if($image->is_primary)
+                                <span class="primary-badge"><i class="bi bi-star-fill"></i> Primary</span>
+                                @endif
+                                <img src="{{ $image->getImageUrl() }}" class="image-preview" alt="{{ $image->image_name }}">
+                                <button type="button" class="remove-image" onclick="deleteProductImage('{{ $product->id }}', '{{ $image->id }}', this)">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                                @if(!$image->is_primary)
+                                <button type="button" class="set-primary-btn" onclick="setPrimaryImage('{{ $product->id }}', '{{ $image->id }}')">
+                                    <i class="bi bi-star"></i> Set Primary
+                                </button>
+                                @endif
                             </div>
+                            @endforeach
                         </div>
-                        @endforeach
                     </div>
-                    @endif
-
-                    <div id="variantsContainer"></div>
-
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addVariant">
-                        <i class="bi bi-plus"></i> Add New Variant
-                    </button>
                 </div>
-                @endif
 
                 <!-- SEO Settings -->
                 <div class="form-section">
@@ -332,13 +365,13 @@
 
                     <div class="mb-3">
                         <label class="form-label">Meta Title</label>
-                        <input type="text" name="meta_title" class="form-control" value="{{ $product->meta_title }}">
+                        <input type="text" name="meta_title" class="form-control" value="{{ $product->meta_title }}" maxlength="60">
                         <div class="form-text">Recommended: 50-60 characters</div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Meta Description</label>
-                        <textarea name="meta_description" class="form-control" rows="3">{{ $product->meta_description }}</textarea>
+                        <textarea name="meta_description" class="form-control" rows="3" maxlength="160">{{ $product->meta_description }}</textarea>
                         <div class="form-text">Recommended: 150-160 characters</div>
                     </div>
 
@@ -349,190 +382,26 @@
 
                     <div class="mb-3">
                         <label class="form-label">Canonical URL</label>
-                        <input type="text" name="canonical_url" class="form-control" value="{{ $product->canonical_url }}">
+                        <input type="url" name="canonical_url" class="form-control" value="{{ $product->canonical_url }}">
+                        <div class="form-text">Leave empty to use default product URL</div>
                     </div>
                 </div>
 
             </div>
 
-            <!-- Right Column -->
-            <div class="col-lg-4">
-
-                <!-- Product Settings -->
-                <div class="form-section">
-                    <h5 class="section-title"><i class="bi bi-gear"></i> Product Settings</h5>
-
-                    <div class="mb-3">
-                        <label class="form-label required-field">Product Type</label>
-                        <select name="product_type" id="productType" class="form-select" required>
-                            @foreach($productTypes as $key => $label)
-                                <option value="{{ $key }}" {{ $product->product_type === $key ? 'selected' : '' }}>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label required-field">Status</label>
-                        <select name="status_key_code" class="form-select" required>
-                            @foreach($statusList as $status)
-                                <option value="{{ $status->key_code }}" {{ $product->status_key_code === $status->key_code ? 'selected' : '' }}>{{ $status->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Category</label>
-                        <select name="category_id" class="form-select">
-                            <option value="">Select Category</option>
-                            @foreach($categories as $category)
-                                <option value="{{ $category->id }}" {{ $product->category_id === $category->id ? 'selected' : '' }}>
-                                    {{ $category->indent }}{{ $category->title }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Vendor</label>
-                        <select name="vendor_id" class="form-select">
-                            <option value="">Select Vendor</option>
-                            @foreach($vendors as $vendor)
-                                <option value="{{ $vendor->id }}" {{ $product->vendor_id === $vendor->id ? 'selected' : '' }}>{{ $vendor->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Tags</label>
-                        <select name="tags[]" id="productTags" class="form-select" multiple>
-                            @foreach($tags as $tag)
-                                <option value="{{ $tag->id }}" {{ $product->tags->contains($tag->id) ? 'selected' : '' }}>{{ $tag->name }}</option>
-                            @endforeach
-                        </select>
-                        <div class="form-text">Hold Ctrl/Cmd to select multiple</div>
-                    </div>
-
-                    <hr>
-
-                    <div class="form-check mb-2">
-                        <input type="checkbox" name="is_featured" id="isFeatured" class="form-check-input" {{ $product->is_featured ? 'checked' : '' }}>
-                        <label class="form-check-label" for="isFeatured">
-                            <i class="bi bi-star"></i> Featured Product
-                        </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                        <input type="checkbox" name="show_on_home" id="showOnHome" class="form-check-input" {{ $product->show_on_home ? 'checked' : '' }}>
-                        <label class="form-check-label" for="showOnHome">
-                            <i class="bi bi-house"></i> Show on Homepage
-                        </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                        <input type="checkbox" name="is_available" id="isAvailable" class="form-check-input" {{ $product->is_available ? 'checked' : '' }}>
-                        <label class="form-check-label" for="isAvailable">
-                            <i class="bi bi-check-circle"></i> Available for Purchase
-                        </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                        <input type="checkbox" name="track_inventory" id="trackInventory" class="form-check-input" {{ $product->track_inventory ? 'checked' : '' }}>
-                        <label class="form-check-label" for="trackInventory">
-                            <i class="bi bi-box"></i> Track Inventory
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Pricing -->
-                <div class="form-section">
-                    <h5 class="section-title"><i class="bi bi-currency-dollar"></i> Pricing</h5>
-
-                    <div class="mb-3">
-                        <label class="form-label">Currency</label>
-                        <select name="curency" class="form-select">
-                            @foreach($currencies as $code => $name)
-                                <option value="{{ $code }}" {{ $product->curency === $code ? 'selected' : '' }}>{{ $name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label required-field">Regular Price</label>
-                        <input type="number" name="price" class="form-control" value="{{ $product->price }}" step="0.01" min="0" required>
-                        <div class="invalid-feedback"></div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Sale Price</label>
-                        <input type="number" name="sale_price" class="form-control" value="{{ $product->sale_price }}" step="0.01" min="0">
-                        <div class="form-text">Leave empty if not on sale</div>
-                        <div class="invalid-feedback"></div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Cost Price</label>
-                        <input type="number" name="cost_price" class="form-control" value="{{ $product->cost_price }}" step="0.01" min="0">
-                        <div class="form-text">Your cost (for profit calculation)</div>
-                    </div>
-
-                    @if($product->isOnSale())
-                    <div class="alert alert-success">
-                        <i class="bi bi-tag"></i> <strong>On Sale!</strong><br>
-                        Discount: {{ $product->getFormattedSalePrice() }} (-{{ $product->getDiscountPercentage() }}%)
-                    </div>
-                    @endif
-                </div>
-
-                <!-- Stock Info -->
-                @if($product->track_inventory)
-                <div class="form-section">
-                    <h5 class="section-title"><i class="bi bi-box-seam"></i> Stock Information</h5>
-
-                    <div class="alert alert-info mb-0">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Total Stock:</strong><br>
-                                <h4 class="mb-0">{{ $product->getTotalStock() }} units</h4>
-                            </div>
-                            <div>
-                                {!! $product->isInStock() ?
-                                    '<span class="badge bg-success">In Stock</span>' :
-                                    '<span class="badge bg-danger">Out of Stock</span>' !!}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                @endif
-
-                <!-- Action Buttons -->
-                <div class="form-section">
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-save btn-lg">
-                            <i class="bi bi-check-circle"></i> Update Product
-                        </button>
-                        <a href="{{ route('admin.products.duplicate', $product->id) }}" class="btn btn-outline-secondary" onclick="return confirm('Duplicate this product?')">
-                            <i class="bi bi-files"></i> Duplicate Product
-                        </a>
-                        <a href="{{ route('admin.products.index') }}" class="btn btn-outline-danger">
-                            <i class="bi bi-x-circle"></i> Cancel
-                        </a>
-                    </div>
-                </div>
-
-            </div>
+            <!-- Right Column - NEXT PART -->
         </div>
     </form>
 </div>
 @endsection
-
 @push('scripts')
 <!-- CKEditor -->
 <script src="https://cdn.ckeditor.com/ckeditor5/39.0.0/classic/ckeditor.js"></script>
 
 <script>
-$(document).ready(function() {
+const PRODUCT_ID = '{{ $product->id }}';
 
-    const productId = '{{ $product->id }}';
+$(document).ready(function() {
 
     // Initialize CKEditor
     let descriptionEditor;
@@ -562,11 +431,9 @@ $(document).ready(function() {
         if (file) {
             let reader = new FileReader();
             reader.onload = function(e) {
-                $('#currentMainImage').hide();
                 $('#mainImagePreview').html(`
                     <div class="image-preview-container">
-                        <img src="${e.target.result}" class="image-preview" alt="New Main Image">
-                        <span class="primary-badge">New Main Image</span>
+                        <img src="${e.target.result}" class="image-preview" alt="Main Image">
                         <button type="button" class="remove-image" onclick="removeMainImage()">
                             <i class="bi bi-x"></i>
                         </button>
@@ -577,78 +444,219 @@ $(document).ready(function() {
         }
     });
 
-    // Gallery images - dropzone click
-    $('#dropzoneArea').on('click', function() {
+    // Gallery images - dropzone events
+    const dropzone = $('#dropzoneArea');
+
+    dropzone.on('click', function() {
         $('#galleryImages').click();
     });
 
-    // Gallery images preview
-    let galleryFiles = [];
-    $('#galleryImages').on('change', function(e) {
-        let files = Array.from(e.target.files);
-
-        files.forEach(file => {
-            galleryFiles.push(file);
-
-            let reader = new FileReader();
-            reader.onload = function(e) {
-                $('#galleryPreview').append(`
-                    <div class="image-preview-container" data-index="${galleryFiles.length - 1}">
-                        <img src="${e.target.result}" class="image-preview" alt="New Gallery Image">
-                        <span class="primary-badge">New</span>
-                        <button type="button" class="remove-image" onclick="removeGalleryImage(${galleryFiles.length - 1})">
-                            <i class="bi bi-x"></i>
-                        </button>
-                    </div>
-                `);
-            };
-            reader.readAsDataURL(file);
-        });
+    dropzone.on('dragover', function(e) {
+        e.preventDefault();
+        $(this).addClass('dragover');
     });
 
-    // Product type change - show/hide variants
-    $('#productType').on('change', function() {
-        if ($(this).val() === 'variable') {
-            $('#variantsSection').removeClass('d-none');
+    dropzone.on('dragleave', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+    });
+
+    dropzone.on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+
+        const files = e.originalEvent.dataTransfer.files;
+        uploadImagesToProduct(files);
+    });
+
+    // Gallery images change
+    $('#galleryImages').on('change', function(e) {
+        const files = e.target.files;
+        uploadImagesToProduct(files);
+    });
+
+    // Upload images to product
+    function uploadImagesToProduct(files) {
+        if (files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('_token', $('meta[name="csrf-token"]').attr('content'));
+
+        Array.from(files).forEach(file => {
+            formData.append('images[]', file);
+        });
+
+        $.ajax({
+            url: `/admin/products/${PRODUCT_ID}/images/upload`,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            beforeSend: function() {
+                Swal.fire({
+                    title: 'Uploading Images...',
+                    text: 'Please wait',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+            },
+            success: function(response) {
+                Swal.close();
+                if (response.success) {
+                    response.images.forEach(image => {
+                        $('#galleryPreview').append(`
+                            <div class="image-preview-container" data-id="${image.id}">
+                                <img src="${image.url}" class="image-preview" alt="${image.name}">
+                                <button type="button" class="remove-image" onclick="deleteProductImage('${PRODUCT_ID}', '${image.id}', this)">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                                <button type="button" class="set-primary-btn" onclick="setPrimaryImage('${PRODUCT_ID}', '${image.id}')">
+                                    <i class="bi bi-star"></i> Set Primary
+                                </button>
+                            </div>
+                        `);
+                    });
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Uploaded!',
+                        text: `${response.images.length} image(s) uploaded successfully`,
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            },
+            error: function(xhr) {
+                Swal.fire('Error!', 'Failed to upload images', 'error');
+            }
+        });
+    }
+
+    // Initialize tags with existing product tags
+    let selectedTags = @json($product->tags->map(function($tag) {
+        return ['id' => $tag->id, 'name' => $tag->name];
+    }));
+    renderTags();
+
+    let tagSearchTimeout;
+
+    $(document).on('keyup', '#tagInput', function(e) {
+        const value = $(this).val().trim();
+
+        // Add tag on Enter or Comma
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            if (value) {
+                addTag(value.replace(',', ''));
+                $(this).val('');
+                $('#tagSuggestions').hide();
+            }
+            return;
+        }
+
+        // Backspace on empty input - remove last tag
+        if (e.key === 'Backspace' && value === '' && selectedTags.length > 0) {
+            selectedTags.pop();
+            renderTags();
+            return;
+        }
+
+        // Search tags
+        if (value.length >= 2) {
+            clearTimeout(tagSearchTimeout);
+            tagSearchTimeout = setTimeout(function() {
+                searchTags(value);
+            }, 300);
         } else {
-            $('#variantsSection').addClass('d-none');
+            $('#tagSuggestions').hide();
         }
     });
 
-    // Add variant
-    let variantIndex = {{ $product->variants->count() }};
-    $('#addVariant').on('click', function() {
-        variantIndex++;
-        let variantHtml = `
-            <div class="variant-row" id="variant-${variantIndex}">
-                <div class="row">
-                    <div class="col-md-3 mb-2">
-                        <label class="form-label">Variant Name</label>
-                        <input type="text" name="variants[${variantIndex}][name]" class="form-control" placeholder="e.g., Size">
-                    </div>
-                    <div class="col-md-3 mb-2">
-                        <label class="form-label">Variant Value</label>
-                        <input type="text" name="variants[${variantIndex}][value]" class="form-control" placeholder="e.g., Large">
-                    </div>
-                    <div class="col-md-2 mb-2">
-                        <label class="form-label">SKU</label>
-                        <input type="text" name="variants[${variantIndex}][sku]" class="form-control" placeholder="VAR-SKU">
-                    </div>
-                    <div class="col-md-2 mb-2">
-                        <label class="form-label">Price</label>
-                        <input type="number" name="variants[${variantIndex}][price]" class="form-control" step="0.01">
-                    </div>
-                    <div class="col-md-2 mb-2">
-                        <label class="form-label">&nbsp;</label>
-                        <button type="button" class="btn btn-danger w-100" onclick="removeVariant(${variantIndex})">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        $('#variantsContainer').append(variantHtml);
+    function searchTags(query) {
+        $.ajax({
+            url: '/admin/products/tags/search',
+            data: { q: query },
+            success: function(response) {
+                if (response.success && response.tags.length > 0) {
+                    let html = '';
+                    response.tags.forEach(tag => {
+                        if (!selectedTags.find(t => t.id === tag.id)) {
+                            html += `<div class="tag-suggestion-item" data-id="${tag.id}" data-name="${tag.name}">${tag.name}</div>`;
+                        }
+                    });
+                    if (html) {
+                        $('#tagSuggestions').html(html).show();
+                    } else {
+                        $('#tagSuggestions').hide();
+                    }
+                } else {
+                    $('#tagSuggestions').hide();
+                }
+            }
+        });
+    }
+
+    $(document).on('click', '.tag-suggestion-item', function() {
+        const tagId = $(this).data('id');
+        const tagName = $(this).data('name');
+        addTag(tagName, tagId);
+        $('#tagInput').val('');
+        $('#tagSuggestions').hide();
     });
+
+    function addTag(name, id = null) {
+        // Check if tag already exists
+        if (selectedTags.find(t => t.name.toLowerCase() === name.toLowerCase())) {
+            return;
+        }
+
+        if (id) {
+            // Existing tag
+            selectedTags.push({ id: id, name: name });
+            renderTags();
+        } else {
+            // Create new tag
+            $.ajax({
+                url: '/admin/products/tags/create',
+                type: 'POST',
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                    name: name
+                },
+                success: function(response) {
+                    if (response.success) {
+                        selectedTags.push({ id: response.tag.id, name: response.tag.name });
+                        renderTags();
+                    }
+                }
+            });
+        }
+    }
+
+    function renderTags() {
+        const tagIds = selectedTags.map(t => t.id);
+        $('#tagsHiddenInput').val(JSON.stringify(tagIds));
+
+        let html = '';
+        selectedTags.forEach((tag, index) => {
+            html += `
+                <div class="tag-item">
+                    ${tag.name}
+                    <button type="button" class="remove-tag" onclick="removeTag(${index})">×</button>
+                </div>
+            `;
+        });
+        html += '<input type="text" id="tagInput" class="tag-input" placeholder="Type to search or add tags...">';
+
+        $('#tagsContainer').html(html);
+    }
+
+    window.removeTag = function(index) {
+        selectedTags.splice(index, 1);
+        renderTags();
+    };
 
     // Form submission
     $('#productForm').on('submit', function(e) {
@@ -661,13 +669,8 @@ $(document).ready(function() {
 
         let formData = new FormData(this);
 
-        // Add gallery images
-        galleryFiles.forEach((file, index) => {
-            formData.append('images[]', file);
-        });
-
         $.ajax({
-            url: '{{ route("admin.products.update", $product->id) }}',
+            url: `/admin/products/${PRODUCT_ID}`,
             type: 'POST',
             data: formData,
             processData: false,
@@ -733,23 +736,99 @@ $(document).ready(function() {
         });
     });
 
+    // Add Category Form
+    $('#addCategoryForm').on('submit', function(e) {
+        e.preventDefault();
+
+        $.ajax({
+            url: '/admin/products/categories/quick-add',
+            type: 'POST',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                title: $('#categoryTitle').val(),
+                parent_id: $('[name="category_parent_id"]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#addCategoryModal').modal('hide');
+
+                    // Add to select dropdown
+                    const indent = response.category.full_path ? response.category.full_path.split(' > ').length > 1 ? '— '.repeat(response.category.full_path.split(' > ').length - 1) : '' : '';
+                    $('#categorySelect').append(`<option value="${response.category.id}" selected>${indent}${response.category.title}</option>`);
+
+                    // Reset form
+                    $('#addCategoryForm')[0].reset();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: response.message,
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            },
+            error: function(xhr) {
+                Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to add category', 'error');
+            }
+        });
+    });
+
+    // Add Vendor Form
+    $('#addVendorForm').on('submit', function(e) {
+        e.preventDefault();
+
+        $.ajax({
+            url: '/admin/products/vendors/quick-add',
+            type: 'POST',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                name: $('#vendorName').val(),
+                email: $('[name="vendor_email"]').val(),
+                phone: $('[name="vendor_phone"]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#addVendorModal').modal('hide');
+
+                    // Add to select dropdown
+                    $('#vendorSelect').append(`<option value="${response.vendor.id}" selected>${response.vendor.name}</option>`);
+
+                    // Reset form
+                    $('#addVendorForm')[0].reset();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: response.message,
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            },
+            error: function(xhr) {
+                Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to add vendor', 'error');
+            }
+        });
+    });
+
 });
 
-// Remove main image
+// ==================== HELPER FUNCTIONS ====================
+
+function adjustStock(amount) {
+    const input = $('#stockQuantity');
+    const currentValue = parseInt(input.val()) || 0;
+    const newValue = Math.max(0, currentValue + amount);
+    input.val(newValue);
+}
+
 function removeMainImage() {
     $('#mainImage').val('');
     $('#mainImagePreview').empty();
-    $('#currentMainImage').show();
 }
 
-// Remove gallery image (new upload)
-function removeGalleryImage(index) {
-    $(`.image-preview-container[data-index="${index}"]`).remove();
-    galleryFiles.splice(index, 1);
-}
-
-// Delete existing gallery image
-function deleteGalleryImage(imageId) {
+function deleteProductImage(productId, imageId, button) {
     Swal.fire({
         title: 'Delete this image?',
         text: "This action cannot be undone!",
@@ -761,44 +840,66 @@ function deleteGalleryImage(imageId) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '{{ route("admin.products.images.delete", [$product->id, ":imageId"]) }}'.replace(':imageId', imageId),
+                url: `/admin/products/${productId}/images/${imageId}`,
                 type: 'DELETE',
                 data: {
-                    _token: '{{ csrf_token() }}'
+                    _token: $('meta[name="csrf-token"]').attr('content')
                 },
                 success: function(response) {
                     if (response.success) {
-                        $(`.image-preview-container[data-image-id="${imageId}"]`).fadeOut(300, function() {
+                        $(button).closest('.image-preview-container').fadeOut(300, function() {
                             $(this).remove();
                         });
+
                         Swal.fire({
                             icon: 'success',
                             title: 'Deleted!',
-                            text: response.message,
-                            timer: 1500,
+                            text: 'Image removed successfully',
+                            timer: 1000,
                             showConfirmButton: false
                         });
                     }
                 },
                 error: function(xhr) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Failed to delete image'
-                    });
+                    Swal.fire('Error!', 'Failed to delete image', 'error');
                 }
             });
         }
     });
 }
 
-// Set primary image
-function setPrimaryImage(imageId) {
+function setPrimaryImage(productId, imageId) {
     $.ajax({
-        url: '{{ route("admin.products.images.set-primary", [$product->id, ":imageId"]) }}'.replace(':imageId', imageId),
+        url: `/admin/products/${productId}/images/${imageId}/set-primary`,
         type: 'POST',
         data: {
-            _token: '{{ csrf_token() }}'
+            _token: $('meta[name="csrf-token"]').attr('content')
+        },
+        success: function(response) {
+            if (response.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: 'Primary image updated',
+                    timer: 1000,
+                    showConfirmButton: false
+                }).then(() => {
+                    location.reload();
+                });
+            }
+        },
+        error: function(xhr) {
+            Swal.fire('Error!', 'Failed to set primary image', 'error');
+        }
+    });
+}
+
+function toggleFeatured() {
+    $.ajax({
+        url: `/admin/products/${PRODUCT_ID}/toggle-featured`,
+        type: 'POST',
+        data: {
+            _token: $('meta[name="csrf-token"]').attr('content')
         },
         success: function(response) {
             if (response.success) {
@@ -806,7 +907,7 @@ function setPrimaryImage(imageId) {
                     icon: 'success',
                     title: 'Success!',
                     text: response.message,
-                    timer: 1500,
+                    timer: 1000,
                     showConfirmButton: false
                 }).then(() => {
                     location.reload();
@@ -814,101 +915,153 @@ function setPrimaryImage(imageId) {
             }
         },
         error: function(xhr) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error!',
-                text: xhr.responseJSON?.message || 'Failed to set primary image'
-            });
+            Swal.fire('Error!', 'Failed to toggle featured status', 'error');
         }
     });
 }
 
-// Delete variant
-function deleteVariant(variantId) {
+function togglePublish() {
+    $.ajax({
+        url: `/admin/products/${PRODUCT_ID}/toggle-publish`,
+        type: 'POST',
+        data: {
+            _token: $('meta[name="csrf-token"]').attr('content')
+        },
+        success: function(response) {
+            if (response.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: response.message,
+                    timer: 1000,
+                    showConfirmButton: false
+                }).then(() => {
+                    location.reload();
+                });
+            }
+        },
+        error: function(xhr) {
+            Swal.fire('Error!', 'Failed to toggle publish status', 'error');
+        }
+    });
+}
+
+function duplicateProduct() {
     Swal.fire({
-        title: 'Delete this variant?',
-        text: "This action cannot be undone!",
-        icon: 'warning',
+        title: 'Duplicate this product?',
+        text: "A copy will be created with '(Copy)' appended to the name",
+        icon: 'question',
         showCancelButton: true,
-        confirmButtonColor: '#dc3545',
+        confirmButtonColor: '#5B914C',
         cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, delete it!'
+        confirmButtonText: 'Yes, duplicate it!'
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '{{ route("admin.products.variants.destroy", [$product->id, ":variantId"]) }}'.replace(':variantId', variantId),
-                type: 'DELETE',
+                url: `/admin/products/${PRODUCT_ID}/duplicate`,
+                type: 'POST',
                 data: {
-                    _token: '{{ csrf_token() }}'
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                },
+                beforeSend: function() {
+                    Swal.fire({
+                        title: 'Duplicating...',
+                        text: 'Please wait',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
                 },
                 success: function(response) {
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Deleted!',
-                            text: response.message,
-                            timer: 1500,
-                            showConfirmButton: false
+                            title: 'Duplicated!',
+                            text: 'Product duplicated successfully',
+                            confirmButtonColor: '#5B914C'
                         }).then(() => {
-                            location.reload();
+                            window.location.href = `/admin/products/${response.product_id}/edit`;
                         });
                     }
                 },
                 error: function(xhr) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Failed to delete variant'
-                    });
+                    Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to duplicate product', 'error');
                 }
             });
         }
     });
 }
 
-// Remove new variant (not yet saved)
-function removeVariant(index) {
-    $(`#variant-${index}`).remove();
-}
-
-// Upload new gallery images via AJAX
-function uploadGalleryImages() {
-    if (galleryFiles.length === 0) return;
-
-    let formData = new FormData();
-    formData.append('_token', '{{ csrf_token() }}');
-
-    galleryFiles.forEach((file, index) => {
-        formData.append('images[]', file);
-    });
-
-    $.ajax({
-        url: '{{ route("admin.products.images.upload", $product->id) }}',
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        success: function(response) {
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Images Uploaded!',
-                    text: response.message,
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    location.reload();
-                });
-            }
-        },
-        error: function(xhr) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error!',
-                text: xhr.responseJSON?.message || 'Failed to upload images'
+function deleteProduct() {
+    Swal.fire({
+        title: 'Delete this product?',
+        text: "This action cannot be undone!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete it!',
+        input: 'checkbox',
+        inputPlaceholder: 'I understand this action is permanent'
+    }).then((result) => {
+        if (result.isConfirmed && result.value) {
+            $.ajax({
+                url: `/admin/products/${PRODUCT_ID}`,
+                type: 'DELETE',
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                },
+                beforeSend: function() {
+                    Swal.fire({
+                        title: 'Deleting...',
+                        text: 'Please wait',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Deleted!',
+                            text: 'Product deleted successfully',
+                            confirmButtonColor: '#5B914C'
+                        }).then(() => {
+                            window.location.href = '/admin/products';
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to delete product', 'error');
+                }
             });
+        } else if (result.isConfirmed && !result.value) {
+            Swal.fire('Cancelled', 'Please check the confirmation box', 'info');
         }
     });
 }
+
+function openAddCategoryModal() {
+    $('#addCategoryModal').modal('show');
+}
+
+function openAddVendorModal() {
+    $('#addVendorModal').modal('show');
+}
+
+// Close tag suggestions when clicking outside
+$(document).on('click', function(e) {
+    if (!$(e.target).closest('#tagsContainer, #tagSuggestions').length) {
+        $('#tagSuggestions').hide();
+    }
+});
+
+// Focus tag input when clicking on tags container
+$(document).on('click', '#tagsContainer', function() {
+    $('#tagInput').focus();
+});
 </script>
 @endpush
