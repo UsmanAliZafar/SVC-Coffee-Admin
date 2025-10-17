@@ -384,6 +384,7 @@ class ProductsController extends Controller
             'tax_type' => 'nullable|in:inclusive,exclusive',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
+            'features' => 'nullable|json',
         ]);
 
         if ($validator->fails()) {
@@ -444,6 +445,25 @@ class ProductsController extends Controller
 
             // Set created_by
             $productData['created_by'] = auth('admin')->id();
+
+             // Attach features if provided
+            if ($request->filled('features')) {
+                $features = json_decode($request->features, true);
+
+                // Validate features structure
+                if (is_array($features)) {
+                    // Optional: Add server-side validation
+                    $richTextCount = count(array_filter($features, fn($f) => ($f['type'] ?? '') === 'rich_text'));
+                    if ($richTextCount > 1) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Only one Rich Text feature is allowed'
+                        ], 422);
+                    }
+
+                    $productData['features'] = $features;
+                }
+            }
 
             // Create product
             $product = Product::create($productData);
@@ -590,7 +610,7 @@ class ProductsController extends Controller
             'barcode' => 'nullable|string|max:255|unique:products,barcode,' . $id,
             'category_id' => 'nullable|exists:products_categories,id',
             'vendor_id' => 'nullable|exists:vendors,id',
-            'product_type' => 'required|in:simple,variable,grouped,external',
+            'product_type' => 'nullable|string|max:100',
             'price' => 'required|numeric|min:0',
             'sale_price' => 'nullable|numeric|min:0|lt:price',
             'cost_price' => 'nullable|numeric|min:0',
@@ -602,6 +622,7 @@ class ProductsController extends Controller
             'tax_type' => 'nullable|in:inclusive,exclusive',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
+            'features' => 'nullable|json',
         ]);
 
         if ($validator->fails()) {
@@ -647,7 +668,24 @@ class ProductsController extends Controller
 
             // Set updated_by
             $productData['updated_by'] = auth('admin')->id();
+            // Attach features if provided
+            if ($request->filled('features')) {
+                $features = json_decode($request->features, true);
 
+                // Validate features structure
+                if (is_array($features)) {
+                    // Optional: Add server-side validation
+                    $richTextCount = count(array_filter($features, fn($f) => ($f['type'] ?? '') === 'rich_text'));
+                    if ($richTextCount > 1) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Only one Rich Text feature is allowed'
+                        ], 422);
+                    }
+
+                    $productData['features'] = $features;
+                }
+            }
             // Update product
             $product->update($productData);
 
@@ -2240,5 +2278,45 @@ class ProductsController extends Controller
                 'message' => 'Failed to update URL: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get feature template for AJAX (optional helper endpoint)
+     */
+    public function getFeatureTemplate(Request $request)
+    {
+        $type = $request->get('type');
+
+        if (!in_array($type, ['rich_text', 'single_line', 'multiline_text', 'links_list'])) {
+            return response()->json(['error' => 'Invalid feature type'], 400);
+        }
+
+        $templates = [
+            'rich_text' => [
+                'name' => 'Rich Text Editor',
+                'icon' => 'bi-file-richtext',
+                'description' => 'Full-featured text editor with formatting'
+            ],
+            'single_line' => [
+                'name' => 'Single Line Text',
+                'icon' => 'bi-input-cursor-text',
+                'description' => 'Simple text input for short values'
+            ],
+            'multiline_text' => [
+                'name' => 'Multiline Text',
+                'icon' => 'bi-textarea-t',
+                'description' => 'Textarea for longer text content'
+            ],
+            'links_list' => [
+                'name' => 'Links List',
+                'icon' => 'bi-link-45deg',
+                'description' => 'Add multiple links with titles'
+            ]
+        ];
+
+        return response()->json([
+            'success' => true,
+            'template' => $templates[$type] ?? null
+        ]);
     }
 }

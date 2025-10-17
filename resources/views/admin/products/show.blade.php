@@ -1,6 +1,6 @@
 @extends('admin.layouts.app')
-
-@section('title', 'View Product')
+{{-- products/show.blade.php --}}
+@section('title', 'View Product - ' . $product->name)
 
 @push('styles')
 <style>
@@ -10,7 +10,9 @@
         padding: 20px;
         margin-bottom: 20px;
         border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
+
     .section-title {
         color: #5B914C;
         font-weight: 600;
@@ -18,80 +20,101 @@
         margin-bottom: 15px;
         padding-bottom: 10px;
         border-bottom: 2px solid #5B914C;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
+
     .info-label {
         font-weight: 600;
         color: #666;
         font-size: 0.9rem;
         margin-bottom: 5px;
     }
+
     .info-value {
         font-size: 1rem;
         color: #333;
         margin-bottom: 15px;
     }
+
     .product-header {
         background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
         color: white;
         padding: 30px;
         border-radius: 10px;
         margin-bottom: 30px;
+        box-shadow: 0 4px 12px rgba(91, 145, 76, 0.3);
     }
+
     .product-title {
         font-size: 2rem;
         font-weight: bold;
         margin-bottom: 10px;
     }
+
     .product-sku {
         font-size: 1rem;
         opacity: 0.9;
     }
+
     .price-display {
-        background: #f8f9fa;
+        background: rgba(255, 255, 255, 0.95);
         padding: 20px;
         border-radius: 8px;
         text-align: center;
-        border: 2px solid #5B914C;
+        border: 2px solid rgba(255, 255, 255, 0.5);
     }
+
     .price-label {
         font-size: 0.9rem;
         color: #666;
         margin-bottom: 5px;
     }
+
     .price-value {
         font-size: 2rem;
         font-weight: bold;
         color: #5B914C;
     }
+
     .sale-price {
         color: #dc3545;
     }
+
     .original-price {
         text-decoration: line-through;
         color: #999;
         font-size: 1.2rem;
     }
+
     .image-gallery {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         gap: 15px;
     }
+
     .gallery-image {
         position: relative;
         border-radius: 8px;
         overflow: hidden;
         border: 2px solid #ddd;
         cursor: pointer;
-        transition: transform 0.3s;
+        transition: all 0.3s;
     }
+
     .gallery-image:hover {
         transform: scale(1.05);
+        border-color: #5B914C;
+        box-shadow: 0 4px 12px rgba(91, 145, 76, 0.3);
     }
+
     .gallery-image img {
         width: 100%;
         height: 150px;
         object-fit: cover;
     }
+
     .primary-badge {
         position: absolute;
         top: 10px;
@@ -103,41 +126,63 @@
         font-size: 0.75rem;
         font-weight: bold;
     }
+
     .main-product-image {
         width: 100%;
         max-width: 500px;
         border-radius: 10px;
         border: 3px solid #5B914C;
         margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
+
     .badge-large {
         font-size: 1rem;
         padding: 8px 15px;
     }
+
     .stat-card {
-        background: #f8f9fa;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         padding: 15px;
         border-radius: 8px;
         text-align: center;
         border: 1px solid #ddd;
+        transition: all 0.3s;
     }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
     .stat-label {
         font-size: 0.85rem;
         color: #666;
         margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
+
     .stat-value {
         font-size: 1.5rem;
         font-weight: bold;
         color: #5B914C;
     }
+
     .variant-card {
         background: #f8f9fa;
         padding: 15px;
         border-radius: 8px;
         margin-bottom: 10px;
         border: 1px solid #ddd;
+        transition: all 0.2s;
     }
+
+    .variant-card:hover {
+        border-color: #5B914C;
+        box-shadow: 0 2px 8px rgba(91, 145, 76, 0.2);
+    }
+
     .tag-badge {
         display: inline-block;
         background: #5B914C;
@@ -146,7 +191,14 @@
         border-radius: 20px;
         margin: 3px;
         font-size: 0.875rem;
+        transition: all 0.2s;
     }
+
+    .tag-badge:hover {
+        background: #4a7a3d;
+        transform: translateY(-2px);
+    }
+
     .timeline-item {
         padding: 10px 0;
         border-left: 2px solid #5B914C;
@@ -154,6 +206,7 @@
         margin-left: 10px;
         position: relative;
     }
+
     .timeline-item::before {
         content: '';
         width: 12px;
@@ -164,15 +217,61 @@
         left: -7px;
         top: 15px;
     }
+
     .description-content {
         line-height: 1.8;
         color: #555;
     }
+
     .description-content img {
         max-width: 100%;
         height: auto;
         border-radius: 8px;
         margin: 10px 0;
+    }
+
+    .tax-info-box {
+        background: #e7f3ff;
+        border-left: 4px solid #0d6efd;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+    }
+
+    .specifications-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+    }
+
+    .spec-item {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 6px;
+        border-left: 3px solid #5B914C;
+    }
+
+    .spec-label {
+        font-size: 0.8rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+    }
+
+    .spec-value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .action-btn {
+        transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
 </style>
 @endpush
@@ -193,21 +292,21 @@
         </div>
         <div>
             @if(auth('admin')->user()->hasPermission('products.update'))
-            <a href="{{ route('admin.products.edit', $product->id) }}" class="btn btn-primary">
+            <a href="{{ route('admin.products.edit', $product->id) }}" class="btn btn-primary action-btn">
                 <i class="bi bi-pencil"></i> Edit Product
             </a>
             @endif
             @if(auth('admin')->user()->hasPermission('products.create'))
-            <a href="{{ route('admin.products.duplicate', $product->id) }}" class="btn btn-outline-secondary" onclick="return confirm('Duplicate this product?')">
+            <button type="button" class="btn btn-outline-secondary action-btn" onclick="duplicateProduct()">
                 <i class="bi bi-files"></i> Duplicate
-            </a>
+            </button>
             @endif
             @if(auth('admin')->user()->hasPermission('products.delete'))
-            <button type="button" class="btn btn-outline-danger" onclick="deleteProduct()">
+            <button type="button" class="btn btn-outline-danger action-btn" onclick="deleteProduct()">
                 <i class="bi bi-trash"></i> Delete
             </button>
             @endif
-            <a href="{{ route('admin.products.index') }}" class="btn btn-outline-secondary">
+            <a href="{{ route('admin.products.index') }}" class="btn btn-outline-secondary action-btn">
                 <i class="bi bi-arrow-left"></i> Back
             </a>
         </div>
@@ -244,6 +343,10 @@
                     @else
                         <span class="badge bg-warning"><i class="bi bi-clock"></i> Unpublished</span>
                     @endif
+
+                    @if($product->track_inventory)
+                        {!! $product->getStockBadge() !!}
+                    @endif
                 </div>
             </div>
             <div class="col-md-4 text-end">
@@ -269,11 +372,13 @@
 
             <!-- Product Image & Gallery -->
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-images"></i> Product Images</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-images"></i> Product Images
+                </h5>
 
                 @if($product->getMainImageUrl())
                 <div class="text-center mb-4">
-                    <img src="{{ $product->getMainImageUrl() }}" alt="{{ $product->name }}" class="main-product-image">
+                    <img src="{{ $product->getMainImageUrl() }}" alt="{{ $product->name }}" class="main-product-image" onclick="viewImage('{{ $product->getMainImageUrl() }}')">
                 </div>
                 @endif
 
@@ -298,7 +403,9 @@
             <!-- Product Description -->
             @if($product->short_description || $product->description)
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-file-text"></i> Description</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-file-text"></i> Description
+                </h5>
 
                 @if($product->short_description)
                 <div class="mb-3">
@@ -318,10 +425,98 @@
             </div>
             @endif
 
+            <!-- Product Features Display -->
+            @include('admin.products.partials.features-display', ['product' => $product])
+
+            <!-- Specifications & Attributes -->
+            @if($product->specifications || $product->attributes)
+            <div class="info-section">
+                <h5 class="section-title">
+                    <i class="bi bi-list-check"></i> Specifications & Attributes
+                </h5>
+
+                @if($product->specifications)
+                <div class="mb-4">
+                    <div class="info-label mb-3">Specifications</div>
+                    <div class="specifications-grid">
+                        @foreach($product->specifications as $key => $value)
+                        <div class="spec-item">
+                            <div class="spec-label">{{ $key }}</div>
+                            <div class="spec-value">{{ $value }}</div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
+                @if($product->attributes)
+                <div>
+                    <div class="info-label mb-3">Attributes</div>
+                    <div class="specifications-grid">
+                        @foreach($product->attributes as $key => $value)
+                        <div class="spec-item">
+                            <div class="spec-label">{{ $key }}</div>
+                            <div class="spec-value">{{ $value }}</div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+            </div>
+            @endif
+
+            <!-- Tax Information -->
+            @if($product->is_taxable)
+            <div class="info-section">
+                <h5 class="section-title">
+                    <i class="bi bi-receipt"></i> Tax Information
+                </h5>
+
+                <div class="tax-info-box">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Tax Status</div>
+                            <div class="info-value">
+                                <span class="badge bg-primary">Taxable</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Tax Type</div>
+                            <div class="info-value">{{ $product->getTaxTypeLabel() }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Tax Percentage</div>
+                            <div class="info-value">{{ $product->tax_percentage }}%</div>
+                        </div>
+                        @if($product->tax_class)
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Tax Class</div>
+                            <div class="info-value">{{ $product->tax_class }}</div>
+                        </div>
+                        @endif
+                    </div>
+
+                    <div class="alert alert-light mb-0">
+                        <strong>Tax Calculation Preview:</strong><br>
+                        @php
+                            $taxInfo = $product->getTaxInfo();
+                        @endphp
+                        <small>
+                            Base Price: {{ $product->curency }} {{ number_format($taxInfo['price_excluding_tax'], 2) }}<br>
+                            Tax Amount: {{ $product->curency }} {{ number_format($taxInfo['tax_amount'], 2) }}<br>
+                            <strong>Final Price: {{ $product->curency }} {{ number_format($taxInfo['price_including_tax'], 2) }}</strong>
+                        </small>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <!-- Product Variants -->
             @if($product->product_type === 'variable' && $product->variants->count() > 0)
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-layers"></i> Product Variants ({{ $product->variants->count() }})</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-layers"></i> Product Variants ({{ $product->variants->count() }})
+                </h5>
 
                 @foreach($product->variants as $variant)
                 <div class="variant-card">
@@ -355,9 +550,11 @@
             @endif
 
             <!-- SEO Information -->
-            @if($product->meta_title || $product->meta_description || $product->meta_keywords)
+            @if($product->meta_title || $product->meta_description || $product->meta_keywords || $product->canonical_url)
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-search"></i> SEO Information</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-search"></i> SEO Information
+                </h5>
 
                 @if($product->meta_title)
                 <div class="mb-3">
@@ -384,16 +581,27 @@
                 <div class="mb-3">
                     <div class="info-label">Canonical URL</div>
                     <div class="info-value">
-                        <a href="{{ $product->canonical_url }}" target="_blank">{{ $product->canonical_url }}</a>
+                        <a href="{{ $product->canonical_url }}" target="_blank" rel="noopener">
+                            {{ $product->canonical_url }} <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
                     </div>
                 </div>
                 @endif
+
+                <div class="mb-0">
+                    <div class="info-label">Product Slug</div>
+                    <div class="info-value">
+                        <code>{{ $product->slug }}</code>
+                    </div>
+                </div>
             </div>
             @endif
 
             <!-- Activity Timeline -->
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-clock-history"></i> Activity Timeline</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-clock-history"></i> Activity Timeline
+                </h5>
 
                 <div class="timeline-item">
                     <strong>Product Created</strong><br>
@@ -423,6 +631,13 @@
                     <small class="text-muted">{{ $product->published_at->format('M d, Y H:i') }}</small>
                 </div>
                 @endif
+
+                @if($product->deleted_at)
+                <div class="timeline-item">
+                    <strong>Deleted</strong><br>
+                    <small class="text-muted">{{ $product->deleted_at->format('M d, Y H:i') }}</small>
+                </div>
+                @endif
             </div>
 
         </div>
@@ -432,7 +647,9 @@
 
             <!-- Quick Stats -->
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-graph-up"></i> Quick Stats</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-graph-up"></i> Quick Stats
+                </h5>
 
                 <div class="row g-3">
                     @if($product->track_inventory)
@@ -442,6 +659,12 @@
                             <div class="stat-value">{{ $product->getTotalStock() }}</div>
                         </div>
                     </div>
+                    <div class="col-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Low Stock Alert</div>
+                            <div class="stat-value">{{ $product->low_stock_threshold }}</div>
+                        </div>
+                    </div>
                     @endif
 
                     @if($product->isOnSale())
@@ -449,6 +672,12 @@
                         <div class="stat-card">
                             <div class="stat-label">Discount</div>
                             <div class="stat-value text-danger">{{ $product->getDiscountPercentage() }}%</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-card">
+                            <div class="stat-label">You Save</div>
+                            <div class="stat-value text-success">{{ $product->curency }} {{ number_format($product->getDiscountAmount(), 2) }}</div>
                         </div>
                     </div>
                     @endif
@@ -468,12 +697,37 @@
                             <div class="stat-value">{{ $product->images->count() }}</div>
                         </div>
                     </div>
+
+                    @if($product->hasFeatures())
+                    <div class="col-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Features</div>
+                            <div class="stat-value">{{ count($product->getFeatures()) }}</div>
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($product->tags->count() > 0)
+                    <div class="col-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Tags</div>
+                            <div class="stat-value">{{ $product->tags->count() }}</div>
+                        </div>
+                    </div>
+                    @endif
                 </div>
             </div>
 
             <!-- Product Information -->
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-info-circle"></i> Product Information</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-info-circle"></i> Product Information
+                </h5>
+
+                <div class="mb-3">
+                    <div class="info-label">Product ID</div>
+                    <div class="info-value"><code>{{ $product->id }}</code></div>
+                </div>
 
                 <div class="mb-3">
                     <div class="info-label">Product Type</div>
@@ -494,11 +748,7 @@
                 @if($product->vendor)
                 <div class="mb-3">
                     <div class="info-label">Vendor</div>
-                    <div class="info-value">
-                        <a href="{{ route('admin.vendors.show', $product->vendor->id) }}">
-                            {{ $product->vendor->name }}
-                        </a>
-                    </div>
+                    <div class="info-value">{{ $product->vendor->name }}</div>
                 </div>
                 @endif
 
@@ -512,13 +762,30 @@
                     <div class="info-label">Cost Price</div>
                     <div class="info-value">{{ $product->curency }} {{ number_format($product->cost_price, 2) }}</div>
                 </div>
+
+                @if($product->price > $product->cost_price)
+                <div class="mb-3">
+                    <div class="info-label">Profit Margin</div>
+                    <div class="info-value text-success">
+                        {{ $product->curency }} {{ number_format($product->price - $product->cost_price, 2) }}
+                        ({{ number_format((($product->price - $product->cost_price) / $product->price) * 100, 2) }}%)
+                    </div>
+                </div>
                 @endif
+                @endif
+
+                <div class="mb-0">
+                    <div class="info-label">Sort Order</div>
+                    <div class="info-value">{{ $product->sort_order ?? 0 }}</div>
+                </div>
             </div>
 
             <!-- Product Tags -->
             @if($product->tags->count() > 0)
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-tags"></i> Tags</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-tags"></i> Tags
+                </h5>
 
                 @foreach($product->tags as $tag)
                     <span class="tag-badge">{{ $tag->name }}</span>
@@ -528,18 +795,20 @@
 
             <!-- Availability Settings -->
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-toggles"></i> Settings</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-toggles"></i> Settings
+                </h5>
 
                 <div class="mb-2">
-                    <i class="bi bi-{{ $product->is_available ? 'check-circle text-success' : 'x-circle text-danger' }}"></i>
-                    <strong>Available for Purchase:</strong>
-                    {{ $product->is_available ? 'Yes' : 'No' }}
+                    <i class="bi bi-{{ $product->is_taxable ? 'check-circle text-success' : 'x-circle text-danger' }}"></i>
+                    <strong>Taxable:</strong>
+                    {{ $product->is_taxable ? 'Yes' : 'No' }}
                 </div>
 
                 <div class="mb-2">
-                    <i class="bi bi-{{ $product->track_inventory ? 'check-circle text-success' : 'x-circle text-danger' }}"></i>
-                    <strong>Track Inventory:</strong>
-                    {{ $product->track_inventory ? 'Yes' : 'No' }}
+                    <i class="bi bi-{{ $product->requires_login ? 'check-circle text-warning' : 'x-circle text-muted' }}"></i>
+                    <strong>Requires Login:</strong>
+                    {{ $product->requires_login ? 'Yes' : 'No' }}
                 </div>
 
                 @if($product->available_from)
@@ -562,23 +831,35 @@
             <!-- Stock Status -->
             @if($product->track_inventory)
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-box-seam"></i> Stock Status</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-box-seam"></i> Stock Status
+                </h5>
 
-                <div class="alert alert-{{ $product->isInStock() ? 'success' : 'danger' }} mb-0">
+                <div class="alert alert-{{ $product->isInStock() ? 'success' : 'danger' }} mb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <strong>{{ $product->isInStock() ? 'In Stock' : 'Out of Stock' }}</strong><br>
-                            <small>Total Units: {{ $product->getTotalStock() }}</small>
+                            <small>Current Stock: {{ $product->stock_quantity }} units</small>
                         </div>
                         <i class="bi bi-box-seam" style="font-size: 2rem; opacity: 0.3;"></i>
                     </div>
                 </div>
+
+                @if($product->isLowStock())
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Low Stock Alert!</strong><br>
+                    <small>Stock is below threshold of {{ $product->low_stock_threshold }} units</small>
+                </div>
+                @endif
             </div>
             @endif
 
             <!-- Quick Actions -->
             <div class="info-section">
-                <h5 class="section-title"><i class="bi bi-lightning"></i> Quick Actions</h5>
+                <h5 class="section-title">
+                    <i class="bi bi-lightning"></i> Quick Actions
+                </h5>
 
                 <div class="d-grid gap-2">
                     @if(auth('admin')->user()->hasPermission('products.update'))
@@ -591,6 +872,11 @@
                     <button type="button" class="btn btn-outline-success" onclick="togglePublish()">
                         <i class="bi bi-upload"></i> Toggle Publish
                     </button>
+                    @if($product->track_inventory)
+                    <button type="button" class="btn btn-outline-warning" onclick="updateStock()">
+                        <i class="bi bi-boxes"></i> Update Stock
+                    </button>
+                    @endif
                     @endif
                 </div>
             </div>
@@ -610,6 +896,60 @@
         </div>
     </div>
 </div>
+
+<!-- Update Stock Modal -->
+<div class="modal fade" id="updateStockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #5B914C; color: white;">
+                <h5 class="modal-title">
+                    <i class="bi bi-boxes"></i> Update Stock
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="updateStockForm">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Product</label>
+                        <input type="text" class="form-control" value="{{ $product->name }}" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Current Stock</label>
+                        <input type="text" class="form-control" value="{{ $product->stock_quantity }}" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Action Type</label>
+                        <select name="action_type" id="actionType" class="form-select" required>
+                            <option value="set">Set Stock (Replace)</option>
+                            <option value="add">Add Stock (Increase)</option>
+                            <option value="reduce">Reduce Stock (Decrease)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Quantity</label>
+                        <input type="number" name="quantity" id="stockQuantity" class="form-control" min="0" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Low Stock Threshold</label>
+                        <input type="number" name="low_stock_threshold" class="form-control" value="{{ $product->low_stock_threshold }}" min="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> Update Stock
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -645,14 +985,71 @@ function deleteProduct() {
                         Swal.fire({
                             icon: 'success',
                             title: 'Deleted!',
-                            text: response.message
+                            text: response.message,
+                            confirmButtonColor: '#5B914C'
                         }).then(() => {
                             window.location.href = '{{ route("admin.products.index") }}';
                         });
                     }
                 },
                 error: function(xhr) {
-                    Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to delete product', 'error');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: xhr.responseJSON?.message || 'Failed to delete product'
+                    });
+                }
+            });
+        }
+    });
+}
+
+// Duplicate product
+function duplicateProduct() {
+    Swal.fire({
+        title: 'Duplicate this product?',
+        text: "A copy will be created with '(Copy)' added to the name",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#5B914C',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, duplicate it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '{{ route("admin.products.duplicate", $product->id) }}',
+                type: 'POST',
+                data: {
+                    _token: '{{ csrf_token() }}'
+                },
+                beforeSend: function() {
+                    Swal.fire({
+                        title: 'Duplicating...',
+                        text: 'Please wait',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Duplicated!',
+                            text: response.message,
+                            confirmButtonColor: '#5B914C'
+                        }).then(() => {
+                            window.location.href = '/admin/products/' + response.product_id + '/edit';
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: xhr.responseJSON?.message || 'Failed to duplicate product'
+                    });
                 }
             });
         }
@@ -681,7 +1078,11 @@ function toggleFeatured() {
             }
         },
         error: function(xhr) {
-            Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to toggle featured status', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: xhr.responseJSON?.message || 'Failed to toggle featured status'
+            });
         }
     });
 }
@@ -708,7 +1109,11 @@ function toggleHomepage() {
             }
         },
         error: function(xhr) {
-            Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to toggle homepage visibility', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: xhr.responseJSON?.message || 'Failed to toggle homepage visibility'
+            });
         }
     });
 }
@@ -735,9 +1140,66 @@ function togglePublish() {
             }
         },
         error: function(xhr) {
-            Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to toggle publish status', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: xhr.responseJSON?.message || 'Failed to toggle publish status'
+            });
         }
     });
 }
+
+// Update stock
+function updateStock() {
+    $('#updateStockModal').modal('show');
+}
+
+// Handle stock update form submission
+$('#updateStockForm').on('submit', function(e) {
+    e.preventDefault();
+
+    const formData = {
+        _token: '{{ csrf_token() }}',
+        action_type: $('#actionType').val(),
+        quantity: $('#stockQuantity').val(),
+        low_stock_threshold: $('input[name="low_stock_threshold"]').val()
+    };
+
+    $.ajax({
+        url: '{{ route("admin.products.quick-stock-update", $product->id) }}',
+        type: 'POST',
+        data: formData,
+        beforeSend: function() {
+            $('#updateStockModal').modal('hide');
+            Swal.fire({
+                title: 'Updating Stock...',
+                text: 'Please wait',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+        },
+        success: function(response) {
+            if (response.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: response.message,
+                    confirmButtonColor: '#5B914C'
+                }).then(() => {
+                    location.reload();
+                });
+            }
+        },
+        error: function(xhr) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: xhr.responseJSON?.message || 'Failed to update stock'
+            });
+        }
+    });
+});
 </script>
 @endpush

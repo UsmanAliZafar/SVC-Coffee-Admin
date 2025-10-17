@@ -71,6 +71,7 @@ class Product extends Model
         'structured_data',
         'attributes',
         'specifications',
+        'features',
         'is_available',
         'requires_login',
         'available_from',
@@ -104,6 +105,7 @@ class Product extends Model
         'low_stock_threshold' => 'integer',
         'attributes' => 'array',
         'specifications' => 'array',
+        'features' => 'array',
         'structured_data' => 'array',
         'visibility_settings' => 'array',
         'available_from' => 'datetime',
@@ -919,5 +921,177 @@ class Product extends Model
             'price_excluding_tax' => $this->getPriceExcludingTax($price),
             'price_including_tax' => $this->getPriceIncludingTax($price),
         ];
+    }
+
+    /**
+     * Get all features
+     */
+    public function getFeatures(): array
+    {
+        return $this->features ?? [];
+    }
+
+    /**
+     * Get feature by label
+     */
+    public function getFeatureByLabel(string $label)
+    {
+        $features = $this->getFeatures();
+
+        foreach ($features as $feature) {
+            if (isset($feature['label']) && $feature['label'] === $label) {
+                return $feature;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get features by type
+     */
+    public function getFeaturesByType(string $type): array
+    {
+        $features = $this->getFeatures();
+
+        return array_filter($features, function($feature) use ($type) {
+            return isset($feature['type']) && $feature['type'] === $type;
+        });
+    }
+
+    /**
+     * Check if product has features
+     */
+    public function hasFeatures(): bool
+    {
+        $features = $this->getFeatures();
+        return !empty($features);
+    }
+
+    /**
+     * Get rich text feature (only one allowed)
+     */
+    public function getRichTextFeature()
+    {
+        $features = $this->getFeaturesByType('rich_text');
+        return !empty($features) ? reset($features) : null;
+    }
+
+    /**
+     * Get all single line text features
+     */
+    public function getSingleLineFeatures(): array
+    {
+        return $this->getFeaturesByType('single_line');
+    }
+
+    /**
+     * Get all multiline text features
+     */
+    public function getMultilineFeatures(): array
+    {
+        return $this->getFeaturesByType('multiline_text');
+    }
+
+    /**
+     * Get all links list features
+     */
+    public function getLinksListFeatures(): array
+    {
+        return $this->getFeaturesByType('links_list');
+    }
+
+    /**
+     * Format features for display
+     */
+    public function getFormattedFeatures(): array
+    {
+        $features = $this->getFeatures();
+        $formatted = [];
+
+        foreach ($features as $feature) {
+            if (!isset($feature['type']) || !isset($feature['label'])) {
+                continue;
+            }
+
+            $formatted[] = [
+                'type' => $feature['type'],
+                'label' => $feature['label'],
+                'value' => $feature['value'] ?? '',
+                'type_name' => $this->getFeatureTypeName($feature['type']),
+                'icon' => $this->getFeatureIcon($feature['type'])
+            ];
+        }
+
+        return $formatted;
+    }
+
+    /**
+     * Get feature type name
+     */
+    private function getFeatureTypeName(string $type): string
+    {
+        return match($type) {
+            'rich_text' => 'Rich Text',
+            'single_line' => 'Single Line Text',
+            'multiline_text' => 'Multiline Text',
+            'links_list' => 'Links List',
+            default => ucfirst(str_replace('_', ' ', $type))
+        };
+    }
+
+    /**
+     * Get feature icon
+     */
+    private function getFeatureIcon(string $type): string
+    {
+        return match($type) {
+            'rich_text' => 'bi-file-richtext',
+            'single_line' => 'bi-input-cursor-text',
+            'multiline_text' => 'bi-textarea-t',
+            'links_list' => 'bi-link-45deg',
+            default => 'bi-star'
+        };
+    }
+
+    /**
+     * Validate features structure
+     */
+    public function validateFeatures(array $features): bool
+    {
+        $richTextCount = 0;
+
+        foreach ($features as $feature) {
+            // Check required fields
+            if (!isset($feature['type']) || !isset($feature['label'])) {
+                return false;
+            }
+
+            // Check valid type
+            if (!in_array($feature['type'], ['rich_text', 'single_line', 'multiline_text', 'links_list'])) {
+                return false;
+            }
+
+            // Count rich text features (should be max 1)
+            if ($feature['type'] === 'rich_text') {
+                $richTextCount++;
+            }
+
+            // Validate links_list structure
+            if ($feature['type'] === 'links_list' && isset($feature['value'])) {
+                if (!is_array($feature['value'])) {
+                    return false;
+                }
+
+                foreach ($feature['value'] as $link) {
+                    if (!isset($link['title']) || !isset($link['url'])) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // Only one rich text allowed
+        return $richTextCount <= 1;
     }
 }

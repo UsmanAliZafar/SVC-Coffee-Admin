@@ -526,7 +526,8 @@
                         </div>
                     </div>
                 </div>
-
+                {{-- FeatureLinting. --}}
+                @include('admin.products.partials.features', ['product' => $product])
                 <!-- SEO Settings -->
                 <div class="form-section">
                     <h5 class="section-title"><i class="bi bi-search"></i> SEO Settings</h5>
@@ -1486,15 +1487,21 @@ $(document).ready(function() {
     $('#productForm').on('submit', function(e) {
         e.preventDefault();
 
-        // Get CKEditor content
+        // Get CKEditor content for description
         if (descriptionEditor) {
             $('textarea[name="description"]').val(descriptionEditor.getData());
         }
 
+        // Update all feature editors before submit
+        if (typeof beforeProductFormSubmit === 'function') {
+            beforeProductFormSubmit();
+        }
+
         let formData = new FormData(this);
+        formData.append('_method', 'PUT');
 
         $.ajax({
-            url: `/admin/products/${PRODUCT_ID}`,
+            url: '/admin/products/{{ $product->id }}',
             type: 'POST',
             data: formData,
             processData: false,
@@ -1516,8 +1523,6 @@ $(document).ready(function() {
                         title: 'Success!',
                         text: response.message,
                         confirmButtonColor: '#5B914C'
-                    }).then(() => {
-                        location.reload();
                     });
                 } else {
                     Swal.fire({
@@ -1533,11 +1538,9 @@ $(document).ready(function() {
                 if (xhr.status === 422) {
                     let errors = xhr.responseJSON.errors;
 
-                    // Clear previous errors
                     $('.is-invalid').removeClass('is-invalid');
                     $('.invalid-feedback').empty();
 
-                    // Show errors
                     $.each(errors, function(field, messages) {
                         let input = $(`[name="${field}"]`);
                         input.addClass('is-invalid');

@@ -414,7 +414,8 @@
                         <div id="galleryPreview" class="mt-3"></div>
                     </div>
                 </div>
-
+                <!-- Product Features -->
+                @include('admin.products.partials.features')
                 <!-- SEO Settings -->
                 <div class="form-section">
                     <h5 class="section-title"><i class="bi bi-search"></i> SEO Settings</h5>
@@ -1187,9 +1188,14 @@
     $('#productForm').on('submit', function(e) {
         e.preventDefault();
 
-        // Get CKEditor content
+        // Get CKEditor content for description
         if (descriptionEditor) {
             $('textarea[name="description"]').val(descriptionEditor.getData());
+        }
+
+        // Update all feature editors before submit
+        if (typeof beforeProductFormSubmit === 'function') {
+            beforeProductFormSubmit();
         }
 
         let formData = new FormData(this);
