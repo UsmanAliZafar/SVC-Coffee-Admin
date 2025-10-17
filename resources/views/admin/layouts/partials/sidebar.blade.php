@@ -105,6 +105,7 @@
                     </ul>
                 </li>
             @endif
+            {{-- Inventory Management --}}
 
             {{-- Orders Management --}}
             @if(auth('admin')->user()->hasPermission('orders.read'))
