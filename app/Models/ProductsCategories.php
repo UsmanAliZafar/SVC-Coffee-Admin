@@ -452,7 +452,7 @@ class ProductsCategories extends Model
         }
 
         // Return placeholder image
-        return asset('images/placeholders/category-placeholder.jpg');
+        return asset('images/placeholders/not_availble.jpg');
     }
 
     /**

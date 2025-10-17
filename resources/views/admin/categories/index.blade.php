@@ -396,5 +396,22 @@ $(document).ready(function() {
     // Initial statistics load
     updateStatistics();
 });
+// View product image in modal
+function viewCategoryImage(imageUrl, categoryTitle) {
+    Swal.fire({
+        title: categoryTitle,
+        imageUrl: imageUrl,
+        imageAlt: categoryTitle,
+        imageWidth: 600,
+        imageHeight: 600,
+        showCloseButton: true,
+        showConfirmButton: false,
+        backdrop: 'rgba(0,0,0,0.8)',
+        customClass: {
+            image: 'rounded',
+            popup: 'border-0'
+        }
+    });
+}
 </script>
 @endpush

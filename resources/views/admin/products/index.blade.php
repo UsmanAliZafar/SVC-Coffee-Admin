@@ -147,18 +147,9 @@
     <!-- Filters -->
     <div class="card filter-card">
         <div class="row g-3">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">Search</label>
                 <input type="text" id="searchFilter" class="form-control" placeholder="Name, SKU, Barcode...">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Status</label>
-                <select id="statusFilter" class="form-select">
-                    <option value="">All Statuses</option>
-                    @foreach($statusList as $status)
-                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
-                    @endforeach
-                </select>
             </div>
             <div class="col-md-2">
                 <label class="form-label">Category</label>
@@ -169,7 +160,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2">
+             <div class="col-md-2">
                 <label class="form-label">Vendor</label>
                 <select id="vendorFilter" class="form-select">
                     <option value="">All Vendors</option>
@@ -178,7 +169,16 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
+                <label class="form-label">Status</label>
+                <select id="statusFilter" class="form-select">
+                    <option value="">All Statuses</option>
+                    @foreach($statusList as $status)
+                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-1">
                 <label class="form-label">Stock Status</label>
                 <select id="stockFilter" class="form-select">
                     <option value="">All</option>
@@ -187,14 +187,7 @@
                     <option value="out_of_stock">Out of Stock</option>
                 </select>
             </div>
-            <div class="col-md-1 d-flex align-items-end">
-                <button type="button" id="resetFilters" class="btn btn-outline-secondary w-100" title="Reset Filters">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </button>
-            </div>
-        </div>
-        <div class="row g-3 mt-1">
-            <div class="col-md-2">
+             <div class="col-md-1">
                 <label class="form-label">Featured</label>
                 <select id="featuredFilter" class="form-select">
                     <option value="">All</option>
@@ -202,7 +195,7 @@
                     <option value="0">Non-Featured</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label">Show on Home</label>
                 <select id="homeFilter" class="form-select">
                     <option value="">All</option>
@@ -210,13 +203,18 @@
                     <option value="0">No</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label">Availability</label>
                 <select id="availableFilter" class="form-select">
                     <option value="">All</option>
                     <option value="1">Available</option>
                     <option value="0">Not Available</option>
                 </select>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="button" id="resetFilters" class="btn btn-outline-secondary w-100" title="Reset Filters">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -926,5 +924,22 @@ $('#quickStockForm').on('submit', function(e) {
         }
     });
 });
+// View product image in modal
+function viewProductImage(imageUrl, productName) {
+    Swal.fire({
+        title: productName,
+        imageUrl: imageUrl,
+        imageAlt: productName,
+        imageWidth: 600,
+        imageHeight: 600,
+        showCloseButton: true,
+        showConfirmButton: false,
+        backdrop: 'rgba(0,0,0,0.8)',
+        customClass: {
+            image: 'rounded',
+            popup: 'border-0'
+        }
+    });
+}
 </script>
 @endpush

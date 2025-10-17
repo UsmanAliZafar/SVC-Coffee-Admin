@@ -61,9 +61,14 @@ class CategoriesController extends Controller
             ->addColumn('checkbox', function ($category) {
                 return '<input type="checkbox" class="category-checkbox" value="' . $category->id . '">';
             })
-            ->addColumn('image_preview', function ($category) {
+           ->addColumn('image_preview', function ($category) {
                 $imageUrl = $category->getImageUrl('thumbnail');
-                return '<img src="' . $imageUrl . '" alt="' . $category->title . '" class="img-thumbnail" style="width: 50px; height: 50px; object-fit: cover;">';
+                return '<img src="' . $imageUrl . '"
+                            alt="' . htmlspecialchars($category->title) . '"
+                            class="img-thumbnail category-image-preview"
+                            style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;"
+                            onclick="viewCategoryImage(\'' . $imageUrl . '\', \'' . htmlspecialchars($category->title, ENT_QUOTES) . '\')"
+                            onerror="this.style.display=\'none\'; this.parentElement.innerHTML+=\'<div class=\\\'img-thumbnail d-flex align-items-center justify-content-center\\\' style=\\\'width: 50px; height: 50px; background-color: #f8f9fa;\\\'><i class=\\\'bi bi-image-fill text-muted\\\'></i></div>\'">';
             })
             ->addColumn('title_link', function ($category) {
                 $depth = $category->depth;
