@@ -1,5 +1,5 @@
 @extends('admin.layouts.app')
-
+{{--  products/index.blade.php --}}
 @section('title', 'Products Management')
 
 @push('styles')
@@ -66,6 +66,22 @@
     }
     .stock-in {
         color: #28a745;
+    }
+
+    .stock-badge-container {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .quick-stock-btn {
+        font-size: 1rem;
+        line-height: 1;
+        vertical-align: middle;
+    }
+
+    .quick-stock-btn:hover i {
+        color: #5B914C !important;
     }
 </style>
 @endpush
@@ -351,6 +367,81 @@
         </div>
     </div>
 </div>
+
+<!-- Quick Stock Management Modal -->
+<div class="modal fade" id="quickStockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-box-seam"></i> Quick Stock Management
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="quickStockForm">
+                @csrf
+                <input type="hidden" id="quickStockProductId" name="product_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <h6 id="quickStockProductName" class="text-muted"></h6>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Current Stock</label>
+                        <div class="alert alert-info mb-2">
+                            <strong id="quickStockCurrent">0</strong> units
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Action Type</label>
+                        <select id="quickStockAction" class="form-select" name="action_type">
+                            <option value="set">Set Stock (Replace)</option>
+                            <option value="add">Add Stock (+)</option>
+                            <option value="reduce">Reduce Stock (-)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Quantity</label>
+                        <div class="input-group">
+                            <button type="button" class="btn btn-outline-secondary" onclick="quickAdjustStock(-10)">
+                                <i class="bi bi-dash-lg"></i> 10
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="quickAdjustStock(-1)">
+                                <i class="bi bi-dash"></i>
+                            </button>
+                            <input type="number" id="quickStockQuantity" name="quantity" class="form-control text-center" min="0" value="0" required>
+                            <button type="button" class="btn btn-outline-secondary" onclick="quickAdjustStock(1)">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="quickAdjustStock(10)">
+                                <i class="bi bi-plus-lg"></i> 10
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Low Stock Threshold</label>
+                        <input type="number" id="quickStockThreshold" name="low_stock_threshold" class="form-control" min="0" value="10">
+                        <div class="form-text">Optional: Update threshold for low stock alerts</div>
+                    </div>
+
+                    <div id="quickStockPreview" class="alert alert-secondary">
+                        <strong>Preview:</strong> <span id="previewText">New stock will be: 0</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-filter">
+                        <i class="bi bi-check-circle"></i> Update Stock
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -716,6 +807,124 @@ $(document).ready(function() {
 
     // Initial statistics load
     updateStatistics();
+});
+
+// Quick Stock Management
+// Quick Stock Management
+$(document).on('click', '.quick-stock-btn', function() {
+    const productId = $(this).data('id');
+    const productName = $(this).data('name');
+    const currentStock = parseInt($(this).data('stock'));
+    const threshold = parseInt($(this).data('threshold'));
+
+    $('#quickStockProductId').val(productId);
+    $('#quickStockProductName').text(productName);
+    $('#quickStockCurrent').text(currentStock);
+    $('#quickStockQuantity').val(0);
+    $('#quickStockThreshold').val(threshold);
+    $('#quickStockAction').val('set');
+
+    updateQuickStockPreview();
+    $('#quickStockModal').modal('show');
+});
+
+// Adjust quick stock quantity
+window.quickAdjustStock = function(amount) {
+    const input = $('#quickStockQuantity');
+    const currentValue = parseInt(input.val()) || 0;
+    const newValue = Math.max(0, currentValue + amount);
+    input.val(newValue);
+    updateQuickStockPreview();
+};
+
+// Update stock preview
+function updateQuickStockPreview() {
+    const action = $('#quickStockAction').val();
+    const quantity = parseInt($('#quickStockQuantity').val()) || 0;
+    const currentStock = parseInt($('#quickStockCurrent').text());
+    let newStock = 0;
+    let actionText = '';
+
+    switch(action) {
+        case 'set':
+            newStock = quantity;
+            actionText = `Stock will be set to: <strong>${newStock}</strong> units`;
+            break;
+        case 'add':
+            newStock = currentStock + quantity;
+            actionText = `Stock will be increased to: <strong>${newStock}</strong> units (${currentStock} + ${quantity})`;
+            break;
+        case 'reduce':
+            newStock = Math.max(0, currentStock - quantity);
+            actionText = `Stock will be reduced to: <strong>${newStock}</strong> units (${currentStock} - ${quantity})`;
+            break;
+    }
+
+    $('#previewText').html(actionText);
+
+    // Change preview color based on result
+    const previewDiv = $('#quickStockPreview');
+    previewDiv.removeClass('alert-secondary alert-success alert-warning alert-danger');
+
+    if (newStock <= 0) {
+        previewDiv.addClass('alert-danger');
+    } else if (newStock <= parseInt($('#quickStockThreshold').val())) {
+        previewDiv.addClass('alert-warning');
+    } else {
+        previewDiv.addClass('alert-success');
+    }
+}
+
+// Update preview when inputs change
+$('#quickStockAction, #quickStockQuantity, #quickStockThreshold').on('change keyup', function() {
+    updateQuickStockPreview();
+});
+
+// Submit quick stock form
+$('#quickStockForm').on('submit', function(e) {
+    e.preventDefault();
+
+    const productId = $('#quickStockProductId').val();
+    const formData = {
+        _token: '{{ csrf_token() }}',
+        action_type: $('#quickStockAction').val(),
+        quantity: parseInt($('#quickStockQuantity').val()),
+        low_stock_threshold: parseInt($('#quickStockThreshold').val())
+    };
+
+    $.ajax({
+        url: `/admin/products/${productId}/quick-stock-update`,
+        type: 'POST',
+        data: formData,
+        beforeSend: function() {
+            Swal.fire({
+                title: 'Updating Stock...',
+                text: 'Please wait',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+        },
+        success: function(response) {
+            if (response.success) {
+                $('#quickStockModal').modal('hide');
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: response.message,
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                table.draw(false); // Reload table without resetting pagination
+            } else {
+                Swal.fire('Error!', response.message, 'error');
+            }
+        },
+        error: function(xhr) {
+            Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to update stock', 'error');
+        }
+    });
 });
 </script>
 @endpush

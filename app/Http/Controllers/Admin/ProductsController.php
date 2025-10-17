@@ -8,6 +8,7 @@ use App\Models\ProductsCategories;
 use App\Models\ProductTag;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
+use App\Models\UrlRedirect;
 use App\Models\SystemStatus;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
@@ -189,19 +190,39 @@ class ProductsController extends Controller
                 return $html;
             })
             ->addColumn('stock_badge', function($product) {
+                $canUpdate = auth('admin')->user()->hasPermission('products.update');
+
                 if (!$product->track_inventory) {
-                    return '<span class="badge bg-info">No Tracking</span>';
-                }
-
-                $stock = $product->getTotalStock();
-
-                if ($stock <= 0) {
-                    return '<span class="badge bg-danger">Out of Stock</span>';
-                } elseif ($stock < 10) {
-                    return '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
+                    $badge = '<span class="badge bg-info">No Tracking</span>';
                 } else {
-                    return '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
+                    $stock = $product->getTotalStock();
+
+                    if ($stock <= 0) {
+                        $badge = '<span class="badge bg-danger">Out of Stock (' . $stock . ')</span>';
+                    } elseif ($stock < 10) {
+                        $badge = '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
+                    } else {
+                        $badge = '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
+                    }
                 }
+
+                if ($canUpdate && $product->track_inventory) {
+                    return '
+                        <div class="stock-badge-container">
+                            ' . $badge . '
+                            <button type="button" class="btn btn-sm btn-link p-0 ms-1 quick-stock-btn"
+                                data-id="' . $product->id . '"
+                                data-name="' . htmlspecialchars($product->name) . '"
+                                data-stock="' . $product->stock_quantity . '"
+                                data-threshold="' . $product->low_stock_threshold . '"
+                                title="Manage Stock">
+                                <i class="bi bi-pencil-square text-primary"></i>
+                            </button>
+                        </div>
+                    ';
+                }
+
+                return $badge;
             })
             ->addColumn('status_badge', function($product) {
                 return $product->getStatusBadge();
@@ -318,12 +339,7 @@ class ProductsController extends Controller
             'external' => 'External/Affiliate Product',
         ];
 
-        $currencies = [
-            'USD' => 'US Dollar ($)',
-            'EUR' => 'Euro (€)',
-            'GBP' => 'British Pound (£)',
-            'PKR' => 'Pakistani Rupee (₨)',
-        ];
+        $currencies = get_currencies();
 
         return view('admin.products.create', compact(
             'categories',
@@ -364,6 +380,10 @@ class ProductsController extends Controller
             'stock_quantity' => 'nullable|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'session_id' => 'nullable|string',
+            'is_taxable' => 'nullable',
+            'tax_type' => 'nullable|in:inclusive,exclusive',
+            'tax_percentage' => 'nullable|numeric|min:0|max:100',
+            'tax_class' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -384,7 +404,8 @@ class ProductsController extends Controller
                 'price', 'sale_price', 'cost_price', 'status_key_code',
                 'is_featured', 'show_on_home', 'is_available', 'track_inventory',
                 'stock_quantity', 'low_stock_threshold',
-                'meta_title', 'meta_description', 'meta_keywords', 'canonical_url'
+                'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
+                'is_taxable', 'tax_type', 'tax_percentage', 'tax_class',
             ]);
 
             // Handle main image upload
@@ -400,7 +421,14 @@ class ProductsController extends Controller
             $productData['show_on_home'] = $request->has('show_on_home');
             $productData['is_available'] = $request->has('is_available') ?? true;
             $productData['track_inventory'] = $request->has('track_inventory') ?? true;
+            $productData['is_taxable'] = $request->has('is_taxable');
 
+            if (!isset($productData['tax_type'])) {
+                $productData['tax_type'] = 'exclusive';
+            }
+            if (!isset($productData['tax_percentage'])) {
+                $productData['tax_percentage'] = 0;
+            }
             // Set default product type if empty
             if (empty($productData['product_type'])) {
                 $productData['product_type'] = 'simple';
@@ -422,7 +450,24 @@ class ProductsController extends Controller
 
             // Attach tags if provided
             if ($request->filled('tags')) {
-                $product->tags()->attach($request->tags);
+                $tags = $request->tags;
+
+                // If it's a JSON string, decode it
+                if (is_string($tags)) {
+                    $tags = json_decode($tags, true);
+                }
+
+                // Make sure it's an array and not empty
+                if (is_array($tags) && !empty($tags)) {
+                    // Filter out empty values and ensure all are valid UUIDs
+                    $tags = array_filter($tags, function($tag) {
+                        return !empty($tag) && is_string($tag);
+                    });
+
+                    if (!empty($tags)) {
+                        $product->tags()->attach($tags);
+                    }
+                }
             }
 
             // Move temp images to product folder
@@ -490,6 +535,10 @@ class ProductsController extends Controller
             'tags'
         ])->findOrFail($id);
 
+        $productRedirects = UrlRedirect::forEntity('product', $id)
+                ->orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get();
         // Get all necessary data for form
         $categories = ProductsCategories::getFlatList();
         $vendors = Vendor::active()->ordered()->get();
@@ -507,12 +556,7 @@ class ProductsController extends Controller
             'external' => 'External/Affiliate Product',
         ];
 
-        $currencies = [
-            'USD' => 'US Dollar ($)',
-            'EUR' => 'Euro (€)',
-            'GBP' => 'British Pound (£)',
-            'PKR' => 'Pakistani Rupee (₨)',
-        ];
+        $currencies = get_currencies();
 
         return view('admin.products.edit', compact(
             'product',
@@ -521,7 +565,8 @@ class ProductsController extends Controller
             'tags',
             'statusList',
             'productTypes',
-            'currencies'
+            'currencies',
+            'productRedirects'
         ));
     }
 
@@ -553,6 +598,10 @@ class ProductsController extends Controller
             'description' => 'nullable|string',
             'status_key_code' => 'required|string',
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'is_taxable' => 'nullable',
+            'tax_type' => 'nullable|in:inclusive,exclusive',
+            'tax_percentage' => 'nullable|numeric|min:0|max:100',
+            'tax_class' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -572,7 +621,8 @@ class ProductsController extends Controller
                 'category_id', 'vendor_id', 'product_type', 'curency',
                 'price', 'sale_price', 'cost_price', 'status_key_code',
                 'is_featured', 'show_on_home', 'is_available', 'track_inventory',
-                'meta_title', 'meta_description', 'meta_keywords', 'canonical_url'
+                'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
+                'is_taxable', 'tax_type', 'tax_percentage', 'tax_class'
             ]);
 
             // Handle main image upload
@@ -593,6 +643,7 @@ class ProductsController extends Controller
             $productData['show_on_home'] = $request->has('show_on_home');
             $productData['is_available'] = $request->has('is_available');
             $productData['track_inventory'] = $request->has('track_inventory');
+            $productData['is_taxable'] = $request->has('is_taxable');
 
             // Set updated_by
             $productData['updated_by'] = auth('admin')->id();
@@ -602,7 +653,25 @@ class ProductsController extends Controller
 
             // Sync tags
             if ($request->has('tags')) {
-                $product->tags()->sync($request->tags);
+                $tags = $request->tags;
+
+                // If it's a JSON string, decode it
+                if (is_string($tags)) {
+                    $tags = json_decode($tags, true);
+                }
+
+                // Make sure it's an array
+                if (is_array($tags)) {
+                    // Filter out empty values
+                    $tags = array_filter($tags, function($tag) {
+                        return !empty($tag) && is_string($tag);
+                    });
+
+                    $product->tags()->sync($tags);
+                } else {
+                    // If tags is empty, detach all
+                    $product->tags()->sync([]);
+                }
             }
 
             DB::commit();
@@ -2049,6 +2118,126 @@ class ProductsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to activate products: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Quick stock update from index page
+     */
+    public function quickStockUpdate(Request $request, $id)
+    {
+        // Check permission
+        if (!auth('admin')->user()->hasPermission('products.update')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'action_type' => 'required|in:set,add,reduce',
+            'quantity' => 'required|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $product = Product::findOrFail($id);
+            $quantity = $request->quantity;
+
+            // Update stock based on action type
+            switch ($request->action_type) {
+                case 'set':
+                    $product->setStock($quantity);
+                    $message = 'Stock set to ' . $quantity . ' units';
+                    break;
+                case 'add':
+                    $product->addStock($quantity);
+                    $message = 'Added ' . $quantity . ' units to stock';
+                    break;
+                case 'reduce':
+                    $product->reduceStock($quantity);
+                    $message = 'Reduced stock by ' . $quantity . ' units';
+                    break;
+            }
+
+            // Update threshold if provided
+            if ($request->filled('low_stock_threshold')) {
+                $product->update(['low_stock_threshold' => $request->low_stock_threshold]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'new_stock' => $product->fresh()->stock_quantity
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update stock: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update product URL/slug with optional redirect
+     */
+    public function updateUrl(Request $request, $id)
+    {
+        if (!auth('admin')->user()->hasPermission('products.update')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'slug' => 'required|string|max:255|unique:products,slug,' . $id,
+            'create_redirect' => 'nullable|in:0,1,true,false',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $product = Product::findOrFail($id);
+            $oldSlug = $product->slug;
+            $newSlug = $request->slug;
+
+            // Update product slug
+            $product->slug = $newSlug;
+            $product->updated_by = auth('admin')->id();
+            $product->save();
+
+            // Create redirect if requested
+            if ($request->create_redirect && $oldSlug !== $newSlug) {
+                UrlRedirect::createProductRedirect($oldSlug, $newSlug, $product->id);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product URL updated successfully' . ($request->create_redirect ? ' with redirect' : ''),
+                'old_slug' => $oldSlug,
+                'new_slug' => $newSlug
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update URL: ' . $e->getMessage()
             ], 500);
         }
     }

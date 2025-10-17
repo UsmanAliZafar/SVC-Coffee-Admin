@@ -1,5 +1,5 @@
 @extends('admin.layouts.app')
-
+{{--  products/edite.blade.php --}}
 @section('title', 'Edit Product')
 
 @push('styles')
@@ -197,6 +197,177 @@
         padding: 6px 12px;
         margin-right: 5px;
     }
+
+    .url-handle-container .input-group-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+
+    .url-handle-container code {
+        background: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.875rem;
+    }
+
+    .url-handle-container .list-group-item {
+        padding: 10px 15px;
+    }
+
+    #urlEditSection .alert {
+        font-size: 0.875rem;
+        padding: 10px 15px;
+    }
+
+    /* Tags Styling */
+    .tags-container {
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 8px;
+        min-height: 46px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        cursor: text;
+        background: #fff;
+        transition: border-color 0.15s ease-in-out;
+    }
+
+    .tags-container:hover {
+        border-color: #5B914C;
+    }
+
+    .tags-container:focus-within {
+        border-color: #5B914C;
+        box-shadow: 0 0 0 0.2rem rgba(91, 145, 76, 0.25);
+    }
+
+    .tag-item {
+        display: inline-flex;
+        align-items: center;
+        background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
+        color: white;
+        padding: 4px 8px 4px 12px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        gap: 6px;
+        animation: tagSlideIn 0.2s ease-out;
+        transition: all 0.2s;
+    }
+
+    @keyframes tagSlideIn {
+        from {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    .tag-item:hover {
+        background: linear-gradient(135deg, #4a7a3d 0%, #3d6632 100%);
+        transform: translateY(-1px);
+    }
+
+    .tag-item .tag-name {
+        line-height: 1;
+    }
+
+    .tag-item .remove-tag {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1rem;
+        line-height: 1;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .tag-item .remove-tag:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.1);
+    }
+
+    .tag-input {
+        border: none;
+        outline: none;
+        flex: 1;
+        min-width: 150px;
+        padding: 4px;
+        font-size: 0.875rem;
+    }
+
+    .tag-suggestions {
+        position: absolute;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1050;
+        width: 100%;
+        margin-top: 4px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: none;
+        animation: suggestionsSlideDown 0.2s ease-out;
+    }
+
+    @keyframes suggestionsSlideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .tag-suggestion-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tag-suggestion-item:last-child {
+        border-bottom: none;
+    }
+
+    .tag-suggestion-item:hover {
+        background: #f8f9fa;
+        padding-left: 20px;
+    }
+
+    .tag-suggestion-item i {
+        color: #5B914C;
+        font-size: 0.9rem;
+    }
+
+    .tag-suggestion-item.tag-create-new {
+        background: #f0f7ed;
+        font-weight: 500;
+    }
+
+    .tag-suggestion-item.tag-create-new:hover {
+        background: #e1f0da;
+    }
+
+    .tag-suggestion-item.tag-create-new i {
+        color: #4a7a3d;
+    }
 </style>
 @endpush
 
@@ -272,8 +443,8 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Slug</label>
-                            <input type="text" name="slug" id="productSlug" class="form-control" value="{{ $product->slug }}">
-                            <div class="form-text">URL-friendly version of the name</div>
+                            <input readonly type="text" name="slug" id="productSlug" class="form-control" value="{{ $product->slug }}">
+                            <div class="form-text">To Update Url Check  SEO Settings. Can'nt be simple.</div>
                             <div class="invalid-feedback"></div>
                         </div>
                         <div class="col-md-6 mb-3">
@@ -291,11 +462,8 @@
 
                     <div class="mb-3">
                         <label class="form-label">Product Type</label>
-                        <select name="product_type" class="form-select">
-                            @foreach($productTypes as $key => $label)
-                                <option value="{{ $key }}" {{ $product->product_type === $key ? 'selected' : '' }}>{{ $label }}</option>
-                            @endforeach
-                        </select>
+                        <input type="text" name="product_type" class="form-control" placeholder="e.g., simple, digital, etc." value="{{ $product->product_type }}">
+                        <div class="form-text">Simple product type by default</div>
                     </div>
 
                     <div class="mb-3">
@@ -363,6 +531,94 @@
                 <div class="form-section">
                     <h5 class="section-title"><i class="bi bi-search"></i> SEO Settings</h5>
 
+                    <!-- URL Handle -->
+                    <div class="mb-3">
+                        <label class="form-label">URL Handle</label>
+                        <div class="url-handle-container">
+                            <div class="input-group" id="urlHandleDisplay">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-link-45deg"></i> {{ url('/') }}/products/
+                                </span>
+                                <input type="text" class="form-control bg-light" value="{{ $product->slug }}" readonly>
+                                <button type="button" class="btn btn-outline-secondary" id="editUrlBtn" title="Edit URL">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </div>
+
+                            <!-- Edit URL Section (Hidden by default) -->
+                            <div id="urlEditSection" class="mt-3" style="display: none;">
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <strong>Warning:</strong> Changing the URL will affect SEO and existing links.
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">New URL Slug</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            {{ url('/') }}/products/
+                                        </span>
+                                        <input type="text" id="newSlugInput" class="form-control" value="{{ $product->slug }}" placeholder="new-product-url">
+                                    </div>
+                                    <div class="form-text">
+                                        Use lowercase letters, numbers, and hyphens only
+                                    </div>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="createRedirect" checked>
+                                    <label class="form-check-label" for="createRedirect">
+                                        <i class="bi bi-arrow-right-circle"></i> Create 301 redirect from old URL to new URL
+                                    </label>
+                                    <div class="form-text">
+                                        Recommended: This will automatically redirect visitors from the old URL to the new one
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-filter" id="saveUrlBtn">
+                                        <i class="bi bi-check-circle"></i> Save URL Change
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="cancelUrlBtn">
+                                        <i class="bi bi-x-circle"></i> Cancel
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Existing Redirects -->
+                            @if($productRedirects && $productRedirects->count() > 0)
+                            <div class="mt-3">
+                                <h6 class="text-muted mb-2">
+                                    <i class="bi bi-arrow-repeat"></i> Existing Redirects
+                                </h6>
+                                <div class="list-group">
+                                    @foreach($productRedirects as $redirect)
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <small class="text-muted">From:</small>
+                                                <code>{{ $redirect->old_url }}</code>
+                                                <i class="bi bi-arrow-right mx-2"></i>
+                                                <small class="text-muted">To:</small>
+                                                <code>{{ $redirect->new_url }}</code>
+                                            </div>
+                                            <div>
+                                                {!! $redirect->getTypeBadge() !!}
+                                                {!! $redirect->getStatusBadge() !!}
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="bi bi-bar-chart"></i> {{ $redirect->hit_count }} hits
+                                            | Created: {{ $redirect->created_at->format('M d, Y') }}
+                                        </small>
+                                    </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @endif
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Meta Title</label>
                         <input type="text" name="meta_title" class="form-control" value="{{ $product->meta_title }}" maxlength="60">
@@ -388,10 +644,374 @@
                 </div>
 
             </div>
+            <!-- Right Column -->
+            <div class="col-lg-4">
 
-            <!-- Right Column - NEXT PART -->
+                <!-- Product Settings -->
+                <div class="form-section">
+                    <h5 class="section-title"><i class="bi bi-gear"></i> Product Settings</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label required-field">Status</label>
+                        <select name="status_key_code" class="form-select" required>
+                            @foreach($statusList as $status)
+                                <option value="{{ $status->key_code }}" {{ $product->status_key_code === $status->key_code ? 'selected' : '' }}>
+                                    {{ $status->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <div class="input-group">
+                            <select name="category_id" id="categorySelect" class="form-select">
+                                <option value="">Select Category</option>
+                                @foreach($categories as $category)
+                                    <option value="{{ $category->id }}" {{ $product->category_id == $category->id ? 'selected' : '' }}>
+                                        {{ $category->indent }}{{ $category->title }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <span class="add-btn-icon" onclick="openAddCategoryModal()" title="Add New Category">
+                                <i class="bi bi-plus"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Vendor</label>
+                        <div class="input-group">
+                            <select name="vendor_id" id="vendorSelect" class="form-select">
+                                <option value="">Select Vendor</option>
+                                @foreach($vendors as $vendor)
+                                    <option value="{{ $vendor->id }}" {{ $product->vendor_id == $vendor->id ? 'selected' : '' }}>
+                                        {{ $vendor->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <span class="add-btn-icon" onclick="openAddVendorModal()" title="Add New Vendor">
+                                <i class="bi bi-plus"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tags</label>
+                        <div class="position-relative">
+                            <div class="tags-container" id="tagsContainer">
+                                <!-- Tags will be rendered here -->
+                            </div>
+                            <div class="tag-suggestions" id="tagSuggestions"></div>
+                        </div>
+                        <div class="form-text">Press Enter, comma, or Tab to add tags. Start typing to see suggestions.</div>
+                        <input type="hidden" name="tags" id="tagsHiddenInput" value="">
+                    </div>
+
+                    <hr>
+
+                    <div class="form-check mb-2">
+                        <input type="checkbox" name="is_featured" id="isFeatured" class="form-check-input" {{ $product->is_featured ? 'checked' : '' }}>
+                        <label class="form-check-label" for="isFeatured">
+                            <i class="bi bi-star"></i> Featured Product
+                        </label>
+                    </div>
+
+                    <div class="form-check mb-2">
+                        <input type="checkbox" name="show_on_home" id="showOnHome" class="form-check-input" {{ $product->show_on_home ? 'checked' : '' }}>
+                        <label class="form-check-label" for="showOnHome">
+                            <i class="bi bi-house"></i> Show on Homepage
+                        </label>
+                    </div>
+
+                    <div class="form-check mb-2">
+                        <input type="checkbox" name="is_available" id="isAvailable" class="form-check-input" {{ $product->is_available ? 'checked' : '' }}>
+                        <label class="form-check-label" for="isAvailable">
+                            <i class="bi bi-check-circle"></i> Available for Purchase
+                        </label>
+                    </div>
+
+                    <div class="form-check mb-2">
+                        <input type="checkbox" name="track_inventory" id="trackInventory" class="form-check-input" {{ $product->track_inventory ? 'checked' : '' }}>
+                        <label class="form-check-label" for="trackInventory">
+                            <i class="bi bi-box"></i> Track Inventory
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Pricing -->
+                <div class="form-section">
+                    <h5 class="section-title"><i class="bi bi-currency-dollar"></i> Pricing</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label">Currency</label>
+                        <select name="curency" class="form-select">
+                            @foreach($currencies as $code => $name)
+                                <option value="{{ $code }}" {{ $product->curency === $code ? 'selected' : '' }}>
+                                    {{ $name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label required-field">Regular Price</label>
+                        <input type="number" name="price" id="regularPrice" class="form-control" value="{{ $product->price }}" placeholder="0.00" step="0.01" min="0" required>
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Sale Price</label>
+                        <input type="number" name="sale_price" id="salePrice" class="form-control" value="{{ $product->sale_price }}" placeholder="0.00" step="0.01" min="0">
+                        <div class="form-text">Leave empty if not on sale</div>
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Cost Price</label>
+                        <input type="number" name="cost_price" class="form-control" value="{{ $product->cost_price }}" placeholder="0.00" step="0.01" min="0">
+                        <div class="form-text">Your cost (for profit calculation)</div>
+                    </div>
+
+                    @if($product->isOnSale())
+                    <div class="alert alert-success">
+                        <i class="bi bi-tag-fill"></i> <strong>On Sale!</strong><br>
+                        <small>Discount: {{ $product->getDiscountPercentage() }}% off</small><br>
+                        <small>Savings: {{ $product->curency }} {{ number_format($product->getDiscountAmount(), 2) }}</small>
+                    </div>
+                    @endif
+
+                    <hr class="my-3">
+
+                    <!-- TAX SETTINGS - ADD THIS SECTION -->
+                    <h6 class="text-muted mb-3"><i class="bi bi-receipt"></i> Tax Settings</h6>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="is_taxable" id="isTaxable" class="form-check-input" {{ $product->is_taxable ? 'checked' : '' }}>
+                        <label class="form-check-label" for="isTaxable">
+                            <i class="bi bi-calculator"></i> This product is taxable
+                        </label>
+                    </div>
+
+                    <div id="taxSettingsSection" style="{{ $product->is_taxable ? '' : 'display: none;' }}">
+                        <div class="mb-3">
+                            <label class="form-label">Tax Type</label>
+                            <select name="tax_type" id="taxType" class="form-select">
+                                <option value="exclusive" {{ $product->tax_type === 'exclusive' ? 'selected' : '' }}>Tax Exclusive (Price + Tax)</option>
+                                <option value="inclusive" {{ $product->tax_type === 'inclusive' ? 'selected' : '' }}>Tax Inclusive (Price includes Tax)</option>
+                            </select>
+                            <div class="form-text" id="taxTypeHelp">
+                                <small><strong>Exclusive:</strong> Tax will be added to the price</small><br>
+                                <small><strong>Inclusive:</strong> Tax is already included in the price</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tax Percentage (%)</label>
+                            <div class="input-group">
+                                <input type="number" name="tax_percentage" id="taxPercentage" class="form-control" value="{{ $product->tax_percentage }}" placeholder="0.00" step="0.01" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <div class="form-text">Enter tax rate (e.g., 15 for 15% tax)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tax Class</label>
+                            <input type="text" name="tax_class" class="form-control" value="{{ $product->tax_class }}" placeholder="e.g., Standard, Reduced, Zero">
+                            <div class="form-text">Optional: Tax classification for reporting</div>
+                        </div>
+
+                        <!-- Current Tax Info -->
+                        @if($product->is_taxable && $product->tax_percentage > 0)
+                        <div class="alert alert-info">
+                            <strong>Current Tax Info:</strong>
+                            <div class="mt-2 small">
+                                @php
+                                    $taxInfo = $product->getTaxInfo();
+                                @endphp
+                                <p class="mb-1"><strong>Type:</strong> {{ $product->getTaxTypeLabel() }}</p>
+                                <p class="mb-1"><strong>Rate:</strong> {{ $product->tax_percentage }}%</p>
+                                <p class="mb-1"><strong>Price (excl. tax):</strong> {{ currency_symbol($product->curency) }} {{ number_format($taxInfo['price_excluding_tax'], 2) }}</p>
+                                <p class="mb-1"><strong>Tax Amount:</strong> {{ currency_symbol($product->curency) }} {{ number_format($taxInfo['tax_amount'], 2) }}</p>
+                                <p class="mb-0"><strong>Price (incl. tax):</strong> {{ currency_symbol($product->curency) }} {{ number_format($taxInfo['price_including_tax'], 2) }}</p>
+                            </div>
+                        </div>
+                        @endif
+
+                        <!-- Tax Calculation Preview -->
+                        <div class="alert alert-info" id="taxPreview" style="display: none;">
+                            <strong>Tax Preview:</strong>
+                            <div id="taxPreviewContent" class="mt-2 small"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stock Management -->
+                <div class="form-section">
+                    <h5 class="section-title"><i class="bi bi-box-seam"></i> Stock Management</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label">Stock Quantity</label>
+                        <div class="input-group">
+                            <button type="button" class="btn btn-outline-secondary" onclick="adjustStock(-10)">
+                                <i class="bi bi-dash-lg"></i> 10
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="adjustStock(-1)">
+                                <i class="bi bi-dash"></i>
+                            </button>
+                            <input type="number" name="stock_quantity" id="stockQuantity" class="form-control text-center" value="{{ $product->stock_quantity }}" min="0">
+                            <button type="button" class="btn btn-outline-secondary" onclick="adjustStock(1)">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="adjustStock(10)">
+                                <i class="bi bi-plus-lg"></i> 10
+                            </button>
+                        </div>
+                        <div class="form-text">Current stock level</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Low Stock Threshold</label>
+                        <input type="number" name="low_stock_threshold" class="form-control" value="{{ $product->low_stock_threshold }}" min="0">
+                        <div class="form-text">Alert when stock reaches this level</div>
+                    </div>
+
+                    @if($product->isLowStock())
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle-fill"></i> <strong>Low Stock Alert!</strong><br>
+                        <small>Current stock ({{ $product->stock_quantity }}) is below threshold ({{ $product->low_stock_threshold }})</small>
+                    </div>
+                    @elseif(!$product->isInStock())
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle-fill"></i> <strong>Out of Stock!</strong><br>
+                        <small>This product is currently unavailable</small>
+                    </div>
+                    @else
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle-fill"></i> <strong>In Stock</strong><br>
+                        <small>{{ $product->stock_quantity }} units available</small>
+                    </div>
+                    @endif
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="form-section">
+                    <h5 class="section-title"><i class="bi bi-lightning-fill"></i> Quick Actions</h5>
+
+                    <div class="d-grid gap-2">
+                        @if(auth('admin')->user()->hasPermission('products.update'))
+                        <button type="button" class="btn btn-outline-warning" onclick="toggleFeatured()">
+                            <i class="bi bi-star{{ $product->is_featured ? '-fill' : '' }}"></i>
+                            {{ $product->is_featured ? 'Remove from Featured' : 'Mark as Featured' }}
+                        </button>
+
+                        <button type="button" class="btn btn-outline-info" onclick="togglePublish()">
+                            <i class="bi bi-{{ $product->published_at ? 'eye-slash' : 'eye' }}"></i>
+                            {{ $product->published_at ? 'Unpublish' : 'Publish' }}
+                        </button>
+
+                        <button type="button" class="btn btn-outline-secondary" onclick="duplicateProduct()">
+                            <i class="bi bi-files"></i> Duplicate Product
+                        </button>
+                        @endif
+
+                        @if(auth('admin')->user()->hasPermission('products.delete'))
+                        <button type="button" class="btn btn-outline-danger" onclick="deleteProduct()">
+                            <i class="bi bi-trash"></i> Delete Product
+                        </button>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="form-section">
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-save btn-lg">
+                            <i class="bi bi-check-circle"></i> Update Product
+                        </button>
+                        <a href="{{ route('admin.products.show', $product->id) }}" class="btn btn-outline-info">
+                            <i class="bi bi-eye"></i> View Product
+                        </a>
+                        <a href="{{ route('admin.products.index') }}" class="btn btn-outline-danger">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </form>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add New Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addCategoryForm">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label required-field">Category Name</label>
+                        <input type="text" name="category_title" id="categoryTitle" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Parent Category</label>
+                        <select name="category_parent_id" class="form-select">
+                            <option value="">None (Root Category)</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}">{{ $category->indent }}{{ $category->title }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-save">
+                        <i class="bi bi-check"></i> Add Category
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Vendor Modal -->
+<div class="modal fade" id="addVendorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add New Vendor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addVendorForm">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label required-field">Vendor Name</label>
+                        <input type="text" name="vendor_name" id="vendorName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="vendor_email" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="text" name="vendor_phone" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-save">
+                        <i class="bi bi-check"></i> Add Vendor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 @endsection
 @push('scripts')
@@ -417,13 +1037,13 @@ $(document).ready(function() {
         });
 
     // Auto-generate slug from product name
-    $('#productName').on('keyup', function() {
-        let name = $(this).val();
-        let slug = name.toLowerCase()
-            .replace(/[^\w ]+/g, '')
-            .replace(/ +/g, '-');
-        $('#productSlug').val(slug);
-    });
+    // $('#productName').on('keyup', function() {
+    //     let name = $(this).val();
+    //     let slug = name.toLowerCase()
+    //         .replace(/[^\w ]+/g, '')
+    //         .replace(/ +/g, '-');
+    //     $('#productSlug').val(slug);
+    // });
 
     // Main image preview
     $('#mainImage').on('change', function(e) {
@@ -534,129 +1154,333 @@ $(document).ready(function() {
         });
     }
 
-    // Initialize tags with existing product tags
-    let selectedTags = @json($product->tags->map(function($tag) {
-        return ['id' => $tag->id, 'name' => $tag->name];
-    }));
+// ==================== TAGS FUNCTIONALITY ====================
+
+// Declare variables first
+let selectedTags = [];
+let tagSearchTimeout;
+let currentTagInput = null;
+
+// Initialize tags container
+function initializeTags() {
     renderTags();
+    attachTagInputEvents();
+}
 
-    let tagSearchTimeout;
+// Render tags
+function renderTags() {
+    let html = '';
 
-    $(document).on('keyup', '#tagInput', function(e) {
-        const value = $(this).val().trim();
+    selectedTags.forEach((tag, index) => {
+        html += `
+            <span class="tag-item" data-index="${index}">
+                <span class="tag-name">${escapeHtml(tag.name)}</span>
+                <button type="button" class="remove-tag" data-index="${index}" title="Remove tag">×</button>
+            </span>
+        `;
+    });
 
-        // Add tag on Enter or Comma
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            if (value) {
-                addTag(value.replace(',', ''));
-                $(this).val('');
+    html += '<input type="text" class="tag-input" id="tagInput" placeholder="Add tags..." autocomplete="off">';
+
+    $('#tagsContainer').html(html);
+
+    // Update hidden input
+    const tagIds = selectedTags.map(t => t.id);
+    $('#tagsHiddenInput').val(JSON.stringify(tagIds));
+
+    // Reattach events after rendering
+    attachTagInputEvents();
+
+    // Focus the new input
+    currentTagInput = $('#tagInput');
+}
+
+// Attach events to tag input
+function attachTagInputEvents() {
+    currentTagInput = $('#tagInput');
+
+    // Remove tag button click
+    $('.remove-tag').off('click').on('click', function(e) {
+        e.stopPropagation();
+        const index = parseInt($(this).data('index'));
+        removeTagByIndex(index);
+    });
+
+    // Tag input events
+    currentTagInput.off().on({
+        'keydown': function(e) {
+            const value = $(this).val().trim();
+
+            // Enter, Comma, or Tab - Add tag
+            if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+                e.preventDefault();
+                if (value) {
+                    addNewTag(value.replace(/,/g, ''));
+                    $(this).val('');
+                    $('#tagSuggestions').hide();
+                }
+                return false;
+            }
+
+            // Backspace on empty input - Remove last tag
+            if (e.key === 'Backspace' && value === '' && selectedTags.length > 0) {
+                e.preventDefault();
+                removeTagByIndex(selectedTags.length - 1);
+            }
+
+            // Escape - Close suggestions
+            if (e.key === 'Escape') {
                 $('#tagSuggestions').hide();
             }
-            return;
-        }
+        },
+        'keyup': function(e) {
+            // Don't search on special keys
+            if (['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', ','].includes(e.key)) {
+                return;
+            }
 
-        // Backspace on empty input - remove last tag
-        if (e.key === 'Backspace' && value === '' && selectedTags.length > 0) {
-            selectedTags.pop();
-            renderTags();
-            return;
-        }
+            const value = $(this).val().trim();
 
-        // Search tags
-        if (value.length >= 2) {
-            clearTimeout(tagSearchTimeout);
-            tagSearchTimeout = setTimeout(function() {
+            // Search for tags
+            if (value.length >= 2) {
+                clearTimeout(tagSearchTimeout);
+                tagSearchTimeout = setTimeout(() => searchTags(value), 300);
+            } else {
+                $('#tagSuggestions').hide();
+            }
+        },
+        'blur': function() {
+            // Delay to allow click on suggestions
+            setTimeout(() => {
+                $('#tagSuggestions').hide();
+            }, 200);
+        },
+        'focus': function() {
+            const value = $(this).val().trim();
+            if (value.length >= 2) {
                 searchTags(value);
-            }, 300);
-        } else {
+            }
+        }
+    });
+}
+
+// Search tags from server
+function searchTags(query) {
+    $.ajax({
+        url: '{{ route("admin.products.tags.search") }}',
+        data: { q: query },
+        method: 'GET',
+        success: function(response) {
+            if (response.success && response.tags.length > 0) {
+                displayTagSuggestions(response.tags, query);
+            } else {
+                // Show "Create new tag" option
+                displayCreateNewTagOption(query);
+            }
+        },
+        error: function() {
             $('#tagSuggestions').hide();
         }
     });
+}
 
-    function searchTags(query) {
-        $.ajax({
-            url: '/admin/products/tags/search',
-            data: { q: query },
-            success: function(response) {
-                if (response.success && response.tags.length > 0) {
-                    let html = '';
-                    response.tags.forEach(tag => {
-                        if (!selectedTags.find(t => t.id === tag.id)) {
-                            html += `<div class="tag-suggestion-item" data-id="${tag.id}" data-name="${tag.name}">${tag.name}</div>`;
-                        }
-                    });
-                    if (html) {
-                        $('#tagSuggestions').html(html).show();
-                    } else {
-                        $('#tagSuggestions').hide();
-                    }
-                } else {
-                    $('#tagSuggestions').hide();
-                }
-            }
-        });
-    }
+// Display tag suggestions
+function displayTagSuggestions(tags, query) {
+    let html = '';
+    let hasResults = false;
 
-    $(document).on('click', '.tag-suggestion-item', function() {
-        const tagId = $(this).data('id');
-        const tagName = $(this).data('name');
-        addTag(tagName, tagId);
-        $('#tagInput').val('');
-        $('#tagSuggestions').hide();
-    });
-
-    function addTag(name, id = null) {
-        // Check if tag already exists
-        if (selectedTags.find(t => t.name.toLowerCase() === name.toLowerCase())) {
-            return;
-        }
-
-        if (id) {
-            // Existing tag
-            selectedTags.push({ id: id, name: name });
-            renderTags();
-        } else {
-            // Create new tag
-            $.ajax({
-                url: '/admin/products/tags/create',
-                type: 'POST',
-                data: {
-                    _token: $('meta[name="csrf-token"]').attr('content'),
-                    name: name
-                },
-                success: function(response) {
-                    if (response.success) {
-                        selectedTags.push({ id: response.tag.id, name: response.tag.name });
-                        renderTags();
-                    }
-                }
-            });
-        }
-    }
-
-    function renderTags() {
-        const tagIds = selectedTags.map(t => t.id);
-        $('#tagsHiddenInput').val(JSON.stringify(tagIds));
-
-        let html = '';
-        selectedTags.forEach((tag, index) => {
+    tags.forEach(tag => {
+        // Don't show already selected tags
+        if (!selectedTags.find(t => t.id === tag.id)) {
             html += `
-                <div class="tag-item">
-                    ${tag.name}
-                    <button type="button" class="remove-tag" onclick="removeTag(${index})">×</button>
+                <div class="tag-suggestion-item" data-id="${tag.id}" data-name="${escapeHtml(tag.name)}">
+                    <i class="bi bi-tag"></i> ${escapeHtml(tag.name)}
                 </div>
             `;
-        });
-        html += '<input type="text" id="tagInput" class="tag-input" placeholder="Type to search or add tags...">';
+            hasResults = true;
+        }
+    });
 
-        $('#tagsContainer').html(html);
+    // Add "Create new" option if query doesn't match exactly
+    const exactMatch = tags.find(t => t.name.toLowerCase() === query.toLowerCase());
+    if (!exactMatch) {
+        html += `
+            <div class="tag-suggestion-item tag-create-new" data-name="${escapeHtml(query)}">
+                <i class="bi bi-plus-circle"></i> Create "<strong>${escapeHtml(query)}</strong>"
+            </div>
+        `;
+        hasResults = true;
     }
 
-    window.removeTag = function(index) {
+    if (hasResults) {
+        $('#tagSuggestions').html(html).show();
+        attachSuggestionEvents();
+    } else {
+        $('#tagSuggestions').hide();
+    }
+}
+
+// Display create new tag option
+function displayCreateNewTagOption(query) {
+    const html = `
+        <div class="tag-suggestion-item tag-create-new" data-name="${escapeHtml(query)}">
+            <i class="bi bi-plus-circle"></i> Create "<strong>${escapeHtml(query)}</strong>"
+        </div>
+    `;
+    $('#tagSuggestions').html(html).show();
+    attachSuggestionEvents();
+}
+
+// Attach events to suggestions
+function attachSuggestionEvents() {
+    $('.tag-suggestion-item').off('click').on('click', function() {
+        const tagId = $(this).data('id');
+        const tagName = $(this).data('name');
+
+        if (tagId) {
+            // Existing tag
+            addExistingTag(tagId, tagName);
+        } else {
+            // Create new tag
+            addNewTag(tagName);
+        }
+
+        currentTagInput.val('');
+        $('#tagSuggestions').hide();
+        currentTagInput.focus();
+    });
+}
+
+// Add existing tag
+function addExistingTag(id, name) {
+    // Check if tag already added
+    if (selectedTags.find(t => t.id === id)) {
+        showNotification('Tag already added', 'info');
+        return;
+    }
+
+    selectedTags.push({ id: id, name: name });
+    renderTags();
+    showNotification('Tag added', 'success');
+}
+
+// Add new tag (create on server)
+function addNewTag(name) {
+    name = name.trim();
+
+    if (!name) return;
+
+    // Check if tag with same name already exists
+    if (selectedTags.find(t => t.name.toLowerCase() === name.toLowerCase())) {
+        showNotification('Tag already added', 'info');
+        return;
+    }
+
+    // Show loading
+    const loadingToast = Swal.fire({
+        title: 'Creating tag...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    $.ajax({
+        url: '{{ route("admin.products.tags.create") }}',
+        type: 'POST',
+        data: {
+            _token: '{{ csrf_token() }}',
+            name: name
+        },
+        success: function(response) {
+            loadingToast.close();
+
+            if (response.success) {
+                selectedTags.push({
+                    id: response.tag.id,
+                    name: response.tag.name
+                });
+                renderTags();
+                showNotification('Tag created and added', 'success');
+            } else {
+                showNotification(response.message || 'Failed to create tag', 'error');
+            }
+        },
+        error: function(xhr) {
+            loadingToast.close();
+            showNotification(xhr.responseJSON?.message || 'Failed to create tag', 'error');
+        }
+    });
+}
+
+// Remove tag by index
+function removeTagByIndex(index) {
+    if (index >= 0 && index < selectedTags.length) {
+        const removedTag = selectedTags[index];
         selectedTags.splice(index, 1);
         renderTags();
+        showNotification(`"${removedTag.name}" removed`, 'info');
+    }
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+        didOpen: (toast) => {
+            toast.addEventListener('mouseenter', Swal.stopTimer);
+            toast.addEventListener('mouseleave', Swal.resumeTimer);
+        }
+    });
+
+    Toast.fire({
+        icon: type,
+        title: message
+    });
+}
+
+// Escape HTML
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
     };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+// Click on container focuses input
+$(document).on('click', '#tagsContainer', function(e) {
+    if (e.target.id !== 'tagInput' && !$(e.target).hasClass('remove-tag')) {
+        $('#tagInput').focus();
+    }
+});
+
+// Close suggestions when clicking outside
+$(document).on('click', function(e) {
+    if (!$(e.target).closest('#tagsContainer, #tagSuggestions').length) {
+        $('#tagSuggestions').hide();
+    }
+});
+
+// Load existing tags and initialize
+$(document).ready(function() {
+    // Load existing tags from product
+    selectedTags = @json($product->tags->map(function($tag) {
+        return ['id' => $tag->id, 'name' => $tag->name];
+    })->values());
+
+    // Initialize tags system
+    initializeTags();
+});
+
+// ==================== END TAGS FUNCTIONALITY ====================
 
     // Form submission
     $('#productForm').on('submit', function(e) {
@@ -1062,6 +1886,193 @@ $(document).on('click', function(e) {
 // Focus tag input when clicking on tags container
 $(document).on('click', '#tagsContainer', function() {
     $('#tagInput').focus();
+});
+//
+// URL Handle Management
+$('#editUrlBtn').on('click', function() {
+    $('#urlEditSection').slideDown();
+    $('#newSlugInput').focus();
+});
+
+$('#cancelUrlBtn').on('click', function() {
+    $('#urlEditSection').slideUp();
+    $('#newSlugInput').val('{{ $product->slug }}');
+});
+
+// Auto-generate slug from input
+$('#newSlugInput').on('keyup', function() {
+    let value = $(this).val();
+    let slug = value.toLowerCase()
+        .replace(/[^\w\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-')      // Replace spaces with hyphens
+        .replace(/-+/g, '-')       // Replace multiple hyphens with single
+        .replace(/^-+|-+$/g, '');  // Remove leading/trailing hyphens
+    $(this).val(slug);
+});
+
+// Save URL change
+$('#saveUrlBtn').on('click', function() {
+    const oldSlug = '{{ $product->slug }}';
+    const newSlug = $('#newSlugInput').val().trim();
+    const createRedirect = $('#createRedirect').is(':checked');
+
+    if (!newSlug) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Please enter a valid URL slug'
+        });
+        return;
+    }
+
+    if (newSlug === oldSlug) {
+        Swal.fire({
+            icon: 'info',
+            title: 'No Changes',
+            text: 'The URL slug is the same as before'
+        });
+        return;
+    }
+
+    // Show confirmation
+    Swal.fire({
+        title: 'Change Product URL?',
+        html: `
+            <div class="text-start">
+                <p><strong>Old URL:</strong><br><code>{{ url('/') }}/products/${oldSlug}</code></p>
+                <p><strong>New URL:</strong><br><code>{{ url('/') }}/products/${newSlug}</code></p>
+                ${createRedirect ? '<p class="text-success"><i class="bi bi-check-circle"></i> A 301 redirect will be created</p>' : '<p class="text-warning"><i class="bi bi-exclamation-triangle"></i> No redirect will be created</p>'}
+            </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#5B914C',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, change URL',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            updateProductUrl(newSlug, createRedirect);
+        }
+    });
+});
+
+function updateProductUrl(newSlug, createRedirect) {
+    $.ajax({
+        url: `/admin/products/${PRODUCT_ID}/update-url`,
+        type: 'POST',
+        data: {
+            _token: '{{ csrf_token() }}',
+            slug: newSlug,
+            create_redirect: createRedirect ? 1 : 0
+        },
+        beforeSend: function() {
+            Swal.fire({
+                title: 'Updating URL...',
+                text: 'Please wait',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+        },
+        success: function(response) {
+            if (response.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: response.message,
+                    confirmButtonColor: '#5B914C'
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.message
+                });
+            }
+        },
+        error: function(xhr) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: xhr.responseJSON?.message || 'Failed to update URL'
+            });
+        }
+    });
+}
+//
+// Tax Settings Toggle
+$('#isTaxable').on('change', function() {
+    if ($(this).is(':checked')) {
+        $('#taxSettingsSection').slideDown();
+    } else {
+        $('#taxSettingsSection').slideUp();
+    }
+    updateTaxPreview();
+});
+
+// Update tax preview when values change
+$('#regularPrice, #salePrice, #taxPercentage, #taxType').on('keyup change', function() {
+    updateTaxPreview();
+});
+
+// Update tax preview
+function updateTaxPreview() {
+    if (!$('#isTaxable').is(':checked')) {
+        $('#taxPreview').hide();
+        return;
+    }
+
+    const price = parseFloat($('#salePrice').val()) || parseFloat($('#regularPrice').val()) || 0;
+    const taxPercentage = parseFloat($('#taxPercentage').val()) || 0;
+    const taxType = $('#taxType').val();
+    const currency = $('select[name="curency"]').val() || 'USD';
+    const symbol = currency_symbol(currency);
+
+    if (price <= 0 || taxPercentage <= 0) {
+        $('#taxPreview').hide();
+        return;
+    }
+
+    let taxAmount, priceExcludingTax, priceIncludingTax;
+
+    if (taxType === 'inclusive') {
+        // Tax is included in price
+        priceExcludingTax = price / (1 + (taxPercentage / 100));
+        taxAmount = price - priceExcludingTax;
+        priceIncludingTax = price;
+    } else {
+        // Tax is exclusive
+        priceExcludingTax = price;
+        taxAmount = price * (taxPercentage / 100);
+        priceIncludingTax = price + taxAmount;
+    }
+
+    const html = `
+        <p class="mb-1"><strong>Base Price:</strong> ${symbol} ${priceExcludingTax.toFixed(2)}</p>
+        <p class="mb-1"><strong>Tax (${taxPercentage}%):</strong> ${symbol} ${taxAmount.toFixed(2)}</p>
+        <p class="mb-0"><strong>Final Price:</strong> ${symbol} ${priceIncludingTax.toFixed(2)}</p>
+    `;
+
+    $('#taxPreviewContent').html(html);
+    $('#taxPreview').slideDown();
+}
+
+// Helper function for currency symbol (if not already defined)
+function currency_symbol(code) {
+    const symbols = {
+        'USD': '$', 'EUR': '€', 'GBP': '£', 'PKR': '₨', 'SAR': '﷼',
+        'AED': 'د.إ', 'CAD': 'C$', 'AUD': 'A$', 'JPY': '¥', 'CNY': '¥', 'INR': '₹'
+    };
+    return symbols[code] || code;
+}
+
+// Initialize on page load
+$(document).ready(function() {
+    updateTaxPreview();
 });
 </script>
 @endpush

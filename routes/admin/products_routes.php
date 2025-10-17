@@ -96,6 +96,8 @@ Route::prefix('products')->name('products.')->group(function () {
 
         Route::post('/{id}/quick-edit', [ProductsController::class, 'quickEdit'])->name('quick-edit')->where('id', '[0-9a-f-]+');
 
+        Route::post('/{id}/quick-stock-update', [ProductsController::class, 'quickStockUpdate'])->name('quick-stock-update')->where('id', '[0-9a-f-]+');
+        Route::post('/{id}/update-url', [ProductsController::class, 'updateUrl'])->name('update-url')->where('id', '[0-9a-f-]+');
         // Product Images
         Route::post('/{id}/images/upload', [ProductsController::class, 'uploadImages'])->name('images.upload')->where('id', '[0-9a-f-]+');
 

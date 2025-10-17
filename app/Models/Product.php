@@ -55,6 +55,10 @@ class Product extends Model
         'sale_price',
         'cost_price',
         'discount_percentage',
+        'is_taxable',
+        'tax_type',
+        'tax_percentage',
+        'tax_class',
         'main_image',
         'status_key_code',
         'is_featured',
@@ -88,6 +92,8 @@ class Product extends Model
         'sale_price' => 'decimal:2',
         'cost_price' => 'decimal:2',
         'discount_percentage' => 'decimal:2',
+        'tax_percentage' => 'decimal:2',
+        'is_taxable' => 'boolean',
         'is_featured' => 'boolean',
         'show_on_home' => 'boolean',
         'is_available' => 'boolean',
@@ -767,5 +773,151 @@ class Product extends Model
     public function toggleHomepage(): bool
     {
         return $this->update(['show_on_home' => !$this->show_on_home]);
+    }
+
+    // ==================== TAX CALCULATION METHODS ====================
+    /**
+     * Check if product is taxable
+     */
+    public function isTaxable(): bool
+    {
+        return $this->is_taxable;
+    }
+
+    /**
+     * Check if tax is inclusive
+     */
+    public function isTaxInclusive(): bool
+    {
+        return $this->tax_type === 'inclusive';
+    }
+
+    /**
+     * Check if tax is exclusive
+     */
+    public function isTaxExclusive(): bool
+    {
+        return $this->tax_type === 'exclusive';
+    }
+
+    /**
+     * Calculate tax amount for given price
+     */
+    public function calculateTaxAmount(float $price = null): float
+    {
+        if (!$this->is_taxable || $this->tax_percentage <= 0) {
+            return 0;
+        }
+
+        $price = $price ?? $this->getFinalPrice();
+
+        if ($this->tax_type === 'inclusive') {
+            // Tax is already included in price, extract it
+            return round($price - ($price / (1 + ($this->tax_percentage / 100))), 2);
+        } else {
+            // Tax is exclusive, calculate it
+            return round($price * ($this->tax_percentage / 100), 2);
+        }
+    }
+
+    /**
+     * Get price excluding tax
+     */
+    public function getPriceExcludingTax(float $price = null): float
+    {
+        $price = $price ?? $this->getFinalPrice();
+
+        if (!$this->is_taxable) {
+            return $price;
+        }
+
+        if ($this->tax_type === 'inclusive') {
+            // Remove tax from price
+            return round($price / (1 + ($this->tax_percentage / 100)), 2);
+        }
+
+        return $price;
+    }
+
+    /**
+     * Get price including tax
+     */
+    public function getPriceIncludingTax(float $price = null): float
+    {
+        $price = $price ?? $this->getFinalPrice();
+
+        if (!$this->is_taxable) {
+            return $price;
+        }
+
+        if ($this->tax_type === 'exclusive') {
+            // Add tax to price
+            return round($price * (1 + ($this->tax_percentage / 100)), 2);
+        }
+
+        return $price;
+    }
+
+    /**
+     * Get formatted price with tax info
+     */
+    public function getFormattedPriceWithTax(): string
+    {
+        $price = $this->getFinalPrice();
+        $symbol = $this->curency;
+
+        if (!$this->is_taxable) {
+            return $symbol . ' ' . number_format($price, 2);
+        }
+
+        $taxAmount = $this->calculateTaxAmount($price);
+
+        if ($this->tax_type === 'inclusive') {
+            return $symbol . ' ' . number_format($price, 2) . ' (inc. tax ' . $symbol . ' ' . number_format($taxAmount, 2) . ')';
+        } else {
+            $priceWithTax = $this->getPriceIncludingTax($price);
+            return $symbol . ' ' . number_format($price, 2) . ' + tax ' . $symbol . ' ' . number_format($taxAmount, 2) . ' = ' . $symbol . ' ' . number_format($priceWithTax, 2);
+        }
+    }
+
+    /**
+     * Get tax type label
+     */
+    public function getTaxTypeLabel(): string
+    {
+        return match($this->tax_type) {
+            'inclusive' => 'Tax Inclusive',
+            'exclusive' => 'Tax Exclusive',
+            default => 'Unknown',
+        };
+    }
+
+    /**
+     * Get tax info as array
+     */
+    public function getTaxInfo(): array
+    {
+        if (!$this->is_taxable) {
+            return [
+                'is_taxable' => false,
+                'tax_percentage' => 0,
+                'tax_type' => null,
+                'tax_amount' => 0,
+                'price_excluding_tax' => $this->getFinalPrice(),
+                'price_including_tax' => $this->getFinalPrice(),
+            ];
+        }
+
+        $price = $this->getFinalPrice();
+
+        return [
+            'is_taxable' => true,
+            'tax_percentage' => $this->tax_percentage,
+            'tax_type' => $this->tax_type,
+            'tax_class' => $this->tax_class,
+            'tax_amount' => $this->calculateTaxAmount($price),
+            'price_excluding_tax' => $this->getPriceExcludingTax($price),
+            'price_including_tax' => $this->getPriceIncludingTax($price),
+        ];
     }
 }

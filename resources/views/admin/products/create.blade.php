@@ -1,5 +1,5 @@
 @extends('admin.layouts.app')
-
+{{--  products/create.blade.php --}}
 @section('title', 'Create Product')
 
 @push('styles')
@@ -156,6 +156,156 @@
     .add-btn-icon:hover {
         background: #4a7a3d;
         transform: scale(1.1);
+    }
+
+    /* Tags Styling */
+    .tags-container {
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 8px;
+        min-height: 46px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        cursor: text;
+        background: #fff;
+        transition: border-color 0.15s ease-in-out;
+    }
+
+    .tags-container:hover {
+        border-color: #5B914C;
+    }
+
+    .tags-container:focus-within {
+        border-color: #5B914C;
+        box-shadow: 0 0 0 0.2rem rgba(91, 145, 76, 0.25);
+    }
+
+    .tag-item {
+        display: inline-flex;
+        align-items: center;
+        background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
+        color: white;
+        padding: 4px 8px 4px 12px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        gap: 6px;
+        animation: tagSlideIn 0.2s ease-out;
+        transition: all 0.2s;
+    }
+
+    @keyframes tagSlideIn {
+        from {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    .tag-item:hover {
+        background: linear-gradient(135deg, #4a7a3d 0%, #3d6632 100%);
+        transform: translateY(-1px);
+    }
+
+    .tag-item .tag-name {
+        line-height: 1;
+    }
+
+    .tag-item .remove-tag {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1rem;
+        line-height: 1;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .tag-item .remove-tag:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.1);
+    }
+
+    .tag-input {
+        border: none;
+        outline: none;
+        flex: 1;
+        min-width: 150px;
+        padding: 4px;
+        font-size: 0.875rem;
+    }
+
+    .tag-suggestions {
+        position: absolute;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1050;
+        width: 100%;
+        margin-top: 4px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: none;
+        animation: suggestionsSlideDown 0.2s ease-out;
+    }
+
+    @keyframes suggestionsSlideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .tag-suggestion-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tag-suggestion-item:last-child {
+        border-bottom: none;
+    }
+
+    .tag-suggestion-item:hover {
+        background: #f8f9fa;
+        padding-left: 20px;
+    }
+
+    .tag-suggestion-item i {
+        color: #5B914C;
+        font-size: 0.9rem;
+    }
+
+    .tag-suggestion-item.tag-create-new {
+        background: #f0f7ed;
+        font-weight: 500;
+    }
+
+    .tag-suggestion-item.tag-create-new:hover {
+        background: #e1f0da;
+    }
+
+    .tag-suggestion-item.tag-create-new i {
+        color: #4a7a3d;
     }
 </style>
 @endpush
@@ -339,12 +489,12 @@
                         <label class="form-label">Tags</label>
                         <div class="position-relative">
                             <div class="tags-container" id="tagsContainer">
-                                <input type="text" id="tagInput" class="tag-input" placeholder="Type to search or add tags...">
+                                <!-- Tags will be rendered here -->
                             </div>
                             <div class="tag-suggestions" id="tagSuggestions"></div>
                         </div>
-                        <div class="form-text">Press Enter or comma to add tags</div>
-                        <input type="hidden" name="tags" id="tagsHiddenInput" value="">
+                        <div class="form-text">Press Enter, comma, or Tab to add tags. Start typing to see suggestions.</div>
+                        <input type="hidden" name="tags" id="tagsHiddenInput" value="[]">
                     </div>
 
                     <hr>
@@ -408,6 +558,53 @@
                         <label class="form-label">Cost Price</label>
                         <input type="number" name="cost_price" class="form-control" placeholder="0.00" step="0.01" min="0">
                         <div class="form-text">Your cost (for profit calculation)</div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- TAX SETTINGS - ADD THIS SECTION -->
+                    <h6 class="text-muted mb-3"><i class="bi bi-receipt"></i> Tax Settings</h6>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="is_taxable" id="isTaxable" class="form-check-input" checked>
+                        <label class="form-check-label" for="isTaxable">
+                            <i class="bi bi-calculator"></i> This product is taxable
+                        </label>
+                    </div>
+
+                    <div id="taxSettingsSection">
+                        <div class="mb-3">
+                            <label class="form-label">Tax Type</label>
+                            <select name="tax_type" id="taxType" class="form-select">
+                                <option value="exclusive" selected>Tax Exclusive (Price + Tax)</option>
+                                <option value="inclusive">Tax Inclusive (Price includes Tax)</option>
+                            </select>
+                            <div class="form-text" id="taxTypeHelp">
+                                <small><strong>Exclusive:</strong> Tax will be added to the price</small><br>
+                                <small><strong>Inclusive:</strong> Tax is already included in the price</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tax Percentage (%)</label>
+                            <div class="input-group">
+                                <input type="number" name="tax_percentage" id="taxPercentage" class="form-control" placeholder="0.00" step="0.01" min="0" max="100" value="0">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <div class="form-text">Enter tax rate (e.g., 15 for 15% tax)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tax Class</label>
+                            <input type="text" name="tax_class" class="form-control" placeholder="e.g., Standard, Reduced, Zero">
+                            <div class="form-text">Optional: Tax classification for reporting</div>
+                        </div>
+
+                        <!-- Tax Calculation Preview -->
+                        <div class="alert alert-info" id="taxPreview" style="display: none;">
+                            <strong>Tax Preview:</strong>
+                            <div id="taxPreviewContent" class="mt-2 small"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -660,125 +857,325 @@
         });
     }
 
-    // Tags functionality
+    // ==================== TAGS FUNCTIONALITY ====================
     let selectedTags = [];
     let tagSearchTimeout;
+    let currentTagInput = null;
 
-    $('#tagInput').on('keyup', function(e) {
-        const value = $(this).val().trim();
+    // Initialize tags container
+    function initializeTags() {
+        renderTags();
+        attachTagInputEvents();
+    }
 
-        // Add tag on Enter or Comma
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            if (value) {
-                addTag(value.replace(',', ''));
-                $(this).val('');
+    // Render tags
+    function renderTags() {
+        let html = '';
+
+        selectedTags.forEach((tag, index) => {
+            html += `
+                <span class="tag-item" data-index="${index}">
+                    <span class="tag-name">${escapeHtml(tag.name)}</span>
+                    <button type="button" class="remove-tag" data-index="${index}" title="Remove tag">×</button>
+                </span>
+            `;
+        });
+
+        html += '<input type="text" class="tag-input" id="tagInput" placeholder="Add tags..." autocomplete="off">';
+
+        $('#tagsContainer').html(html);
+
+        // Update hidden input
+        const tagIds = selectedTags.map(t => t.id);
+        $('#tagsHiddenInput').val(JSON.stringify(tagIds));
+
+        // Reattach events after rendering
+        attachTagInputEvents();
+
+        // Focus the new input
+        currentTagInput = $('#tagInput');
+    }
+
+    // Attach events to tag input
+    function attachTagInputEvents() {
+        currentTagInput = $('#tagInput');
+
+        // Remove tag button click
+        $('.remove-tag').off('click').on('click', function(e) {
+            e.stopPropagation();
+            const index = parseInt($(this).data('index'));
+            removeTagByIndex(index);
+        });
+
+        // Tag input events
+        currentTagInput.off().on({
+            'keydown': function(e) {
+                const value = $(this).val().trim();
+
+                // Enter, Comma, or Tab - Add tag
+                if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+                    e.preventDefault();
+                    if (value) {
+                        addNewTag(value.replace(/,/g, ''));
+                        $(this).val('');
+                        $('#tagSuggestions').hide();
+                    }
+                    return false;
+                }
+
+                // Backspace on empty input - Remove last tag
+                if (e.key === 'Backspace' && value === '' && selectedTags.length > 0) {
+                    e.preventDefault();
+                    removeTagByIndex(selectedTags.length - 1);
+                }
+
+                // Escape - Close suggestions
+                if (e.key === 'Escape') {
+                    $('#tagSuggestions').hide();
+                }
+            },
+            'keyup': function(e) {
+                // Don't search on special keys
+                if (['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', ','].includes(e.key)) {
+                    return;
+                }
+
+                const value = $(this).val().trim();
+
+                // Search for tags
+                if (value.length >= 2) {
+                    clearTimeout(tagSearchTimeout);
+                    tagSearchTimeout = setTimeout(() => searchTags(value), 300);
+                } else {
+                    $('#tagSuggestions').hide();
+                }
+            },
+            'blur': function() {
+                // Delay to allow click on suggestions
+                setTimeout(() => {
+                    $('#tagSuggestions').hide();
+                }, 200);
+            },
+            'focus': function() {
+                const value = $(this).val().trim();
+                if (value.length >= 2) {
+                    searchTags(value);
+                }
+            }
+        });
+    }
+
+    // Search tags from server
+    function searchTags(query) {
+        $.ajax({
+            url: '{{ route("admin.products.tags.search") }}',
+            data: { q: query },
+            method: 'GET',
+            success: function(response) {
+                if (response.success && response.tags.length > 0) {
+                    displayTagSuggestions(response.tags, query);
+                } else {
+                    // Show "Create new tag" option
+                    displayCreateNewTagOption(query);
+                }
+            },
+            error: function() {
                 $('#tagSuggestions').hide();
             }
-            return;
+        });
+    }
+
+    // Display tag suggestions
+    function displayTagSuggestions(tags, query) {
+        let html = '';
+        let hasResults = false;
+
+        tags.forEach(tag => {
+            // Don't show already selected tags
+            if (!selectedTags.find(t => t.id === tag.id)) {
+                html += `
+                    <div class="tag-suggestion-item" data-id="${tag.id}" data-name="${escapeHtml(tag.name)}">
+                        <i class="bi bi-tag"></i> ${escapeHtml(tag.name)}
+                    </div>
+                `;
+                hasResults = true;
+            }
+        });
+
+        // Add "Create new" option if query doesn't match exactly
+        const exactMatch = tags.find(t => t.name.toLowerCase() === query.toLowerCase());
+        if (!exactMatch) {
+            html += `
+                <div class="tag-suggestion-item tag-create-new" data-name="${escapeHtml(query)}">
+                    <i class="bi bi-plus-circle"></i> Create "<strong>${escapeHtml(query)}</strong>"
+                </div>
+            `;
+            hasResults = true;
         }
 
-        // Backspace on empty input - remove last tag
-        if (e.key === 'Backspace' && value === '' && selectedTags.length > 0) {
-            selectedTags.pop();
-            renderTags();
-            return;
-        }
-
-        // Search tags
-        if (value.length >= 2) {
-            clearTimeout(tagSearchTimeout);
-            tagSearchTimeout = setTimeout(function() {
-                searchTags(value);
-            }, 300);
+        if (hasResults) {
+            $('#tagSuggestions').html(html).show();
+            attachSuggestionEvents();
         } else {
+            $('#tagSuggestions').hide();
+        }
+    }
+
+    // Display create new tag option
+    function displayCreateNewTagOption(query) {
+        const html = `
+            <div class="tag-suggestion-item tag-create-new" data-name="${escapeHtml(query)}">
+                <i class="bi bi-plus-circle"></i> Create "<strong>${escapeHtml(query)}</strong>"
+            </div>
+        `;
+        $('#tagSuggestions').html(html).show();
+        attachSuggestionEvents();
+    }
+
+    // Attach events to suggestions
+    function attachSuggestionEvents() {
+        $('.tag-suggestion-item').off('click').on('click', function() {
+            const tagId = $(this).data('id');
+            const tagName = $(this).data('name');
+
+            if (tagId) {
+                // Existing tag
+                addExistingTag(tagId, tagName);
+            } else {
+                // Create new tag
+                addNewTag(tagName);
+            }
+
+            currentTagInput.val('');
+            $('#tagSuggestions').hide();
+            currentTagInput.focus();
+        });
+    }
+
+    // Add existing tag
+    function addExistingTag(id, name) {
+        // Check if tag already added
+        if (selectedTags.find(t => t.id === id)) {
+            showNotification('Tag already added', 'info');
+            return;
+        }
+
+        selectedTags.push({ id: id, name: name });
+        renderTags();
+        showNotification('Tag added', 'success');
+    }
+
+    // Add new tag (create on server)
+    function addNewTag(name) {
+        name = name.trim();
+
+        if (!name) return;
+
+        // Check if tag with same name already exists
+        if (selectedTags.find(t => t.name.toLowerCase() === name.toLowerCase())) {
+            showNotification('Tag already added', 'info');
+            return;
+        }
+
+        // Show loading
+        const loadingToast = Swal.fire({
+            title: 'Creating tag...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        $.ajax({
+            url: '{{ route("admin.products.tags.create") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                name: name
+            },
+            success: function(response) {
+                loadingToast.close();
+
+                if (response.success) {
+                    selectedTags.push({
+                        id: response.tag.id,
+                        name: response.tag.name
+                    });
+                    renderTags();
+                    showNotification('Tag created and added', 'success');
+                } else {
+                    showNotification(response.message || 'Failed to create tag', 'error');
+                }
+            },
+            error: function(xhr) {
+                loadingToast.close();
+                showNotification(xhr.responseJSON?.message || 'Failed to create tag', 'error');
+            }
+        });
+    }
+
+    // Remove tag by index
+    function removeTagByIndex(index) {
+        if (index >= 0 && index < selectedTags.length) {
+            const removedTag = selectedTags[index];
+            selectedTags.splice(index, 1);
+            renderTags();
+            showNotification(`"${removedTag.name}" removed`, 'info');
+        }
+    }
+
+    // Show notification
+    function showNotification(message, type = 'info') {
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer);
+                toast.addEventListener('mouseleave', Swal.resumeTimer);
+            }
+        });
+
+        Toast.fire({
+            icon: type,
+            title: message
+        });
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // Click on container focuses input
+    $(document).on('click', '#tagsContainer', function(e) {
+        if (e.target.id !== 'tagInput' && !$(e.target).hasClass('remove-tag')) {
+            $('#tagInput').focus();
+        }
+    });
+
+    // Close suggestions when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#tagsContainer, #tagSuggestions').length) {
             $('#tagSuggestions').hide();
         }
     });
 
-    function searchTags(query) {
-        $.ajax({
-            url: '/admin/products/tags/search',
-            data: { q: query },
-            success: function(response) {
-                if (response.success && response.tags.length > 0) {
-                    let html = '';
-                    response.tags.forEach(tag => {
-                        if (!selectedTags.find(t => t.id === tag.id)) {
-                            html += `<div class="tag-suggestion-item" data-id="${tag.id}" data-name="${tag.name}">${tag.name}</div>`;
-                        }
-                    });
-                    if (html) {
-                        $('#tagSuggestions').html(html).show();
-                    } else {
-                        $('#tagSuggestions').hide();
-                    }
-                } else {
-                    $('#tagSuggestions').hide();
-                }
-            }
-        });
-    }
-
-    $(document).on('click', '.tag-suggestion-item', function() {
-        const tagId = $(this).data('id');
-        const tagName = $(this).data('name');
-        addTag(tagName, tagId);
-        $('#tagInput').val('');
-        $('#tagSuggestions').hide();
+    // Initialize on page load
+    $(document).ready(function() {
+        initializeTags();
     });
 
-    function addTag(name, id = null) {
-        // Check if tag already exists
-        if (selectedTags.find(t => t.name.toLowerCase() === name.toLowerCase())) {
-            return;
-        }
-
-        if (id) {
-            // Existing tag
-            selectedTags.push({ id: id, name: name });
-            renderTags();
-        } else {
-            // Create new tag
-            $.ajax({
-                url: '/admin/products/tags/create',
-                type: 'POST',
-                data: {
-                    _token: $('meta[name="csrf-token"]').attr('content'),
-                    name: name
-                },
-                success: function(response) {
-                    if (response.success) {
-                        selectedTags.push({ id: response.tag.id, name: response.tag.name });
-                        renderTags();
-                    }
-                }
-            });
-        }
-    }
-
-    function renderTags() {
-        const tagIds = selectedTags.map(t => t.id);
-        $('#tagsHiddenInput').val(JSON.stringify(tagIds));
-
-        let html = '';
-        selectedTags.forEach((tag, index) => {
-            html += `
-                <div class="tag-item">
-                    ${tag.name}
-                    <button type="button" class="remove-tag" onclick="removeTag(${index})">×</button>
-                </div>
-            `;
-        });
-        html += '<input type="text" id="tagInput" class="tag-input" placeholder="Type to search or add tags...">';
-
-        $('#tagsContainer').html(html);
-    }
-
-    window.removeTag = function(index) {
-        selectedTags.splice(index, 1);
-        renderTags();
-    };
+    // ==================== END TAGS FUNCTIONALITY ====================
 
     // Save as draft
     $('#saveDraft').on('click', function() {
@@ -1029,6 +1426,78 @@ $(document).on('click', function(e) {
 // Focus tag input when clicking on tags container
 $(document).on('click', '#tagsContainer', function() {
     $('#tagInput').focus();
+});
+
+//
+// Tax Settings Toggle
+$('#isTaxable').on('change', function() {
+    if ($(this).is(':checked')) {
+        $('#taxSettingsSection').slideDown();
+    } else {
+        $('#taxSettingsSection').slideUp();
+    }
+    updateTaxPreview();
+});
+
+// Update tax preview when values change
+$('#regularPrice, #salePrice, #taxPercentage, #taxType').on('keyup change', function() {
+    updateTaxPreview();
+});
+
+// Update tax preview
+function updateTaxPreview() {
+    if (!$('#isTaxable').is(':checked')) {
+        $('#taxPreview').hide();
+        return;
+    }
+
+    const price = parseFloat($('#salePrice').val()) || parseFloat($('#regularPrice').val()) || 0;
+    const taxPercentage = parseFloat($('#taxPercentage').val()) || 0;
+    const taxType = $('#taxType').val();
+    const currency = $('select[name="curency"]').val() || 'USD';
+    const symbol = currency_symbol(currency);
+
+    if (price <= 0 || taxPercentage <= 0) {
+        $('#taxPreview').hide();
+        return;
+    }
+
+    let taxAmount, priceExcludingTax, priceIncludingTax;
+
+    if (taxType === 'inclusive') {
+        // Tax is included in price
+        priceExcludingTax = price / (1 + (taxPercentage / 100));
+        taxAmount = price - priceExcludingTax;
+        priceIncludingTax = price;
+    } else {
+        // Tax is exclusive
+        priceExcludingTax = price;
+        taxAmount = price * (taxPercentage / 100);
+        priceIncludingTax = price + taxAmount;
+    }
+
+    const html = `
+        <p class="mb-1"><strong>Base Price:</strong> ${symbol} ${priceExcludingTax.toFixed(2)}</p>
+        <p class="mb-1"><strong>Tax (${taxPercentage}%):</strong> ${symbol} ${taxAmount.toFixed(2)}</p>
+        <p class="mb-0"><strong>Final Price:</strong> ${symbol} ${priceIncludingTax.toFixed(2)}</p>
+    `;
+
+    $('#taxPreviewContent').html(html);
+    $('#taxPreview').slideDown();
+}
+
+// Helper function for currency symbol (if not already defined)
+function currency_symbol(code) {
+    const symbols = {
+        'USD': '$', 'EUR': '€', 'GBP': '£', 'PKR': '₨', 'SAR': '﷼',
+        'AED': 'د.إ', 'CAD': 'C$', 'AUD': 'A$', 'JPY': '¥', 'CNY': '¥', 'INR': '₹'
+    };
+    return symbols[code] || code;
+}
+
+// Initialize on page load
+$(document).ready(function() {
+    updateTaxPreview();
 });
 </script>
 @endpush
