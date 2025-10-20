@@ -5,112 +5,192 @@
 @push('styles')
 <style>
     .warehouse-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
         padding: 20px;
-        border-radius: 8px;
-        text-align: center;
-        border: 2px solid #5B914C;
-        transition: all 0.3s;
+        transition: all 0.3s ease;
         cursor: pointer;
         height: 100%;
     }
 
     .warehouse-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 6px 20px rgba(91, 145, 76, 0.3);
+        box-shadow: 0 8px 20px rgba(91, 145, 76, 0.15);
+        border-color: #5B914C;
     }
 
-    .warehouse-icon {
-        font-size: 3rem;
-        color: #5B914C;
+    .warehouse-card.default-warehouse {
+        border-color: #5B914C;
+        background: linear-gradient(135deg, #f0f7ed 0%, #e8f5e0 100%);
+    }
+
+    .warehouse-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
         margin-bottom: 15px;
     }
 
     .warehouse-name {
-        font-size: 1.2rem;
-        font-weight: bold;
-        color: #333;
-        margin-bottom: 10px;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+
+    .warehouse-code {
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-family: 'Courier New', monospace;
+        background: #f8f9fa;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+
+    .warehouse-location {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
     }
 
     .warehouse-stats {
-        display: flex;
-        justify-content: space-around;
-        margin-top: 15px;
-        padding-top: 15px;
-        border-top: 1px solid #dee2e6;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-bottom: 15px;
     }
 
-    .warehouse-stat {
+    .stat-item {
+        background: white;
+        padding: 10px;
+        border-radius: 6px;
         text-align: center;
+        border: 1px solid #e9ecef;
     }
 
-    .warehouse-stat-value {
-        font-size: 1.3rem;
-        font-weight: bold;
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
         color: #5B914C;
+        display: block;
     }
 
-    .warehouse-stat-label {
+    .stat-label {
         font-size: 0.75rem;
-        color: #666;
+        color: #6c757d;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .warehouse-actions {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+
+    .warehouse-actions .btn {
+        flex: 1;
+        min-width: 80px;
+    }
+
+    .view-mode-toggle {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 5px;
+        display: inline-flex;
+        gap: 5px;
+    }
+
+    .view-mode-btn {
+        padding: 8px 16px;
+        border: none;
+        background: transparent;
+        color: #6c757d;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: all 0.3s;
+    }
+
+    .view-mode-btn.active {
+        background: #5B914C;
+        color: white;
+    }
+
+    .view-mode-btn:hover:not(.active) {
+        background: #f8f9fa;
+    }
+
+    .table-view {
+        display: none;
+    }
+
+    .card-view {
+        display: block;
+    }
+
+    .alert-badges {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+
+    .priority-badge {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: #5B914C;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
     }
 
     .filter-section {
-        background: #fff;
+        background: white;
         padding: 20px;
         border-radius: 8px;
         margin-bottom: 20px;
         border: 1px solid #e0e0e0;
     }
 
-    .btn-add-warehouse {
-        background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
-        border: none;
-        color: white;
-        padding: 10px 25px;
-        font-weight: 600;
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .quick-stat-card {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
         transition: all 0.3s;
     }
 
-    .btn-add-warehouse:hover {
+    .quick-stat-card:hover {
+        border-color: #5B914C;
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(91, 145, 76, 0.4);
-        color: white;
     }
 
-    .default-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: #ffc107;
-        color: #000;
-        padding: 5px 10px;
-        border-radius: 20px;
-        font-size: 0.75rem;
+    .quick-stat-value {
+        font-size: 2rem;
         font-weight: bold;
+        color: #5B914C;
+        margin-bottom: 5px;
     }
 
-    .warehouse-card-container {
-        position: relative;
-    }
-
-    .status-indicator {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 5px;
-    }
-
-    .status-active {
-        background-color: #28a745;
-        box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
-    }
-
-    .status-inactive {
-        background-color: #6c757d;
+    .quick-stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
     }
 </style>
 @endpush
@@ -131,53 +211,38 @@
         </div>
         <div>
             @if(auth('admin')->user()->hasPermission('inventory.update'))
-            <button type="button" class="btn btn-add-warehouse" onclick="window.location.href='{{ route('admin.warehouses.create') }}'">
-                <i class="bi bi-plus-circle"></i> Add New Warehouse
+            <button type="button" class="btn btn-primary" onclick="window.location.href='{{ route('admin.warehouses.create') }}'">
+                <i class="bi bi-plus-circle"></i> Add Warehouse
             </button>
             @endif
-            <button type="button" class="btn btn-outline-secondary" onclick="toggleView()">
-                <i class="bi bi-grid" id="viewIcon"></i> <span id="viewText">Table View</span>
-            </button>
+            <div class="view-mode-toggle ms-2 d-inline-flex">
+                <button class="view-mode-btn active" data-view="card">
+                    <i class="bi bi-grid-3x3-gap"></i> Cards
+                </button>
+                <button class="view-mode-btn" data-view="table">
+                    <i class="bi bi-table"></i> Table
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Quick Stats -->
-    <div class="row mb-4" id="quickStats">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <i class="bi bi-building text-primary" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2 mb-0" id="totalWarehouses">0</h3>
-                    <small class="text-muted">Total Warehouses</small>
-                </div>
-            </div>
+    <!-- Quick Statistics -->
+    <div class="quick-stats">
+        <div class="quick-stat-card">
+            <div class="quick-stat-value" id="totalWarehouses">0</div>
+            <div class="quick-stat-label">Total Warehouses</div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2 mb-0" id="activeWarehouses">0</h3>
-                    <small class="text-muted">Active</small>
-                </div>
-            </div>
+        <div class="quick-stat-card">
+            <div class="quick-stat-value text-success" id="activeWarehouses">0</div>
+            <div class="quick-stat-label">Active</div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <i class="bi bi-boxes text-info" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2 mb-0" id="totalStock">0</h3>
-                    <small class="text-muted">Total Stock Units</small>
-                </div>
-            </div>
+        <div class="quick-stat-card">
+            <div class="quick-stat-value text-primary" id="totalStockUnits">0</div>
+            <div class="quick-stat-label">Total Stock Units</div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <i class="bi bi-currency-dollar text-success" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2 mb-0" id="totalValue">$0</h3>
-                    <small class="text-muted">Total Stock Value</small>
-                </div>
-            </div>
+        <div class="quick-stat-card">
+            <div class="quick-stat-value text-info" id="totalStockValue">$0</div>
+            <div class="quick-stat-label">Total Stock Value</div>
         </div>
     </div>
 
@@ -194,39 +259,37 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label">Search</label>
-                <input type="text" id="filterSearch" class="form-control" placeholder="Search by name, code, or city...">
+                <input type="text" id="filterSearch" class="form-control" placeholder="Search by name, code, or location...">
             </div>
-            <div class="col-md-2">
-                <label class="form-label">&nbsp;</label>
-                <div>
-                    <button type="button" class="btn btn-primary w-100" onclick="applyFilters()">
-                        <i class="bi bi-funnel"></i> Apply
-                    </button>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">&nbsp;</label>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-secondary flex-fill" onclick="resetFilters()">
-                        <i class="bi bi-x-circle"></i> Reset
-                    </button>
-                    <button type="button" class="btn btn-outline-success flex-fill" onclick="refreshData()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
-                </div>
+            <div class="col-md-5 d-flex align-items-end gap-2">
+                <button type="button" class="btn btn-primary" onclick="applyFilters()" style="background-color: #5B914C; border-color: #5B914C;">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="resetFilters()">
+                    <i class="bi bi-x-circle"></i> Reset
+                </button>
+                <button type="button" class="btn btn-outline-success" onclick="refreshData()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Card View (Default) -->
-    <div id="cardView" style="display: none;">
-        <div class="row" id="warehouseCards">
-            <!-- Cards will be loaded here via AJAX -->
+    <!-- Card View -->
+    <div id="cardView" class="card-view">
+        <div class="row" id="warehousesGrid">
+            <!-- Warehouses will be loaded here via AJAX -->
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Loading warehouses...</p>
+            </div>
         </div>
     </div>
 
     <!-- Table View -->
-    <div id="tableView">
+    <div id="tableView" class="table-view">
         <div class="card">
             <div class="card-body">
                 <div class="table-responsive">
@@ -238,11 +301,14 @@
                                 <th>Contact</th>
                                 <th>Stock Info</th>
                                 <th>Alerts</th>
-                                <th>Priority</th>
                                 <th>Status</th>
+                                <th>Priority</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
+                        <tbody>
+                            <!-- Data loaded via DataTables -->
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -254,51 +320,26 @@
 @push('scripts')
 <script>
 let warehousesTable;
-let currentView = 'table'; // 'table' or 'card'
+let currentView = 'card';
 
 $(document).ready(function() {
-    // Initialize DataTable
-    initializeDataTable();
-
-    // Load quick stats
+    // Load quick statistics
     loadQuickStats();
 
-    // Show table view by default
-    $('#tableView').show();
+    // Load card view by default
+    loadCardView();
+
+    // Initialize table (but keep it hidden)
+    initializeTable();
+
+    // View mode toggle
+    $('.view-mode-btn').on('click', function() {
+        const view = $(this).data('view');
+        switchView(view);
+    });
 });
 
-// Initialize DataTable
-function initializeDataTable() {
-    warehousesTable = $('#warehousesTable').DataTable({
-        processing: true,
-        serverSide: true,
-        ajax: {
-            url: '{{ route("admin.warehouses.data") }}',
-            data: function(d) {
-                d.status = $('#filterStatus').val();
-                d.search = $('#filterSearch').val();
-            }
-        },
-        columns: [
-            { data: 'info', name: 'name', orderable: true },
-            { data: 'location', name: 'city', orderable: false },
-            { data: 'contact', name: 'email', orderable: false },
-            { data: 'stock_info', name: 'stock_info', orderable: false },
-            { data: 'alerts', name: 'alerts', orderable: false },
-            { data: 'priority', name: 'priority' },
-            { data: 'status', name: 'is_active' },
-            { data: 'actions', name: 'actions', orderable: false, searchable: false }
-        ],
-        order: [[5, 'desc']], // Sort by priority
-        pageLength: 25,
-        language: {
-            processing: '<i class="bi bi-hourglass-split"></i> Loading...',
-            emptyTable: 'No warehouses found'
-        }
-    });
-}
-
-// Load quick stats
+// Load quick statistics
 function loadQuickStats() {
     $.ajax({
         url: '{{ route("admin.warehouses.data") }}',
@@ -307,101 +348,226 @@ function loadQuickStats() {
             if (response.stats) {
                 $('#totalWarehouses').text(response.stats.total || 0);
                 $('#activeWarehouses').text(response.stats.active || 0);
-                $('#totalStock').text((response.stats.total_stock || 0).toLocaleString());
-                $('#totalValue').text('$' + (response.stats.total_value || 0).toLocaleString());
+                $('#totalStockUnits').text(formatNumber(response.stats.total_stock || 0));
+                $('#totalStockValue').text('$' + formatNumber(response.stats.total_value || 0, 2));
             }
+        },
+        error: function(xhr) {
+            console.error('Failed to load statistics:', xhr);
         }
     });
 }
 
-// Toggle between card and table view
-function toggleView() {
-    if (currentView === 'table') {
-        currentView = 'card';
-        $('#tableView').hide();
-        $('#cardView').show();
-        $('#viewIcon').removeClass('bi-grid').addClass('bi-table');
-        $('#viewText').text('Table View');
-        loadCardView();
-    } else {
-        currentView = 'table';
-        $('#cardView').hide();
-        $('#tableView').show();
-        $('#viewIcon').removeClass('bi-table').addClass('bi-grid');
-        $('#viewText').text('Card View');
-    }
-}
-
 // Load card view
 function loadCardView() {
+    const filters = getFilters();
+
     $.ajax({
         url: '{{ route("admin.warehouses.data") }}',
-        data: {
-            view: 'cards',
-            status: $('#filterStatus').val(),
-            search: $('#filterSearch').val()
+        data: { ...filters, view: 'card' },
+        beforeSend: function() {
+            $('#warehousesGrid').html(`
+                <div class="col-12 text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading warehouses...</p>
+                </div>
+            `);
         },
         success: function(response) {
-            let html = '';
-
             if (response.data && response.data.length > 0) {
+                let html = '';
                 response.data.forEach(warehouse => {
                     html += generateWarehouseCard(warehouse);
                 });
+                $('#warehousesGrid').html(html);
             } else {
-                html = '<div class="col-12"><div class="alert alert-info text-center">No warehouses found</div></div>';
+                $('#warehousesGrid').html(`
+                    <div class="col-12 text-center py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                        <p class="mt-3 text-muted">No warehouses found</p>
+                    </div>
+                `);
             }
-
-            $('#warehouseCards').html(html);
+        },
+        error: function(xhr) {
+            $('#warehousesGrid').html(`
+                <div class="col-12 text-center py-5">
+                    <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+                    <p class="mt-3 text-danger">Failed to load warehouses</p>
+                </div>
+            `);
         }
     });
 }
 
 // Generate warehouse card HTML
 function generateWarehouseCard(warehouse) {
-    const statusClass = warehouse.is_active ? 'status-active' : 'status-inactive';
-    const defaultBadge = warehouse.is_default ? '<span class="default-badge"><i class="bi bi-star-fill"></i> Default</span>' : '';
+    const defaultClass = warehouse.is_default ? 'default-warehouse' : '';
+    const statusBadge = warehouse.is_active ?
+        '<span class="badge bg-success">Active</span>' :
+        '<span class="badge bg-secondary">Inactive</span>';
+
+    const lowStock = warehouse.low_stock_count || 0;
+    const outOfStock = warehouse.out_of_stock_count || 0;
+
+    let alertBadges = '';
+    if (outOfStock > 0) {
+        alertBadges += `<span class="badge bg-danger">${outOfStock} Out</span> `;
+    }
+    if (lowStock > 0) {
+        alertBadges += `<span class="badge bg-warning text-dark">${lowStock} Low</span>`;
+    }
+    if (!alertBadges) {
+        alertBadges = '<span class="badge bg-success">All Good</span>';
+    }
+
+    const location = warehouse.full_address || '<span class="text-muted">No location</span>';
+    const totalStock = formatNumber(warehouse.total_stock || 0);
+    const totalValue = formatNumber(warehouse.total_value || 0, 2);
+    const productCount = warehouse.stock_count || 0;
+
+    // Build action buttons based on permissions (passed from server)
+    let actionButtons = `
+        <a href="/admin/warehouses/${warehouse.id}"
+           class="btn btn-sm btn-info" title="View Details">
+            <i class="bi bi-eye"></i>
+        </a>
+    `;
+
+    if (warehouse.can_update) {
+        actionButtons += `
+            <a href="/admin/warehouses/${warehouse.id}/edit"
+               class="btn btn-sm btn-primary" title="Edit">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <button type="button" class="btn btn-sm btn-warning"
+                    onclick="toggleWarehouseStatus('${warehouse.id}')" title="Toggle Status">
+                <i class="bi bi-toggle-${warehouse.is_active ? 'on' : 'off'}"></i>
+            </button>
+        `;
+    }
+
+    if (warehouse.can_delete && !warehouse.is_default && !warehouse.has_stock) {
+        actionButtons += `
+            <button type="button" class="btn btn-sm btn-danger"
+                    onclick="deleteWarehouse('${warehouse.id}')" title="Delete">
+                <i class="bi bi-trash"></i>
+            </button>
+        `;
+    }
 
     return `
-        <div class="col-md-4 mb-4">
-            <div class="warehouse-card-container">
-                ${defaultBadge}
-                <div class="warehouse-card" onclick="window.location.href='{{ route('admin.warehouses.show') }}/${warehouse.id}'">
-                    <div class="warehouse-icon">
-                        <i class="bi bi-building"></i>
-                    </div>
-                    <div class="warehouse-name">
-                        <span class="status-indicator ${statusClass}"></span>
-                        ${warehouse.name}
-                    </div>
-                    <small class="text-muted">${warehouse.code}</small>
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="warehouse-card ${defaultClass}" onclick="viewWarehouse('${warehouse.id}')">
+                ${warehouse.is_default ? '<span class="badge bg-primary position-absolute" style="top: 10px; left: 10px;">Default</span>' : ''}
+                <div class="priority-badge">Priority: ${warehouse.priority}</div>
 
-                    <div class="warehouse-stats">
-                        <div class="warehouse-stat">
-                            <div class="warehouse-stat-value">${warehouse.total_stock || 0}</div>
-                            <div class="warehouse-stat-label">Stock</div>
-                        </div>
-                        <div class="warehouse-stat">
-                            <div class="warehouse-stat-value">${warehouse.product_count || 0}</div>
-                            <div class="warehouse-stat-label">Products</div>
-                        </div>
-                        <div class="warehouse-stat">
-                            <div class="warehouse-stat-value text-success">$${(warehouse.total_value || 0).toLocaleString()}</div>
-                            <div class="warehouse-stat-label">Value</div>
-                        </div>
+                <div class="warehouse-header">
+                    <div>
+                        <div class="warehouse-name">${warehouse.name}</div>
+                        <span class="warehouse-code">${warehouse.code}</span>
                     </div>
+                    <div>${statusBadge}</div>
+                </div>
+
+                <div class="warehouse-location">
+                    <i class="bi bi-geo-alt"></i>
+                    ${location}
+                </div>
+
+                <div class="warehouse-stats">
+                    <div class="stat-item">
+                        <span class="stat-value">${totalStock}</span>
+                        <div class="stat-label">Stock Units</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">${productCount}</span>
+                        <div class="stat-label">Products</div>
+                    </div>
+                    <div class="stat-item" style="grid-column: 1 / -1;">
+                        <span class="stat-value text-success">${totalValue}</span>
+                        <div class="stat-label">Total Value</div>
+                    </div>
+                </div>
+
+                <div class="alert-badges">
+                    ${alertBadges}
+                </div>
+
+                <hr class="my-3">
+
+                <div class="warehouse-actions" onclick="event.stopPropagation()">
+                    ${actionButtons}
                 </div>
             </div>
         </div>
     `;
 }
 
+// Initialize DataTable
+function initializeTable() {
+    warehousesTable = $('#warehousesTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '{{ route("admin.warehouses.data") }}',
+            data: function(d) {
+                return { ...d, ...getFilters() };
+            }
+        },
+        columns: [
+            { data: 'info', name: 'name' },
+            { data: 'location', name: 'location', orderable: false },
+            { data: 'contact', name: 'contact', orderable: false },
+            { data: 'stock_info', name: 'stock_info', orderable: false },
+            { data: 'alerts', name: 'alerts', orderable: false },
+            { data: 'status', name: 'status', orderable: false },
+            { data: 'priority', name: 'priority' },
+            { data: 'actions', name: 'actions', orderable: false, searchable: false }
+        ],
+        order: [[6, 'desc']],
+        pageLength: 25,
+        language: {
+            processing: '<i class="bi bi-hourglass-split"></i> Loading...',
+            emptyTable: 'No warehouses found'
+        }
+    });
+}
+
+// Switch view
+function switchView(view) {
+    currentView = view;
+
+    $('.view-mode-btn').removeClass('active');
+    $(`.view-mode-btn[data-view="${view}"]`).addClass('active');
+
+    if (view === 'card') {
+        $('#tableView').hide();
+        $('#cardView').show();
+        loadCardView();
+    } else {
+        $('#cardView').hide();
+        $('#tableView').show();
+        warehousesTable.ajax.reload();
+    }
+}
+
+// Get current filters
+function getFilters() {
+    return {
+        status: $('#filterStatus').val(),
+        search: $('#filterSearch').val()
+    };
+}
+
 // Apply filters
 function applyFilters() {
-    if (currentView === 'table') {
-        warehousesTable.ajax.reload();
-    } else {
+    if (currentView === 'card') {
         loadCardView();
+    } else {
+        warehousesTable.ajax.reload();
     }
 }
 
@@ -414,19 +580,24 @@ function resetFilters() {
 
 // Refresh data
 function refreshData() {
-    if (currentView === 'table') {
-        warehousesTable.ajax.reload();
-    } else {
-        loadCardView();
-    }
     loadQuickStats();
+    if (currentView === 'card') {
+        loadCardView();
+    } else {
+        warehousesTable.ajax.reload();
+    }
+}
+
+// View warehouse details
+function viewWarehouse(id) {
+    window.location.href = '{{ route("admin.warehouses.show", ":id") }}'.replace(':id', id);
 }
 
 // Toggle warehouse status
-function toggleWarehouseStatus(warehouseId) {
+function toggleWarehouseStatus(id) {
     Swal.fire({
-        title: 'Confirm Status Change',
-        text: 'Are you sure you want to toggle this warehouse status?',
+        title: 'Toggle Warehouse Status?',
+        text: 'This will activate or deactivate the warehouse',
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#5B914C',
@@ -435,7 +606,7 @@ function toggleWarehouseStatus(warehouseId) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '{{ route("admin.warehouses.toggle-status", "") }}/' + warehouseId,
+                url: '{{ route("admin.warehouses.toggle-status", ":id") }}'.replace(':id', id),
                 type: 'POST',
                 data: {
                     _token: '{{ csrf_token() }}'
@@ -455,7 +626,7 @@ function toggleWarehouseStatus(warehouseId) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Failed to update status'
+                        text: xhr.responseJSON?.message || 'Failed to toggle status'
                     });
                 }
             });
@@ -464,10 +635,10 @@ function toggleWarehouseStatus(warehouseId) {
 }
 
 // Set default warehouse
-function setDefaultWarehouse(warehouseId) {
+function setDefaultWarehouse(id) {
     Swal.fire({
         title: 'Set as Default Warehouse?',
-        text: 'This will be used as the default warehouse for new stock',
+        text: 'This will be used as the default warehouse for all operations',
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#5B914C',
@@ -476,7 +647,7 @@ function setDefaultWarehouse(warehouseId) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '{{ route("admin.warehouses.set-default", "") }}/' + warehouseId,
+                url: '{{ route("admin.warehouses.set-default", ":id") }}'.replace(':id', id),
                 type: 'POST',
                 data: {
                     _token: '{{ csrf_token() }}'
@@ -496,7 +667,7 @@ function setDefaultWarehouse(warehouseId) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Failed to set default'
+                        text: xhr.responseJSON?.message || 'Failed to set default warehouse'
                     });
                 }
             });
@@ -505,7 +676,7 @@ function setDefaultWarehouse(warehouseId) {
 }
 
 // Delete warehouse
-function deleteWarehouse(warehouseId) {
+function deleteWarehouse(id) {
     Swal.fire({
         title: 'Delete Warehouse?',
         text: 'This action cannot be undone!',
@@ -513,14 +684,26 @@ function deleteWarehouse(warehouseId) {
         showCancelButton: true,
         confirmButtonColor: '#dc3545',
         cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, delete it!'
+        confirmButtonText: 'Yes, delete it!',
+        input: 'checkbox',
+        inputPlaceholder: 'I understand this warehouse will be permanently deleted'
     }).then((result) => {
-        if (result.isConfirmed) {
+        if (result.isConfirmed && result.value) {
             $.ajax({
-                url: '{{ route("admin.warehouses.destroy", "") }}/' + warehouseId,
+                url: '{{ route("admin.warehouses.destroy", ":id") }}'.replace(':id', id),
                 type: 'DELETE',
                 data: {
                     _token: '{{ csrf_token() }}'
+                },
+                beforeSend: function() {
+                    Swal.fire({
+                        title: 'Deleting...',
+                        text: 'Please wait',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
                 },
                 success: function(response) {
                     if (response.success) {
@@ -541,7 +724,17 @@ function deleteWarehouse(warehouseId) {
                     });
                 }
             });
+        } else if (result.isConfirmed && !result.value) {
+            Swal.fire('Cancelled', 'Please check the confirmation box', 'info');
         }
+    });
+}
+
+// Format number helper
+function formatNumber(num, decimals = 0) {
+    return Number(num).toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
     });
 }
 </script>

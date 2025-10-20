@@ -110,27 +110,43 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
 |--------------------------------------------------------------------------
 */
 
+/*
+|--------------------------------------------------------------------------
+| Warehouse Management Routes
+|--------------------------------------------------------------------------
+*/
+
 Route::prefix('warehouses')->name('warehouses.')->group(function () {
+
+    // Manage warehouses - CREATE routes MUST be first
+    Route::middleware('admin.permission:inventory.update')->group(function () {
+        Route::get('/create', [WarehouseController::class, 'create'])->name('create');
+        Route::post('/', [WarehouseController::class, 'store'])->name('store');
+    });
 
     // View warehouses
     Route::middleware('admin.permission:inventory.read')->group(function () {
         Route::get('/', [WarehouseController::class, 'index'])->name('index');
         Route::get('/data', [WarehouseController::class, 'getData'])->name('data');
-        Route::get('/{warehouse}', [WarehouseController::class, 'show'])->name('show');
-        Route::get('/{warehouse}/stock', [WarehouseController::class, 'stock'])->name('stock');
-        Route::get('/{warehouse}/stock-data', [WarehouseController::class, 'getStockData'])->name('stock.data');
-        Route::get('/{warehouse}/statistics', [WarehouseController::class, 'statistics'])->name('statistics');
-        Route::get('/{warehouse}/export-stock', [WarehouseController::class, 'exportStock'])->name('export-stock');
     });
 
-    // Manage warehouses
+    // Edit warehouses
     Route::middleware('admin.permission:inventory.update')->group(function () {
-        Route::get('/create', [WarehouseController::class, 'create'])->name('create');
-        Route::post('/', [WarehouseController::class, 'store'])->name('store');
         Route::get('/{warehouse}/edit', [WarehouseController::class, 'edit'])->name('edit');
         Route::put('/{warehouse}', [WarehouseController::class, 'update'])->name('update');
         Route::post('/{warehouse}/toggle-status', [WarehouseController::class, 'toggleStatus'])->name('toggle-status');
         Route::post('/{warehouse}/set-default', [WarehouseController::class, 'setDefault'])->name('set-default');
+    });
+
+    // View warehouse details - These MUST come after /create but before /{warehouse}
+    Route::middleware('admin.permission:inventory.read')->group(function () {
+        Route::get('/{warehouse}/stock', [WarehouseController::class, 'stock'])->name('stock');
+        Route::get('/{warehouse}/stock-data', [WarehouseController::class, 'getStockData'])->name('stock.data');
+        Route::get('/{warehouse}/statistics', [WarehouseController::class, 'statistics'])->name('statistics');
+        Route::get('/{warehouse}/export-stock', [WarehouseController::class, 'exportStock'])->name('export-stock');
+
+        // THIS MUST BE LAST - catches any /{warehouse} pattern
+        Route::get('/{warehouse}', [WarehouseController::class, 'show'])->name('show');
     });
 
     // Delete warehouses

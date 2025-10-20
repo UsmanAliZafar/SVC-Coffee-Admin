@@ -158,12 +158,12 @@
                         </li>
 
                         {{-- Warehouse Sync --}}
-                        <li>
+                        {{-- <li>
                             <a href="{{ route('admin.inventory.warehouse-sync') }}"
                             class="{{ request()->routeIs('admin.inventory.warehouse-sync', 'admin.inventory.sync-settings') ? 'active' : '' }}">
                                 <i class="bi bi-arrow-repeat"></i> Warehouse Sync
                             </a>
-                        </li>
+                        </li> --}}
 
                         {{-- Bulk Update --}}
                         {{-- @if(auth('admin')->user()->hasPermission('inventory.update'))
@@ -176,12 +176,12 @@
                         @endif --}}
 
                         {{-- Reports --}}
-                        <li>
+                        {{-- <li>
                             <a href="{{ route('admin.inventory.reports') }}"
                             class="{{ request()->routeIs('admin.inventory.reports') ? 'active' : '' }}">
                                 <i class="bi bi-graph-up"></i> Reports
                             </a>
-                        </li>
+                        </li> --}}
                         @endif
                     </ul>
                 </li>
