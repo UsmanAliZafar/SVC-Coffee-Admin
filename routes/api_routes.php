@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\Route;
 */
 Route::prefix('api')->name('api.')->group(function () {
         // Load Module Routes
-        require __DIR__ . '/api/categories_routes.php';
-        require __DIR__ . '/api/products_routes.php';
-        require __DIR__ . '/api/orders_routes.php';
-        require __DIR__ . '/api/customers_routes.php';
+        require __DIR__ . '/apis/categories_routes.php';
+        require __DIR__ . '/apis/products_routes.php';
+        require __DIR__ . '/apis/orders_routes.php';
+        require __DIR__ . '/apis/customers_routes.php';
 });
