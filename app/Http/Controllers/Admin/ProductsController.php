@@ -2324,4 +2324,83 @@ class ProductsController extends Controller
             'template' => $templates[$type] ?? null
         ]);
     }
+
+    //
+    /**
+     * Get products list for AJAX requests (for dropdowns, etc.)
+     */
+    public function getProductsList(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('products.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $query = Product::where('track_inventory', true)
+                       ->active()
+                       ->select('id', 'name', 'sku', 'stock_quantity');
+
+        // Search filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        // Category filter
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        // Limit results
+        $limit = $request->get('limit', 100);
+        $products = $query->orderBy('name', 'asc')->limit($limit)->get();
+
+        return response()->json([
+            'success' => true,
+            'products' => $products,
+            'count' => $products->count()
+        ]);
+    }
+
+    /**
+     * Get single product details for AJAX
+     */
+    public function getProductDetails(string $id)
+    {
+        if (!auth('admin')->user()->hasPermission('products.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $product = Product::with(['warehouseStock.warehouse', 'category'])
+                         ->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'stock_quantity' => $product->stock_quantity,
+                'low_stock_threshold' => $product->low_stock_threshold,
+                'track_inventory' => $product->track_inventory,
+                'price' => $product->price,
+                'category' => $product->category ? [
+                    'id' => $product->category->id,
+                    'name' => $product->category->name
+                ] : null,
+                'warehouse_stock' => $product->warehouseStock->map(function($stock) {
+                    return [
+                        'warehouse_id' => $stock->warehouse_id,
+                        'warehouse_name' => $stock->warehouse->name,
+                        'quantity' => $stock->quantity,
+                        'available_quantity' => $stock->available_quantity,
+                        'reserved_quantity' => $stock->reserved_quantity,
+                        'location' => $stock->location,
+                    ];
+                }),
+            ]
+        ]);
+    }
 }

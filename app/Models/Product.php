@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class Product extends Model
 {
@@ -1094,4 +1095,379 @@ class Product extends Model
         // Only one rich text allowed
         return $richTextCount <= 1;
     }
+
+    // ==================== WAREHOUSE & INVENTORY RELATIONSHIPS ====================
+
+    /**
+     * Get all warehouse stock for this product
+     */
+    public function warehouseStock(): HasMany
+    {
+        return $this->hasMany(ProductWarehouseStock::class, 'product_id');
+    }
+
+    /**
+     * Get warehouses that have this product in stock
+     */
+    public function warehouses(): BelongsToMany
+    {
+        return $this->belongsToMany(Warehouse::class, 'product_warehouse_stock', 'product_id', 'warehouse_id')
+                    ->withPivot('quantity', 'reserved_quantity', 'available_quantity', 'location')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Get inventory movements for this product
+     */
+    public function inventoryMovements(): HasMany
+    {
+        return $this->hasMany(InventoryMovement::class, 'product_id');
+    }
+
+    /**
+     * Get stock alerts for this product
+     */
+    public function stockAlerts(): HasMany
+    {
+        return $this->hasMany(StockAlert::class, 'product_id');
+    }
+
+    /**
+     * Get active/unresolved stock alerts
+     */
+    public function activeStockAlerts(): HasMany
+    {
+        return $this->hasMany(StockAlert::class, 'product_id')->where('is_resolved', false);
+    }
+
+    // ==================== WAREHOUSE STOCK HELPER METHODS ====================
+
+    /**
+     * Get total stock across all warehouses
+     */
+    public function getTotalWarehouseStock(): int
+    {
+        if (!$this->track_inventory) {
+            return PHP_INT_MAX;
+        }
+
+        return $this->warehouseStock()->sum('quantity');
+    }
+
+    /**
+     * Get total available stock (not reserved) across all warehouses
+     */
+    public function getTotalAvailableStock(): int
+    {
+        if (!$this->track_inventory) {
+            return PHP_INT_MAX;
+        }
+
+        return $this->warehouseStock()->sum('available_quantity');
+    }
+
+    /**
+     * Get total reserved stock across all warehouses
+     */
+    public function getTotalReservedStock(): int
+    {
+        if (!$this->track_inventory) {
+            return 0;
+        }
+
+        return $this->warehouseStock()->sum('reserved_quantity');
+    }
+
+    /**
+     * Get stock for a specific warehouse
+     */
+    public function getWarehouseStock(string $warehouseId): int
+    {
+        if (!$this->track_inventory) {
+            return PHP_INT_MAX;
+        }
+
+        $stock = $this->warehouseStock()->where('warehouse_id', $warehouseId)->first();
+        return $stock ? $stock->quantity : 0;
+    }
+
+    /**
+     * Get available stock for a specific warehouse
+     */
+    public function getAvailableWarehouseStock(string $warehouseId): int
+    {
+        if (!$this->track_inventory) {
+            return PHP_INT_MAX;
+        }
+
+        $stock = $this->warehouseStock()->where('warehouse_id', $warehouseId)->first();
+        return $stock ? $stock->available_quantity : 0;
+    }
+
+    /**
+     * Check if product has stock in any warehouse
+     */
+    public function hasWarehouseStock(): bool
+    {
+        if (!$this->track_inventory) {
+            return true;
+        }
+
+        return $this->warehouseStock()->where('quantity', '>', 0)->exists();
+    }
+
+    /**
+     * Check if product has available stock in any warehouse
+     */
+    public function hasAvailableStock(int $quantity = 1): bool
+    {
+        if (!$this->track_inventory) {
+            return true;
+        }
+
+        return $this->warehouseStock()->where('available_quantity', '>=', $quantity)->exists();
+    }
+
+    /**
+     * Add stock to a specific warehouse
+     */
+    public function addWarehouseStock(string $warehouseId, int $quantity, string $reason = null): bool
+    {
+        try {
+            DB::beginTransaction();
+
+            $stock = ProductWarehouseStock::firstOrCreate(
+                [
+                    'product_id' => $this->id,
+                    'warehouse_id' => $warehouseId,
+                ],
+                [
+                    'quantity' => 0,
+                    'reserved_quantity' => 0,
+                    'available_quantity' => 0,
+                ]
+            );
+
+            $previousQuantity = $stock->quantity;
+            $stock->addStock($quantity);
+
+            // Create movement record
+            InventoryMovement::create([
+                'product_id' => $this->id,
+                'warehouse_id' => $warehouseId,
+                'type' => 'adjustment',
+                'quantity' => $quantity,
+                'previous_quantity' => $previousQuantity,
+                'new_quantity' => $stock->fresh()->quantity,
+                'reason' => $reason ?? 'Stock added',
+            ]);
+
+            // Update product total stock
+            $this->updateTotalStock();
+
+            DB::commit();
+            return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return false;
+        }
+    }
+
+    /**
+     * Reduce stock from a specific warehouse
+     */
+    public function reduceWarehouseStock(string $warehouseId, int $quantity, string $reason = null): bool
+    {
+        try {
+            DB::beginTransaction();
+
+            $stock = ProductWarehouseStock::where('product_id', $this->id)
+                                        ->where('warehouse_id', $warehouseId)
+                                        ->first();
+
+            if (!$stock || $stock->available_quantity < $quantity) {
+                DB::rollBack();
+                return false;
+            }
+
+            $previousQuantity = $stock->quantity;
+            $stock->reduceStock($quantity);
+
+            // Create movement record
+            InventoryMovement::create([
+                'product_id' => $this->id,
+                'warehouse_id' => $warehouseId,
+                'type' => 'adjustment',
+                'quantity' => -$quantity,
+                'previous_quantity' => $previousQuantity,
+                'new_quantity' => $stock->fresh()->quantity,
+                'reason' => $reason ?? 'Stock reduced',
+            ]);
+
+            // Update product total stock
+            $this->updateTotalStock();
+
+            DB::commit();
+            return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return false;
+        }
+    }
+
+    /**
+     * Transfer stock between warehouses
+     */
+    public function transferStock(string $fromWarehouseId, string $toWarehouseId, int $quantity, string $reason = null): bool
+    {
+        try {
+            DB::beginTransaction();
+
+            // Get source warehouse stock
+            $fromStock = ProductWarehouseStock::where('product_id', $this->id)
+                                            ->where('warehouse_id', $fromWarehouseId)
+                                            ->first();
+
+            if (!$fromStock || $fromStock->available_quantity < $quantity) {
+                DB::rollBack();
+                return false;
+            }
+
+            // Get or create destination warehouse stock
+            $toStock = ProductWarehouseStock::firstOrCreate(
+                [
+                    'product_id' => $this->id,
+                    'warehouse_id' => $toWarehouseId,
+                ],
+                [
+                    'quantity' => 0,
+                    'reserved_quantity' => 0,
+                    'available_quantity' => 0,
+                ]
+            );
+
+            // Reduce from source
+            $fromPreviousQty = $fromStock->quantity;
+            $fromStock->reduceStock($quantity);
+
+            // Add to destination
+            $toPreviousQty = $toStock->quantity;
+            $toStock->addStock($quantity);
+
+            // Create movement record
+            InventoryMovement::create([
+                'product_id' => $this->id,
+                'warehouse_id' => $toWarehouseId,
+                'from_warehouse_id' => $fromWarehouseId,
+                'to_warehouse_id' => $toWarehouseId,
+                'type' => 'transfer',
+                'quantity' => $quantity,
+                'previous_quantity' => $toPreviousQty,
+                'new_quantity' => $toStock->fresh()->quantity,
+                'reason' => $reason ?? 'Stock transfer',
+            ]);
+
+            DB::commit();
+            return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return false;
+        }
+    }
+
+    /**
+     * Reserve stock for an order
+     */
+    public function reserveStock(string $warehouseId, int $quantity): bool
+    {
+        $stock = ProductWarehouseStock::where('product_id', $this->id)
+                                    ->where('warehouse_id', $warehouseId)
+                                    ->first();
+
+        if (!$stock) {
+            return false;
+        }
+
+        return $stock->reserveStock($quantity);
+    }
+
+    /**
+     * Release reserved stock
+     */
+    public function releaseStock(string $warehouseId, int $quantity): bool
+    {
+        $stock = ProductWarehouseStock::where('product_id', $this->id)
+                                    ->where('warehouse_id', $warehouseId)
+                                    ->first();
+
+        if (!$stock) {
+            return false;
+        }
+
+        $stock->releaseStock($quantity);
+        return true;
+    }
+
+    /**
+     * Update total stock quantity from all warehouses
+     */
+    public function updateTotalStock(): void
+    {
+        if ($this->track_inventory) {
+            $totalStock = $this->warehouseStock()->sum('quantity');
+            $this->update(['stock_quantity' => $totalStock]);
+        }
+    }
+
+    /**
+     * Sync product stock with warehouse stocks
+     */
+    public function syncWarehouseStock(): void
+    {
+        if ($this->track_inventory) {
+            $this->updateTotalStock();
+
+            // Check for alerts
+            if ($this->isLowStock() || $this->stock_quantity <= 0) {
+                $this->createStockAlerts();
+            }
+        }
+    }
+
+    /**
+     * Create stock alerts for all warehouses
+     */
+    protected function createStockAlerts(): void
+    {
+        foreach ($this->warehouseStock as $stock) {
+            if ($stock->quantity <= 0) {
+                StockAlert::updateOrCreate(
+                    [
+                        'product_id' => $this->id,
+                        'warehouse_id' => $stock->warehouse_id,
+                        'alert_type' => 'out_of_stock',
+                        'is_resolved' => false,
+                    ],
+                    [
+                        'current_quantity' => $stock->quantity,
+                        'threshold_quantity' => 0,
+                    ]
+                );
+            } elseif ($stock->quantity <= $this->low_stock_threshold) {
+                StockAlert::updateOrCreate(
+                    [
+                        'product_id' => $this->id,
+                        'warehouse_id' => $stock->warehouse_id,
+                        'alert_type' => 'low_stock',
+                        'is_resolved' => false,
+                    ],
+                    [
+                        'current_quantity' => $stock->quantity,
+                        'threshold_quantity' => $this->low_stock_threshold,
+                    ]
+                );
+            }
+        }
+    }
+
 }

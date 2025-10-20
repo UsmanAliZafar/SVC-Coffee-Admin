@@ -84,28 +84,109 @@
 
             {{-- Inventory Management --}}
             @if(auth('admin')->user()->hasPermission('inventory.read'))
-                <li class="nav-item has-dropdown">
-                    <a class="nav-link {{ request()->routeIs('admin.inventory.*') ? 'active' : '' }}"
-                       href="#"
-                       data-tooltip="Inventory">
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.inventory.*', 'admin.warehouses.*', 'admin.stock-alerts.*') ? 'open' : '' }}">
+                    <a class="nav-link {{ request()->routeIs('admin.inventory.*', 'admin.warehouses.*', 'admin.stock-alerts.*') ? 'active' : '' }}"
+                    href="{{ route('admin.inventory.index') }}"
+                    data-tooltip="Inventory">
                         <i class="bi bi-boxes"></i>
                         <span class="nav-text">Inventory</span>
                         <i class="bi bi-chevron-down dropdown-arrow"></i>
                     </a>
                     <ul class="submenu">
-                        @if(auth('admin')->user()->hasPermission('inventory.update'))
-                        <li><a href="#"><i class="bi bi-plus-slash-minus"></i> Adjust Stock</a></li>
-                        @endif
+                        {{-- Main Inventory Overview --}}
                         @if(auth('admin')->user()->hasPermission('inventory.read'))
-                        <li><a href="#"><i class="bi bi-arrow-left-right"></i> Movement</a></li>
-                        <li><a href="#"><i class="bi bi-arrow-repeat"></i> Warehouse Sync</a></li>
-                        <li><a href="#"><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock</a></li>
-                        <li><a href="#"><i class="bi bi-x-circle text-danger"></i> Out of Stock</a></li>
+                        <li>
+                            <a href="{{ route('admin.inventory.index') }}"
+                            class="{{ request()->routeIs('admin.inventory.index') ? 'active' : '' }}">
+                                <i class="bi bi-grid"></i> Overview
+                            </a>
+                        </li>
+                        @endif
+
+                        {{-- Adjust Stock --}}
+                        @if(auth('admin')->user()->hasPermission('inventory.update'))
+                        <li>
+                            <a href="{{ route('admin.inventory.adjust') }}"
+                            class="{{ request()->routeIs('admin.inventory.adjust') ? 'active' : '' }}">
+                                <i class="bi bi-plus-slash-minus"></i> Adjust Stock
+                            </a>
+                        </li>
+                        @endif
+
+                        {{-- Movement History --}}
+                        @if(auth('admin')->user()->hasPermission('inventory.read'))
+                        <li>
+                            <a href="{{ route('admin.inventory.movement') }}"
+                            class="{{ request()->routeIs('admin.inventory.movement') ? 'active' : '' }}">
+                                <i class="bi bi-clock-history"></i> Movement
+                            </a>
+                        </li>
+
+                        {{-- Low Stock --}}
+                        <li>
+                            <a href="{{ route('admin.inventory.low-stock') }}"
+                            class="{{ request()->routeIs('admin.inventory.low-stock') ? 'active' : '' }}">
+                                <i class="bi bi-exclamation-triangle text-warning"></i> Low Stock
+                                <span class="badge bg-warning text-dark ms-auto" id="lowStockBadge" style="display: none;">0</span>
+                            </a>
+                        </li>
+
+                        {{-- Out of Stock --}}
+                        <li>
+                            <a href="{{ route('admin.inventory.out-of-stock') }}"
+                            class="{{ request()->routeIs('admin.inventory.out-of-stock') ? 'active' : '' }}">
+                                <i class="bi bi-x-octagon text-danger"></i> Out of Stock
+                                <span class="badge bg-danger text-white ms-auto" id="outOfStockBadge" style="display: none;">0</span>
+                            </a>
+                        </li>
+
+                        {{-- Stock Alerts --}}
+                        {{-- <li>
+                            <a href="{{ route('admin.stock-alerts.index') }}"
+                            class="{{ request()->routeIs('admin.stock-alerts.*') ? 'active' : '' }}">
+                                <i class="bi bi-bell"></i> All Alerts
+                                <span class="badge bg-danger text-white ms-auto" id="totalAlertsBadge" style="display: none;">0</span>
+                            </a>
+                        </li> --}}
+
+                        {{-- Warehouses --}}
+                        <li>
+                            <a href="{{ route('admin.warehouses.index') }}"
+                            class="{{ request()->routeIs('admin.warehouses.*') ? 'active' : '' }}">
+                                <i class="bi bi-building"></i> Warehouses
+                            </a>
+                        </li>
+
+                        {{-- Warehouse Sync --}}
+                        <li>
+                            <a href="{{ route('admin.inventory.warehouse-sync') }}"
+                            class="{{ request()->routeIs('admin.inventory.warehouse-sync', 'admin.inventory.sync-settings') ? 'active' : '' }}">
+                                <i class="bi bi-arrow-repeat"></i> Warehouse Sync
+                            </a>
+                        </li>
+
+                        {{-- Bulk Update --}}
+                        {{-- @if(auth('admin')->user()->hasPermission('inventory.update'))
+                        <li>
+                            <a href="{{ route('admin.inventory.bulk-update') }}"
+                            class="{{ request()->routeIs('admin.inventory.bulk-update') ? 'active' : '' }}">
+                                <i class="bi bi-file-earmark-spreadsheet"></i> Bulk Update
+                            </a>
+                        </li>
+                        @endif --}}
+
+                        {{-- Reports --}}
+                        <li>
+                            <a href="{{ route('admin.inventory.reports') }}"
+                            class="{{ request()->routeIs('admin.inventory.reports') ? 'active' : '' }}">
+                                <i class="bi bi-graph-up"></i> Reports
+                            </a>
+                        </li>
                         @endif
                     </ul>
                 </li>
             @endif
-            {{-- Inventory Management --}}
+            {{-- End Inventory Management --}}
 
             {{-- Orders Management --}}
             @if(auth('admin')->user()->hasPermission('orders.read'))

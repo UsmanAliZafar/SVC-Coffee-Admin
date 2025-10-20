@@ -55,6 +55,10 @@ Route::prefix('products')->name('products.')->group(function () {
         Route::get('/export', [ProductsController::class, 'export'])->name('export');
 
         Route::get('/get-by-sku', [ProductsController::class, 'getBySku'])->name('get-by-sku');
+
+        // AJAX Lists
+        Route::get('/ajax-list', [ProductsController::class, 'getProductsList'])->name('ajax-list');
+        Route::get('/ajax-details/{id}', [ProductsController::class, 'getProductDetails'])->name('ajax-details');
     });
 
     // Update routes (specific paths before /{id})
