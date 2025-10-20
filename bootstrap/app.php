@@ -11,8 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
-            //Admin Routes
+            //Admin Main Routes
             Route::middleware('web')->group(base_path('routes/admin_routes.php'));
+            Route::middleware('api')->group(base_path('routes/api_routes.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
