@@ -13,9 +13,7 @@ return [
     */
 
     'valid_keys' => [
-        env('API_KEY_WAREHOUSE', 'warehouse_key_here'),
-        env('API_KEY_MOBILE_APP', 'mobile_app_key_here'),
-        env('API_KEY_POS_SYSTEM', 'pos_system_key_here'),
+        env('API_KEY_FRONT_APP', 'front_app_key_here'),
         // Add more API keys as needed
     ],
 

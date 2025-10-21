@@ -5,6 +5,8 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class ApiKeyAuth
 {
@@ -32,7 +34,7 @@ class ApiKeyAuth
 
         if (!in_array($apiKey, $validApiKeys)) {
             // Log unauthorized access attempt
-            \Log::warning('Unauthorized API access attempt', [
+            Log::warning('Unauthorized API access attempt', [
                 'api_key' => $apiKey,
                 'ip' => $request->ip(),
                 'endpoint' => $request->fullUrl(),
@@ -52,7 +54,7 @@ class ApiKeyAuth
             $clientIp = $request->ip();
 
             if (!in_array($clientIp, $allowedIps)) {
-                \Log::warning('API access from unauthorized IP', [
+                Log::warning('API access from unauthorized IP', [
                     'ip' => $clientIp,
                     'api_key' => $apiKey,
                     'endpoint' => $request->fullUrl()
@@ -67,25 +69,27 @@ class ApiKeyAuth
         }
 
         // Optional: Rate limiting check
-        $rateLimitKey = 'api_rate_limit:' . $apiKey;
-        $maxRequests = config('api.rate_limit.max_requests', 1000);
-        $perMinutes = config('api.rate_limit.per_minutes', 60);
+        if (config('api.rate_limit.enabled', true)) {
+            $rateLimitKey = 'api_rate_limit:' . $apiKey;
+            $maxRequests = (int) config('api.rate_limit.max_requests', 1000);
+            $perMinutes = (int) config('api.rate_limit.per_minutes', 60);
 
-        $requestCount = \Cache::get($rateLimitKey, 0);
+            $requestCount = (int) Cache::get($rateLimitKey, 0);
 
-        if ($requestCount >= $maxRequests) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Rate limit exceeded',
-                'error' => "Maximum {$maxRequests} requests per {$perMinutes} minutes"
-            ], 429);
+            if ($requestCount >= $maxRequests) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Rate limit exceeded',
+                    'error' => "Maximum {$maxRequests} requests per {$perMinutes} minutes"
+                ], 429);
+            }
+
+            // Increment request count with proper integer value
+            Cache::put($rateLimitKey, $requestCount + 1, now()->addMinutes($perMinutes));
         }
 
-        // Increment request count
-        \Cache::put($rateLimitKey, $requestCount + 1, now()->addMinutes($perMinutes));
-
         // Log successful API access
-        \Log::info('API access granted', [
+        Log::info('API access granted', [
             'api_key' => substr($apiKey, 0, 10) . '...',
             'ip' => $request->ip(),
             'endpoint' => $request->path(),

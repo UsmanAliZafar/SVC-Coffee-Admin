@@ -22,6 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.auth' => \App\Http\Middleware\AdminAuth::class,
             'admin.permission' => \App\Http\Middleware\CheckPermission::class,
             'admin.guest' => \App\Http\Middleware\RedirectIfAdminAuthenticated::class,
+            //
+            'api.key' => \App\Http\Middleware\ApiKeyAuth::class,
+        ]);
+
+        $middleware->group('api', [
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
