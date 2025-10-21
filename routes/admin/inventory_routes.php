@@ -110,12 +110,6 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-/*
-|--------------------------------------------------------------------------
-| Warehouse Management Routes
-|--------------------------------------------------------------------------
-*/
-
 Route::prefix('warehouses')->name('warehouses.')->group(function () {
 
     // Manage warehouses - CREATE routes MUST be first
