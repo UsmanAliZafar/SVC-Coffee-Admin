@@ -388,7 +388,34 @@ $(document).ready(function() {
         $('.warehouse-tab').removeClass('active');
         $(this).addClass('active');
         currentWarehouse = $(this).data('warehouse');
-        refreshData();
+
+        // Destroy and recreate table with correct columns
+        if (inventoryTable) {
+            inventoryTable.destroy();
+        }
+
+        // Update table headers
+        if (currentWarehouse) {
+            $('#inventoryTable thead tr').html(`
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Available</th>
+                <th>Reserved</th>
+                <th>Location</th>
+                <th>Actions</th>
+            `);
+        } else {
+            $('#inventoryTable thead tr').html(`
+                <th>Product</th>
+                <th>Total Stock</th>
+                <th>Available</th>
+                <th>Reserved</th>
+                <th>Warehouses</th>
+                <th>Actions</th>
+            `);
+        }
+
+        initializeDataTable();
         loadStatistics();
     });
 
@@ -425,6 +452,28 @@ $(document).ready(function() {
 
 // Initialize DataTable
 function initializeDataTable() {
+    let columns;
+
+    if (currentWarehouse) {
+        columns = [
+            { data: 'product_info', name: 'product_info', orderable: false },
+            { data: 'quantity', name: 'quantity', orderable: false },
+            { data: 'available', name: 'available', orderable: false },
+            { data: 'reserved', name: 'reserved', orderable: false },
+            { data: 'location', name: 'location', orderable: false },
+            { data: 'actions', name: 'actions', orderable: false, searchable: false }
+        ];
+    } else {
+        columns = [
+            { data: 'product_info', name: 'product_info', orderable: false },
+            { data: 'total_stock', name: 'total_stock', orderable: false },
+            { data: 'available', name: 'available', orderable: false },
+            { data: 'reserved', name: 'reserved', orderable: false },
+            { data: 'warehouses', name: 'warehouses', orderable: false },
+            { data: 'actions', name: 'actions', orderable: false, searchable: false }
+        ];
+    }
+
     inventoryTable = $('#inventoryTable').DataTable({
         processing: true,
         serverSide: true,
@@ -436,27 +485,18 @@ function initializeDataTable() {
                 d.search = $('#filterSearch').val();
             }
         },
-        columns: [
-            { data: 'product_info', name: 'product_info', orderable: false },
-            { data: 'total_stock', name: 'total_stock' },
-            { data: 'available', name: 'available', orderable: false },
-            { data: 'reserved', name: 'reserved', orderable: false },
-            { data: 'warehouses', name: 'warehouses', orderable: false },
-            { data: 'actions', name: 'actions', orderable: false, searchable: false }
-        ],
-        order: [[1, 'desc']],
+        columns: columns,
+        ordering: false,
         pageLength: 25,
         language: {
             processing: '<i class="bi bi-hourglass-split"></i> Loading...',
             emptyTable: 'No inventory data available'
         },
         drawCallback: function() {
-            // Initialize tooltips after table draw
             $('[data-bs-toggle="tooltip"]').tooltip();
         }
     });
 }
-
 // Load statistics
 function loadStatistics() {
     $.ajax({

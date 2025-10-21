@@ -157,10 +157,17 @@ class InventoryController extends Controller
                     </button>';
                 }
 
+                $actions .= '<a href="' . route('admin.products.show', $stock->product_id) . '"
+                    class="btn btn-sm btn-info" title="View Product">
+                    <i class="bi bi-eye"></i>
+                </a>';
+
                 $actions .= '</div>';
                 return $actions;
             })
+            // FIX: Tell DataTables not to order by server-side for these columns
             ->rawColumns(['product_info', 'quantity', 'available', 'reserved', 'location', 'actions'])
+            ->skipTotalRecords() // Optional: skip total records count for performance
             ->make(true);
     }
 
