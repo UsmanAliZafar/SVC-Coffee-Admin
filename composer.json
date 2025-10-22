@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "barryvdh/laravel-dompdf": "^3.1",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "yajra/laravel-datatables-oracle": "^12.6"
@@ -28,7 +29,8 @@
         },
         "files": [
             "app/Helpers/CommenHelpers.php",
-            "app/Helpers/SystemStatusesHelper.php"
+            "app/Helpers/SystemStatusesHelper.php",
+            "app/Helpers/StockManager.php"
         ]
     },
     "autoload-dev": {

@@ -190,28 +190,100 @@
 
             {{-- Orders Management --}}
             @if(auth('admin')->user()->hasPermission('orders.read'))
-                <li class="nav-item has-dropdown">
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.orders.*') ? 'open' : '' }}">
                     <a class="nav-link {{ request()->routeIs('admin.orders.*') ? 'active' : '' }}"
-                       href="#"
-                       data-tooltip="Orders">
+                    href="{{ route('admin.orders.index') }}"
+                    data-tooltip="Orders">
                         <i class="bi bi-receipt"></i>
                         <span class="nav-text">Orders</span>
                         <i class="bi bi-chevron-down dropdown-arrow"></i>
                     </a>
                     <ul class="submenu">
-                        @if(auth('admin')->user()->hasPermission('orders.create'))
-                        <li><a href="#"><i class="bi bi-plus-square"></i> Create Order</a></li>
-                        @endif
                         @if(auth('admin')->user()->hasPermission('orders.read'))
-                        <li><a href="#"><i class="bi bi-clock text-warning"></i> Pending</a></li>
-                        <li><a href="#"><i class="bi bi-hourglass-split text-info"></i> Processing</a></li>
-                        <li><a href="#"><i class="bi bi-truck text-primary"></i> Shipped</a></li>
-                        <li><a href="#"><i class="bi bi-file-earmark-text"></i> Invoices</a></li>
-                        <li><a href="#"><i class="bi bi-arrow-counterclockwise"></i> Refunds</a></li>
+                        <li>
+                            <a href="{{ route('admin.orders.index') }}" class="{{ request()->routeIs('admin.orders.index') ? 'active' : '' }}">
+                                <i class="bi bi-list-ul"></i> All Orders
+                            </a>
+                        </li>
+                        @endif
+
+                        @if(auth('admin')->user()->hasPermission('orders.create'))
+                        <li>
+                            <a href="{{ route('admin.orders.create') }}" class="{{ request()->routeIs('admin.orders.create') ? 'active' : '' }}">
+                                <i class="bi bi-plus-square"></i> Create Order
+                            </a>
+                        </li>
+                        @endif
+
+                        @if(auth('admin')->user()->hasPermission('orders.read'))
+                        <li class="divider"></li>
+
+                        <li>
+                            <a href="{{ route('admin.orders.pending') }}" class="{{ request()->routeIs('admin.orders.pending') ? 'active' : '' }}">
+                                <i class="bi bi-clock text-warning"></i> Pending
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.orders.processing') }}" class="{{ request()->routeIs('admin.orders.processing') ? 'active' : '' }}">
+                                <i class="bi bi-hourglass-split text-info"></i> Processing
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.orders.shipped') }}" class="{{ request()->routeIs('admin.orders.shipped') ? 'active' : '' }}">
+                                <i class="bi bi-truck text-primary"></i> Shipped
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.orders.delivered') }}" class="{{ request()->routeIs('admin.orders.delivered') ? 'active' : '' }}">
+                                <i class="bi bi-check-circle text-success"></i> Delivered
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.orders.cancelled') }}" class="{{ request()->routeIs('admin.orders.cancelled') ? 'active' : '' }}">
+                                <i class="bi bi-x-circle text-danger"></i> Cancelled
+                            </a>
+                        </li>
+
+                        <li class="divider"></li>
+
+                        <li>
+                            <a href="{{ route('admin.orders.today') }}" class="{{ request()->routeIs('admin.orders.today') ? 'active' : '' }}">
+                                <i class="bi bi-calendar-day text-secondary"></i> Today's Orders
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.orders.invoices') }}" class="{{ request()->routeIs('admin.orders.invoices') ? 'active' : '' }}">
+                                <i class="bi bi-file-earmark-text text-info"></i> Invoices
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.orders.shipping') }}" class="{{ request()->routeIs('admin.orders.shipping') ? 'active' : '' }}">
+                                <i class="bi bi-box-seam text-primary"></i> Shipping
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.orders.refunds') }}" class="{{ request()->routeIs('admin.orders.refunds') ? 'active' : '' }}">
+                                <i class="bi bi-arrow-counterclockwise text-warning"></i> Refunds
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('admin.orders.with-notes') }}" class="{{ request()->routeIs('admin.orders.with-notes') ? 'active' : '' }}">
+                                <i class="bi bi-sticky text-muted"></i> With Notes
+                            </a>
+                        </li>
+
+                        <li class="divider"></li>
+
+                        <li>
+                            <a href="{{ route('admin.orders.reports') }}" class="{{ request()->routeIs('admin.orders.reports') ? 'active' : '' }}">
+                                <i class="bi bi-graph-up text-success"></i> Reports
+                            </a>
+                        </li>
                         @endif
                     </ul>
                 </li>
             @endif
+            {{-- Orders Management --}}
 
             {{-- Customers Management --}}
             @if(auth('admin')->user()->hasPermission('customers.read'))
