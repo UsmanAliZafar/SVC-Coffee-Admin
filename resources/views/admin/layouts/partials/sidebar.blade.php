@@ -422,7 +422,7 @@
 
             {{-- Admin Users Management --}}
             @if(auth('admin')->user()->hasPermission('admin_users.read') || auth('admin')->user()->hasPermission('roles.read') || auth('admin')->user()->hasRole('super_admin'))
-            <li class="nav-item has-dropdown {{ request()->routeIs('admin.*') ? 'open' : '' }}">
+            <li class="nav-item has-dropdown {{ request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*') || request()->routeIs('admin.permissions.*') || request()->routeIs('admin.profile.*')  ? 'open' : '' }}">
                 <a class="nav-link {{ request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*') || request()->routeIs('admin.permissions.*') ? 'active' : '' }}"
                    href="{{ route('admin.users.index') }}"
                    data-tooltip="Admin Users">
@@ -451,7 +451,7 @@
             @if(auth('admin')->user()->hasPermission('settings.read'))
             <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}"
-                   href="#" data-tooltip="Settings">
+                   href="{{ route('admin.settings.index') }}" data-tooltip="Settings">
                     <i class="bi bi-sliders"></i>
                     <span class="nav-text">Settings</span>
                 </a>
