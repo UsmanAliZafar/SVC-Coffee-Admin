@@ -287,7 +287,7 @@
 
             {{-- Customers Management --}}
             @if(auth('admin')->user()->hasPermission('customers.read'))
-                <li class="nav-item has-dropdown">
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.customers.*') ? 'open' : '' }}">
                     <a class="nav-link {{ request()->routeIs('admin.customers.*') ? 'active' : '' }}"
                     href="{{ route('admin.customers.index') }}"
                     data-tooltip="Customers">
@@ -593,13 +593,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Close dropdowns when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.sidebar')) {
-            dropdownItems.forEach(item => {
-                item.classList.remove('open');
-            });
-        }
-    });
 });
 </script>
