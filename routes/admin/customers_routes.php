@@ -1,125 +1,71 @@
 <?php
-// routes/admin/customers_routes.php
 
+use App\Http\Controllers\Admin\CustomersController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
 | Customers Management Routes
 |--------------------------------------------------------------------------
+| All routes for customer management including CRUD, segments,
+| and reporting features.
+|
 */
 
 Route::prefix('customers')->name('customers.')->group(function () {
 
-    // View customers
+    // Main customers listing and data
+    Route::get('/', [CustomersController::class, 'index'])
+        ->name('index')
+        ->middleware('admin.permission:customers.read');
+
+    Route::get('/data', [CustomersController::class, 'getData'])
+        ->name('data')
+        ->middleware('admin.permission:customers.read');
+
+    // Customer Segments & Filters
     Route::middleware('admin.permission:customers.read')->group(function () {
-        Route::get('/', function () {
-            return view('admin.customers.index');
-        })->name('index');
-
-        Route::get('/ajax-data', function () {
-            // AJAX endpoint for datatables
-        })->name('data');
-
-        Route::get('/groups', function () {
-            return view('admin.customers.groups');
-        })->name('groups');
-
-        Route::get('/new', function () {
-            return view('admin.customers.new');
-        })->name('new');
-
-        Route::get('/returning', function () {
-            return view('admin.customers.returning');
-        })->name('returning');
-
-        Route::get('/top', function () {
-            return view('admin.customers.top');
-        })->name('top');
-
-        Route::get('/active', function () {
-            return view('admin.customers.active');
-        })->name('active');
-
-        Route::get('/blocked', function () {
-            return view('admin.customers.blocked');
-        })->name('blocked');
-
-        Route::get('/inactive', function () {
-            return view('admin.customers.inactive');
-        })->name('inactive');
-
-        Route::get('/purchase-patterns', function () {
-            return view('admin.customers.purchase-patterns');
-        })->name('purchase-patterns');
-
-        Route::get('/communication', function () {
-            return view('admin.customers.communication');
-        })->name('communication');
-
-        Route::get('/newsletter', function () {
-            return view('admin.customers.newsletter');
-        })->name('newsletter');
-
-        Route::get('/bulk-email', function () {
-            return view('admin.customers.bulk-email');
-        })->name('bulk-email');
-
-        Route::get('/reports', function () {
-            return view('admin.customers.reports');
-        })->name('reports');
-
-        Route::get('/{id}', function ($id) {
-            return view('admin.customers.show', compact('id'));
-        })->name('show');
+        Route::get('/new', [CustomersController::class, 'newCustomers'])->name('new');
+        Route::get('/returning', [CustomersController::class, 'returningCustomers'])->name('returning');
+        Route::get('/top', [CustomersController::class, 'topCustomers'])->name('top');
+        Route::get('/active', [CustomersController::class, 'activeCustomers'])->name('active');
+        Route::get('/blocked', [CustomersController::class, 'blockedCustomers'])->name('blocked');
+        Route::get('/inactive', [CustomersController::class, 'inactiveCustomers'])->name('inactive');
     });
 
-    // Create customer
+    // Analytics & Reports
+    Route::middleware('admin.permission:customers.read')->group(function () {
+        Route::get('/reports', [CustomersController::class, 'reports'])->name('reports');
+        Route::get('/reports/data', [CustomersController::class, 'reportsData'])->name('reports.data');
+    });
+
+    // Create Customer
     Route::middleware('admin.permission:customers.create')->group(function () {
-        Route::get('/create', function () {
-            return view('admin.customers.create');
-        })->name('create');
-
-        Route::post('/', function () {
-            // Store logic
-        })->name('store');
-
-        Route::post('/groups/create', function () {
-            // Create customer group
-        })->name('groups.store');
+        Route::get('/create', [CustomersController::class, 'create'])->name('create');
+        Route::post('/', [CustomersController::class, 'store'])->name('store');
     });
 
-    // Update customer
+    // Update Customer
     Route::middleware('admin.permission:customers.update')->group(function () {
-        Route::get('/{id}/edit', function ($id) {
-            return view('admin.customers.edit', compact('id'));
-        })->name('edit');
-
-        Route::put('/{id}', function ($id) {
-            // Update logic
-        })->name('update');
-
-        Route::post('/{id}/toggle-status', function ($id) {
-            // Toggle active/blocked status
-        })->name('toggle-status');
-
-        Route::post('/bulk-email/send', function () {
-            // Send bulk email
-        })->name('bulk-email.send');
-
-        Route::post('/newsletter/send', function () {
-            // Send newsletter
-        })->name('newsletter.send');
+        Route::post('/{id}/toggle-status', [CustomersController::class, 'toggleStatus'])->name('toggle-status');
     });
 
-    // Delete customer
-    Route::middleware('admin.permission:customers.delete')->group(function () {
-        Route::delete('/{id}', function ($id) {
-            // Delete logic
-        })->name('destroy');
+    // Export
+    Route::get('/export', [CustomersController::class, 'export'])
+        ->name('export')
+        ->middleware('admin.permission:customers.read');
 
-        Route::delete('/groups/{groupId}', function ($groupId) {
-            // Delete customer group
-        })->name('groups.destroy');
+    // CRUD Routes (MUST BE LAST - after all specific routes)
+    Route::middleware('admin.permission:customers.read')->group(function () {
+        Route::get('/{id}', [CustomersController::class, 'show'])->name('show');
+    });
+
+    Route::middleware('admin.permission:customers.update')->group(function () {
+        Route::get('/{id}/edit', [CustomersController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [CustomersController::class, 'update'])->name('update');
+    });
+
+    Route::middleware('admin.permission:customers.delete')->group(function () {
+        Route::delete('/{id}', [CustomersController::class, 'destroy'])->name('destroy');
     });
 });

@@ -29,8 +29,7 @@
         },
         "files": [
             "app/Helpers/CommenHelpers.php",
-            "app/Helpers/SystemStatusesHelper.php",
-            "app/Helpers/StockManager.php"
+            "app/Helpers/SystemStatusesHelper.php"
         ]
     },
     "autoload-dev": {

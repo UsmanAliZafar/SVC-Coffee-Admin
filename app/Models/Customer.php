@@ -803,4 +803,105 @@ class Customer extends Authenticatable
     {
         return $this->update(['is_sms_subscribed' => false]);
     }
+
+    /**
+     * Scope: Get customers created today
+     */
+    public function scopeToday($query)
+    {
+        return $query->whereDate('created_at', today());
+    }
+
+    /**
+     * Scope: Get customers created this week
+     */
+    public function scopeThisWeek($query)
+    {
+        return $query->whereBetween('created_at', [
+            now()->startOfWeek(),
+            now()->endOfWeek()
+        ]);
+    }
+
+    /**
+     * Scope: Get customers created this month
+     */
+    public function scopeThisMonth($query)
+    {
+        return $query->whereMonth('created_at', now()->month)
+                    ->whereYear('created_at', now()->year);
+    }
+
+    /**
+     * Scope: Get customers created this year
+     */
+    public function scopeThisYear($query)
+    {
+        return $query->whereYear('created_at', now()->year);
+    }
+
+    /**
+     * Scope: Get returning customers (2+ orders)
+     */
+    public function scopeReturning($query)
+    {
+        return $query->where('total_orders', '>=', 2);
+    }
+
+
+    /**
+     * Scope: Get customers at risk (no orders in X days)
+     */
+    public function scopeAtRisk($query, $days = 90)
+    {
+        return $query->where('last_order_at', '<=', now()->subDays($days))
+                    ->where('total_orders', '>', 0);
+    }
+
+    /**
+     * Scope: Get customers by date range
+     */
+    public function scopeDateRange($query, $from, $to)
+    {
+        if ($from && $to) {
+            return $query->whereBetween('created_at', [
+                $from . ' 00:00:00',
+                $to . ' 23:59:59'
+            ]);
+        }
+        return $query;
+    }
+
+
+    /**
+     * Scope: Order by registration date
+     */
+    public function scopeOrderByRegistration($query, $direction = 'desc')
+    {
+        return $query->orderBy('created_at', $direction);
+    }
+
+    /**
+     * Scope: Order by last order date
+     */
+    public function scopeOrderByLastOrder($query, $direction = 'desc')
+    {
+        return $query->orderBy('last_order_at', $direction);
+    }
+
+    /**
+     * Scope: Order by total spent
+     */
+    public function scopeOrderBySpent($query, $direction = 'desc')
+    {
+        return $query->orderBy('total_spent', $direction);
+    }
+
+    /**
+     * Scope: Order by total orders
+     */
+    public function scopeOrderByOrders($query, $direction = 'desc')
+    {
+        return $query->orderBy('total_orders', $direction);
+    }
 }

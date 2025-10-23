@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
 use Barryvdh\DomPDF\Facade\Pdf;
-use App\Helpers\StockManager;
 use Illuminate\Support\Facades\Log;
 // MODELS
 use App\Models\Order;

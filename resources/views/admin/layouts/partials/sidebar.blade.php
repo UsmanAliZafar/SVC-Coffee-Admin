@@ -289,26 +289,88 @@
             @if(auth('admin')->user()->hasPermission('customers.read'))
                 <li class="nav-item has-dropdown">
                     <a class="nav-link {{ request()->routeIs('admin.customers.*') ? 'active' : '' }}"
-                       href="#"
-                       data-tooltip="Customers">
+                    href="{{ route('admin.customers.index') }}"
+                    data-tooltip="Customers">
                         <i class="bi bi-people"></i>
                         <span class="nav-text">Customers</span>
                         <i class="bi bi-chevron-down dropdown-arrow"></i>
                     </a>
                     <ul class="submenu">
+                        {{-- All Customers --}}
+                        <li>
+                            <a href="{{ route('admin.customers.index') }}"
+                            class="{{ request()->routeIs('admin.customers.index') ? 'active' : '' }}">
+                                <i class="bi bi-people"></i> All Customers
+                            </a>
+                        </li>
+
+                        {{-- Add Customer --}}
                         @if(auth('admin')->user()->hasPermission('customers.create'))
-                        <li><a href="#"><i class="bi bi-person-plus"></i> Add Customer</a></li>
+                        <li>
+                            <a href="{{ route('admin.customers.create') }}"
+                            class="{{ request()->routeIs('admin.customers.create') ? 'active' : '' }}">
+                                <i class="bi bi-person-plus"></i> Add Customer
+                            </a>
+                        </li>
                         @endif
-                        @if(auth('admin')->user()->hasPermission('customers.read'))
-                        <li><a href="#"><i class="bi bi-collection"></i> Groups</a></li>
-                        <li><a href="#"><i class="bi bi-person-check text-success"></i> New</a></li>
-                        <li><a href="#"><i class="bi bi-trophy text-warning"></i> Top Customers</a></li>
-                        <li><a href="#"><i class="bi bi-envelope"></i> Email Templates</a></li>
-                        <li><a href="#"><i class="bi bi-newspaper"></i> Newsletter</a></li>
-                        @endif
+
+                        <li class="submenu-divider"></li>
+
+                        {{-- Customer Segments --}}
+                        <li>
+                            <a href="{{ route('admin.customers.new') }}"
+                            class="{{ request()->routeIs('admin.customers.new') ? 'active' : '' }}">
+                                <i class="bi bi-person-check text-success"></i> New Customers
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.customers.returning') }}"
+                            class="{{ request()->routeIs('admin.customers.returning') ? 'active' : '' }}">
+                                <i class="bi bi-arrow-repeat text-primary"></i> Returning
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.customers.top') }}"
+                            class="{{ request()->routeIs('admin.customers.top') ? 'active' : '' }}">
+                                <i class="bi bi-trophy text-warning"></i> Top Customers
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.customers.active') }}"
+                            class="{{ request()->routeIs('admin.customers.active') ? 'active' : '' }}">
+                                <i class="bi bi-check-circle text-success"></i> Active
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.customers.inactive') }}"
+                            class="{{ request()->routeIs('admin.customers.inactive') ? 'active' : '' }}">
+                                <i class="bi bi-pause-circle text-secondary"></i> Inactive
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.customers.blocked') }}"
+                            class="{{ request()->routeIs('admin.customers.blocked') ? 'active' : '' }}">
+                                <i class="bi bi-lock text-danger"></i> Blocked
+                            </a>
+                        </li>
+
+                        <li class="submenu-divider"></li>
+                        {{-- Reports --}}
+                        <li>
+                            <a href="{{ route('admin.customers.reports') }}"
+                            class="{{ request()->routeIs('admin.customers.reports') ? 'active' : '' }}">
+                                <i class="bi bi-bar-chart"></i> Reports & Analytics
+                            </a>
+                        </li>
                     </ul>
                 </li>
             @endif
+            {{-- End Customers Management --}}
 
             {{-- Coffee Categories Section --}}
             <li class="nav-item section-divider">
