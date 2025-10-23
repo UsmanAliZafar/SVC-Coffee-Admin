@@ -159,37 +159,89 @@ class CustomersController extends Controller
                 'email' => 'required|email|unique:customers,email',
                 'phone' => 'nullable|string|max:20',
                 'company_name' => 'nullable|string|max:255',
-                'password' => 'required|string|min:8|confirmed',
-                'customer_type' => 'required|in:individual,business,wholesale,vip',
-                'status_key_code' => 'required|string|exists:system_statuses,key_code',
+                'password' => 'nullable|string|min:8|confirmed',
+                'customer_type' => 'nullable|in:individual,business,wholesale,vip',
+                'status_key_code' => 'nullable|string|exists:system_statuses,key_code',
                 'billing_address_line1' => 'nullable|string|max:255',
+                'billing_address_line2' => 'nullable|string|max:255',
                 'billing_city' => 'nullable|string|max:100',
                 'billing_state' => 'nullable|string|max:100',
                 'billing_postal_code' => 'nullable|string|max:20',
                 'billing_country' => 'nullable|string|max:100',
-                'is_newsletter_subscribed' => 'boolean',
-                'is_sms_subscribed' => 'boolean',
+                'shipping_address_line1' => 'nullable|string|max:255',
+                'shipping_address_line2' => 'nullable|string|max:255',
+                'shipping_city' => 'nullable|string|max:100',
+                'shipping_state' => 'nullable|string|max:100',
+                'shipping_postal_code' => 'nullable|string|max:20',
+                'shipping_country' => 'nullable|string|max:100',
+                'is_newsletter_subscribed' => 'nullable|boolean',
+                'is_sms_subscribed' => 'nullable|boolean',
+                'is_verified' => 'nullable|boolean',
                 'notes' => 'nullable|string',
             ]);
 
             DB::beginTransaction();
 
+            // Set defaults for fields that might be missing
+            if (empty($validated['customer_type'])) {
+                $validated['customer_type'] = 'individual';
+            }
+
+            if (empty($validated['status_key_code'])) {
+                $validated['status_key_code'] = 'CUSTOMER_ACTIVE';
+            }
+
             $customer = Customer::create($validated);
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Customer created successfully',
-                'redirect' => route('admin.customers.show', $customer->id)
-            ]);
+            // Check if request is from modal (AJAX) or regular form submission
+            if ($request->ajax() || $request->wantsJson() || $request->input('request_from') === 'modal') {
+                // Response for modal (AJAX request)
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Customer created successfully',
+                    'customer' => $customer  // ← Include customer data for modal
+                ]);
+            }
+
+            // Response for regular form submission (Create blade)
+            return redirect()
+                ->route('admin.customers.show', $customer->id)
+                ->with('success', 'Customer created successfully');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+
+            // AJAX validation error response
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $e->errors()
+                ], 422);
+            }
+
+            // Regular form validation error
+            return back()
+                ->withErrors($e->errors())
+                ->withInput();
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create customer: ' . $e->getMessage()
-            ], 500);
+
+            // AJAX error response
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create customer: ' . $e->getMessage()
+                ], 500);
+            }
+
+            // Regular form error
+            return back()
+                ->with('error', 'Failed to create customer: ' . $e->getMessage())
+                ->withInput();
         }
     }
 

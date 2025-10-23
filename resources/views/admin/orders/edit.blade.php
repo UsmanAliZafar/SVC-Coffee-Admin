@@ -34,38 +34,76 @@
             <div class="col-lg-8">
 
                 {{-- Customer Information --}}
+                {{-- Customer Information --}}
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-white border-0 py-3">
-                        <h5 class="mb-0"><i class="bi bi-person-circle text-primary"></i> Customer Information</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-person-circle text-primary"></i> Customer Information</h5>
+                            @if(!$order->customer)
+                            <button type="button" class="btn btn-sm btn-success" id="addCustomerBtn" title="Add New Customer">
+                                <i class="bi bi-plus-circle"></i> Add Customer
+                            </button>
+                            @endif
+                        </div>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Customer Name</label>
-                                <p class="mb-0">{{ $order->getCustomerName() }}</p>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Email</label>
-                                <p class="mb-0">{{ $order->getCustomerEmail() }}</p>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Phone</label>
-                                <p class="mb-0">{{ $order->getCustomerPhone() ?: '—' }}</p>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Customer Type</label>
-                                <p class="mb-0">
-                                    @if($order->customer)
+                        @if($order->customer)
+                            {{-- Existing Customer (Display Only) --}}
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Customer Name</label>
+                                    <p class="mb-0">{{ $order->getCustomerName() }}</p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Email</label>
+                                    <p class="mb-0">{{ $order->getCustomerEmail() }}</p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Phone</label>
+                                    <p class="mb-0">{{ $order->getCustomerPhone() ?: '—' }}</p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Customer Type</label>
+                                    <p class="mb-0">
                                         <span class="badge bg-primary">Registered Customer</span>
                                         <a href="{{ route('admin.customers.show', $order->customer_id) }}" class="btn btn-sm btn-outline-primary ms-2">
                                             <i class="bi bi-eye"></i> View Profile
                                         </a>
-                                    @else
-                                        <span class="badge bg-secondary">Guest</span>
-                                    @endif
-                                </p>
+                                    </p>
+                                </div>
                             </div>
-                        </div>
+                        @else
+                            {{-- Guest Customer - Can be upgraded to registered customer --}}
+                            <div id="guestCustomerInfo">
+                                <div class="alert alert-info mb-3">
+                                    <i class="bi bi-info-circle"></i> This order was placed by a guest customer.
+                                    You can convert them to a registered customer by clicking "Add Customer" above.
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold">Guest Name</label>
+                                        <p class="mb-0">{{ $order->guest_name }}</p>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold">Guest Email</label>
+                                        <p class="mb-0">{{ $order->guest_email }}</p>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold">Guest Phone</label>
+                                        <p class="mb-0">{{ $order->guest_phone ?: '—' }}</p>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold">Customer Type</label>
+                                        <p class="mb-0">
+                                            <span class="badge bg-secondary">Guest</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Hidden field for linking customer after creation --}}
+                            <input type="hidden" name="customer_id" id="linked_customer_id" value="">
+                        @endif
                     </div>
                 </div>
 
@@ -373,6 +411,197 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="confirmAddItem">Add Item</button>
             </div>
+        </div>
+    </div>
+</div>
+
+{{-- Add Customer Modal (Same as Create) --}}
+<div class="modal fade" id="addCustomerModal" tabindex="-1" aria-labelledby="addCustomerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #5B914C; color: white;">
+                <h5 class="modal-title" id="addCustomerModalLabel">
+                    <i class="bi bi-person-plus-fill"></i> Convert Guest to Registered Customer
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addCustomerForm">
+                @csrf
+                <div class="modal-body">
+                    <div class="alert alert-warning mb-3">
+                        <i class="bi bi-exclamation-triangle"></i> Creating this customer will link them to this order.
+                    </div>
+                    <div class="row">
+                        {{-- Personal Information --}}
+                        <input type="hidden" name="request_from" value="modal">
+                        <input type="hidden" name="status_key_code" value="CUSTOMER_ACTIVE">
+                        <div class="col-12 mb-3">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-person"></i> Personal Information</h6>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="modal_first_name" name="first_name"
+                                   value="{{ $order->guest_name ? explode(' ', $order->guest_name)[0] : '' }}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="modal_last_name" name="last_name"
+                                   value="{{ $order->guest_name ? (count(explode(' ', $order->guest_name)) > 1 ? implode(' ', array_slice(explode(' ', $order->guest_name), 1)) : '') : '' }}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_email" class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="modal_email" name="email"
+                                   value="{{ $order->guest_email ?? '' }}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_phone" class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="modal_phone" name="phone"
+                                   value="{{ $order->guest_phone ?? '' }}">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_customer_type" class="form-label">Customer Type</label>
+                            <select class="form-select" id="modal_customer_type" name="customer_type">
+                                <option value="individual">Individual</option>
+                                <option value="business">Business</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_company_name" class="form-label">Company Name</label>
+                            <input type="text" class="form-control" id="modal_company_name" name="company_name">
+                        </div>
+
+                        {{-- Billing Address --}}
+                        <div class="col-12 mb-3 mt-3">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-geo-alt"></i> Billing Address</h6>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_billing_address_line1" class="form-label">Address Line 1</label>
+                            <input type="text" class="form-control" id="modal_billing_address_line1" name="billing_address_line1"
+                                   value="{{ $order->billing_address_line1 ?? '' }}">
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_billing_address_line2" class="form-label">Address Line 2</label>
+                            <input type="text" class="form-control" id="modal_billing_address_line2" name="billing_address_line2"
+                                   value="{{ $order->billing_address_line2 ?? '' }}">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_billing_city" class="form-label">City</label>
+                            <input type="text" class="form-control" id="modal_billing_city" name="billing_city"
+                                   value="{{ $order->billing_city ?? '' }}">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_billing_state" class="form-label">State/Province</label>
+                            <input type="text" class="form-control" id="modal_billing_state" name="billing_state"
+                                   value="{{ $order->billing_state ?? '' }}">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_billing_postal_code" class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" id="modal_billing_postal_code" name="billing_postal_code"
+                                   value="{{ $order->billing_postal_code ?? '' }}">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_billing_country" class="form-label">Country</label>
+                            <input type="text" class="form-control" id="modal_billing_country" name="billing_country"
+                                   value="{{ $order->billing_country ?? 'Pakistan' }}">
+                        </div>
+
+                        {{-- Shipping Address --}}
+                        <div class="col-12 mb-3 mt-3">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-truck"></i> Shipping Address</h6>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="sameAsBilling">
+                                <label class="form-check-label" for="sameAsBilling">
+                                    Same as billing address
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_shipping_address_line1" class="form-label">Address Line 1</label>
+                            <input type="text" class="form-control" id="modal_shipping_address_line1" name="shipping_address_line1"
+                                   value="{{ $order->shipping_address_line1 ?? '' }}">
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_shipping_address_line2" class="form-label">Address Line 2</label>
+                            <input type="text" class="form-control" id="modal_shipping_address_line2" name="shipping_address_line2"
+                                   value="{{ $order->shipping_address_line2 ?? '' }}">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_shipping_city" class="form-label">City</label>
+                            <input type="text" class="form-control" id="modal_shipping_city" name="shipping_city"
+                                   value="{{ $order->shipping_city ?? '' }}">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_shipping_state" class="form-label">State/Province</label>
+                            <input type="text" class="form-control" id="modal_shipping_state" name="shipping_state"
+                                   value="{{ $order->shipping_state ?? '' }}">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_shipping_postal_code" class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" id="modal_shipping_postal_code" name="shipping_postal_code"
+                                   value="{{ $order->shipping_postal_code ?? '' }}">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_shipping_country" class="form-label">Country</label>
+                            <input type="text" class="form-control" id="modal_shipping_country" name="shipping_country"
+                                   value="{{ $order->shipping_country ?? 'Pakistan' }}">
+                        </div>
+
+                        {{-- Additional Options --}}
+                        <div class="col-12 mb-3 mt-3">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-gear"></i> Additional Options</h6>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="modal_is_newsletter_subscribed" name="is_newsletter_subscribed" value="1">
+                                <label class="form-check-label" for="modal_is_newsletter_subscribed">
+                                    Subscribe to newsletter
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="modal_is_verified" name="is_verified" value="1" checked>
+                                <label class="form-check-label" for="modal_is_verified">
+                                    Mark as verified
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="modal_notes" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-success" id="saveCustomerBtn">
+                        <i class="bi bi-check-circle"></i> Create & Link Customer
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -746,6 +975,122 @@ $(document).ready(function() {
                 $('#submitBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Order');
             }
         });
+    });
+
+    // Open Add Customer Modal (For Edit Page - Convert Guest)
+    $('#addCustomerBtn').on('click', function() {
+        $('#addCustomerModal').modal('show');
+    });
+
+    // Copy Billing to Shipping Address
+    $('#sameAsBilling').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#modal_shipping_address_line1').val($('#modal_billing_address_line1').val());
+            $('#modal_shipping_address_line2').val($('#modal_billing_address_line2').val());
+            $('#modal_shipping_city').val($('#modal_billing_city').val());
+            $('#modal_shipping_state').val($('#modal_billing_state').val());
+            $('#modal_shipping_postal_code').val($('#modal_billing_postal_code').val());
+            $('#modal_shipping_country').val($('#modal_billing_country').val());
+        }
+    });
+
+    // Submit Add Customer Form (Edit Page - Convert Guest to Customer)
+    $('#addCustomerForm').on('submit', function(e) {
+        e.preventDefault();
+
+        const saveBtn = $('#saveCustomerBtn');
+        const originalText = saveBtn.html();
+
+        // Disable button and show loading
+        saveBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Creating...');
+
+        $.ajax({
+            url: '{{ route("admin.customers.store") }}',
+            type: 'POST',
+            data: $(this).serialize(),
+            success: function(response) {
+                if (response.success) {
+                    // Set the customer ID to link with order
+                    $('#linked_customer_id').val(response.customer.id);
+
+                    // Update the UI to show customer is now linked
+                    $('#guestCustomerInfo').html(`
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-check-circle"></i> Customer created successfully and linked to this order!
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Customer Name</label>
+                                <p class="mb-0">${response.customer.first_name} ${response.customer.last_name}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Email</label>
+                                <p class="mb-0">${response.customer.email}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Phone</label>
+                                <p class="mb-0">${response.customer.phone || '—'}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Customer Type</label>
+                                <p class="mb-0">
+                                    <span class="badge bg-success">Newly Registered Customer</span>
+                                </p>
+                            </div>
+                        </div>
+                    `);
+
+                    // Hide the Add Customer button
+                    $('#addCustomerBtn').hide();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Customer Created!',
+                        html: `${response.message}<br><small class="text-muted">Don't forget to save the order to apply changes.</small>`,
+                        timer: 3000,
+                        showConfirmButton: false
+                    });
+
+                    // Close modal
+                    $('#addCustomerModal').modal('hide');
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: response.message || 'Failed to create customer'
+                    });
+                }
+
+                // Re-enable button
+                saveBtn.prop('disabled', false).html(originalText);
+            },
+            error: function(xhr) {
+                let errorMessage = 'Failed to create customer.';
+
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    } else if (xhr.responseJSON.errors) {
+                        const errors = Object.values(xhr.responseJSON.errors).flat();
+                        errorMessage = errors.join('<br>');
+                    }
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    html: errorMessage
+                });
+
+                // Re-enable button
+                saveBtn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    // Reset modal form when closed
+    $('#addCustomerModal').on('hidden.bs.modal', function() {
+        $('#sameAsBilling').prop('checked', false);
     });
 });
 </script>

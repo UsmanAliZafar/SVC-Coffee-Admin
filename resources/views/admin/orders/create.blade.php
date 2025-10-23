@@ -87,6 +87,10 @@
                                     @endforeach
                                 </select>
                             </div>
+                             <button type="button" class="btn btn-success" id="addCustomerBtn" title="Add New Customer">
+                                <i class="bi bi-plus-circle"></i> Add Customer
+                            </button>
+                            <small class="text-muted">Or click "Add Customer" to create a new customer</small>
                         </div>
 
                         {{-- Guest Customer --}}
@@ -427,6 +431,178 @@
         </div>
     </div>
 </div>
+
+{{-- Add Customer Modal --}}
+<div class="modal fade" id="addCustomerModal" tabindex="-1" aria-labelledby="addCustomerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #5B914C; color: white;">
+                <h5 class="modal-title" id="addCustomerModalLabel">
+                    <i class="bi bi-person-plus-fill"></i> Add New Customer
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addCustomerForm">
+                @csrf
+                <div class="modal-body">
+                    <div class="row">
+                        {{-- Personal Information --}}
+                        <input type="hidden" name="request_from" value="modal">
+                        <input type="hidden" name="status_key_code" value="CUSTOMER_ACTIVE">
+                        <div class="col-12 mb-3">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-person"></i> Personal Information</h6>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="modal_first_name" name="first_name" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="modal_last_name" name="last_name" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_email" class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="modal_email" name="email" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_phone" class="form-label">Phone</label>
+                            <input type="text" class="form-control" id="modal_phone" name="phone">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_customer_type" class="form-label">Customer Type</label>
+                            <select class="form-select" id="modal_customer_type" name="customer_type">
+                                <option value="individual">Individual</option>
+                                <option value="business">Business</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_company_name" class="form-label">Company Name</label>
+                            <input type="text" class="form-control" id="modal_company_name" name="company_name">
+                        </div>
+
+                        {{-- Billing Address --}}
+                        <div class="col-12 mb-3 mt-3">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-geo-alt"></i> Billing Address</h6>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_billing_address_line1" class="form-label">Address Line 1</label>
+                            <input type="text" class="form-control" id="modal_billing_address_line1" name="billing_address_line1">
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_billing_address_line2" class="form-label">Address Line 2</label>
+                            <input type="text" class="form-control" id="modal_billing_address_line2" name="billing_address_line2">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_billing_city" class="form-label">City</label>
+                            <input type="text" class="form-control" id="modal_billing_city" name="billing_city">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_billing_state" class="form-label">State/Province</label>
+                            <input type="text" class="form-control" id="modal_billing_state" name="billing_state">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_billing_postal_code" class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" id="modal_billing_postal_code" name="billing_postal_code">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_billing_country" class="form-label">Country</label>
+                            <input type="text" class="form-control" id="modal_billing_country" name="billing_country" value="Pakistan">
+                        </div>
+
+                        {{-- Shipping Address --}}
+                        <div class="col-12 mb-3 mt-3">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-truck"></i> Shipping Address</h6>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="sameAsBilling">
+                                <label class="form-check-label" for="sameAsBilling">
+                                    Same as billing address
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_shipping_address_line1" class="form-label">Address Line 1</label>
+                            <input type="text" class="form-control" id="modal_shipping_address_line1" name="shipping_address_line1">
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_shipping_address_line2" class="form-label">Address Line 2</label>
+                            <input type="text" class="form-control" id="modal_shipping_address_line2" name="shipping_address_line2">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_shipping_city" class="form-label">City</label>
+                            <input type="text" class="form-control" id="modal_shipping_city" name="shipping_city">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_shipping_state" class="form-label">State/Province</label>
+                            <input type="text" class="form-control" id="modal_shipping_state" name="shipping_state">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="modal_shipping_postal_code" class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" id="modal_shipping_postal_code" name="shipping_postal_code">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="modal_shipping_country" class="form-label">Country</label>
+                            <input type="text" class="form-control" id="modal_shipping_country" name="shipping_country" value="Pakistan">
+                        </div>
+
+                        {{-- Additional Options --}}
+                        <div class="col-12 mb-3 mt-3">
+                            <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-gear"></i> Additional Options</h6>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="modal_is_newsletter_subscribed" name="is_newsletter_subscribed" value="1">
+                                <label class="form-check-label" for="modal_is_newsletter_subscribed">
+                                    Subscribe to newsletter
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="modal_is_verified" name="is_verified" value="1" checked>
+                                <label class="form-check-label" for="modal_is_verified">
+                                    Mark as verified
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <label for="modal_notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="modal_notes" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-success" id="saveCustomerBtn">
+                        <i class="bi bi-check-circle"></i> Save Customer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('styles')
@@ -453,7 +629,7 @@
 
 @push('scripts')
 <script>
-    $(document).ready(function() {
+$(document).ready(function() {
     let orderItems = [];
     let itemCounter = 0;
 
@@ -803,6 +979,140 @@
     // Initialize
     $('#noItemsAlert').removeClass('d-none');
     calculateTotals();
+
+    $('#addCustomerBtn').on('click', function() {
+        $('#addCustomerModal').modal('show');
+    });
+
+    // Copy Billing to Shipping Address
+    $('#sameAsBilling').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#modal_shipping_address_line1').val($('#modal_billing_address_line1').val());
+            $('#modal_shipping_address_line2').val($('#modal_billing_address_line2').val());
+            $('#modal_shipping_city').val($('#modal_billing_city').val());
+            $('#modal_shipping_state').val($('#modal_billing_state').val());
+            $('#modal_shipping_postal_code').val($('#modal_billing_postal_code').val());
+            $('#modal_shipping_country').val($('#modal_billing_country').val());
+        }
+    });
+
+    // Submit Add Customer Form
+    $('#addCustomerForm').on('submit', function(e) {
+        e.preventDefault();
+
+        const saveBtn = $('#saveCustomerBtn');
+        const originalText = saveBtn.html();
+
+        // Disable button and show loading
+        saveBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Saving...');
+
+        $.ajax({
+            url: '{{ route("admin.customers.store") }}',
+            type: 'POST',
+            data: $(this).serialize(),
+            success: function(response) {
+                if (response.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Customer Created!',
+                        text: response.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    // Add new customer to dropdown
+                    const newCustomer = response.customer;
+                    const newOption = new Option(
+                        `${newCustomer.first_name} ${newCustomer.last_name} - ${newCustomer.email}`,
+                        newCustomer.id,
+                        true,
+                        true
+                    );
+
+                    // Set data attributes for auto-fill
+                    $(newOption).attr({
+                        'data-email': newCustomer.email,
+                        'data-phone': newCustomer.phone || '',
+                        'data-billing': JSON.stringify({
+                            first_name: newCustomer.first_name,
+                            last_name: newCustomer.last_name,
+                            address_line1: newCustomer.billing_address_line1 || '',
+                            address_line2: newCustomer.billing_address_line2 || '',
+                            city: newCustomer.billing_city || '',
+                            state: newCustomer.billing_state || '',
+                            postal_code: newCustomer.billing_postal_code || '',
+                            country: newCustomer.billing_country || ''
+                        }),
+                        'data-shipping': JSON.stringify({
+                            first_name: newCustomer.first_name,
+                            last_name: newCustomer.last_name,
+                            address_line1: newCustomer.shipping_address_line1 || '',
+                            address_line2: newCustomer.shipping_address_line2 || '',
+                            city: newCustomer.shipping_city || '',
+                            state: newCustomer.shipping_state || '',
+                            postal_code: newCustomer.shipping_postal_code || '',
+                            country: newCustomer.shipping_country || ''
+                        })
+                    });
+
+                    $('#customer_id').append(newOption).trigger('change');
+
+                    // Close modal and reset form
+                    $('#addCustomerModal').modal('hide');
+                    $('#addCustomerForm')[0].reset();
+
+                    // Auto-fill shipping address if data exists
+                    if (newCustomer.shipping_address_line1) {
+                        $('#shipping_first_name').val(newCustomer.first_name);
+                        $('#shipping_last_name').val(newCustomer.last_name);
+                        $('#shipping_address_line1').val(newCustomer.shipping_address_line1);
+                        $('#shipping_address_line2').val(newCustomer.shipping_address_line2);
+                        $('#shipping_city').val(newCustomer.shipping_city);
+                        $('#shipping_state').val(newCustomer.shipping_state);
+                        $('#shipping_postal_code').val(newCustomer.shipping_postal_code);
+                        $('#shipping_country').val(newCustomer.shipping_country);
+                        $('#shipping_phone').val(newCustomer.phone);
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: response.message || 'Failed to create customer'
+                    });
+                }
+
+                // Re-enable button
+                saveBtn.prop('disabled', false).html(originalText);
+            },
+            error: function(xhr) {
+                let errorMessage = 'Failed to create customer.';
+
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    } else if (xhr.responseJSON.errors) {
+                        const errors = Object.values(xhr.responseJSON.errors).flat();
+                        errorMessage = errors.join('<br>');
+                    }
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    html: errorMessage
+                });
+
+                // Re-enable button
+                saveBtn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    // Reset modal form when closed
+    $('#addCustomerModal').on('hidden.bs.modal', function() {
+        $('#addCustomerForm')[0].reset();
+        $('#sameAsBilling').prop('checked', false);
+    });
 });
 </script>
 @endpush
