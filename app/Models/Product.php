@@ -13,10 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use App\Traits\InventoryManager;
 
 class Product extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
+    use InventoryManager;
 
     /**
      * The table associated with the model.

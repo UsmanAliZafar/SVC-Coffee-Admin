@@ -28,7 +28,7 @@ class OrdersController extends Controller
     public function index()
     {
         $statusList = SystemStatus::where('module', 'orders')->get();
-        $paymentStatusList = SystemStatus::where('module', 'payment')->get();
+        $paymentStatusList = SystemStatus::where('module', 'payments')->get();
 
         $stats = [
             'total_orders' => Order::count(),
@@ -136,6 +136,17 @@ class OrdersController extends Controller
             ->addColumn('actions', function ($order) {
                 $actions = '<div class="btn-group btn-group-sm" role="group">';
 
+                // Quick Update Button (NEW)
+                if (auth('admin')->user()->hasPermission('orders.update')) {
+                    $actions .= '<button type="button" class="btn btn-outline-secondary quick-update-btn"
+                                        data-id="' . $order->id . '"
+                                        data-status="' . $order->status_key_code . '"
+                                        data-payment="' . $order->payment_status_key_code . '"
+                                        title="Quick Update">
+                                    <i class="bi bi-lightning"></i>
+                                </button>';
+                }
+
                 if (auth('admin')->user()->hasPermission('orders.read')) {
                     $actions .= '<a href="' . route('admin.orders.show', $order->id) . '" class="btn btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>';
                     $actions .= '<a href="' . route('admin.orders.invoice', $order->id) . '" class="btn btn-outline-info" title="Invoice" target="_blank"><i class="bi bi-file-pdf"></i></a>';
@@ -209,6 +220,7 @@ class OrdersController extends Controller
                 'billing_phone' => 'nullable|string|max:20',
 
                 'shipping_method' => 'nullable|string|max:100',
+                'currency' => 'required|string|max:3',
                 'shipping_amount' => 'nullable|numeric|min:0',
                 'discount_code' => 'nullable|string|max:50',
                 'discount_amount' => 'nullable|numeric|min:0',
@@ -274,7 +286,7 @@ class OrdersController extends Controller
                 'discount_amount' => $discountAmount,
                 'shipping_amount' => $shippingAmount,
                 'total_amount' => $totalAmount,
-                'currency' => 'USD',
+                'currency' => $validated['currency'] ?? 'USD',
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
@@ -405,8 +417,9 @@ class OrdersController extends Controller
         $customers = Customer::active()->orderBy('first_name')->get();
         $statusList = SystemStatus::where('module', 'orders')->active()->ordered()->get();
         $paymentStatusList = SystemStatus::where('module', 'payments')->active()->ordered()->get();
+        $currencies = get_currencies();
 
-        return view('admin.orders.edit', compact('order', 'products', 'customers', 'statusList', 'paymentStatusList'));
+        return view('admin.orders.edit', compact('order', 'products', 'customers', 'statusList', 'paymentStatusList', 'currencies'));
     }
 
     /**
@@ -1170,5 +1183,498 @@ class OrdersController extends Controller
         ];
 
         return view('admin.orders.reports', compact('stats'));
+    }
+
+    /**
+     * Get reports data via AJAX
+     */
+    public function reportsData(Request $request)
+    {
+        try {
+            $dateFrom = $request->input('date_from');
+            $dateTo = $request->input('date_to');
+
+            // Validate dates
+            if (!$dateFrom || !$dateTo) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Date range is required'
+                ], 400);
+            }
+
+            // Build base query
+            $query = Order::whereBetween('created_at', [
+                $dateFrom . ' 00:00:00',
+                $dateTo . ' 23:59:59'
+            ]);
+
+            // Get metrics
+            $totalOrders = $query->count();
+            $totalRevenue = $query->sum('total_amount');
+            $avgOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
+            $pendingOrders = Order::whereBetween('created_at', [
+                $dateFrom . ' 00:00:00',
+                $dateTo . ' 23:59:59'
+            ])->where('status_key_code', 'ORDER_PENDING')->count();
+
+            // Status breakdown
+            $statusBreakdown = [
+                'pending' => Order::whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+                    ->where('status_key_code', 'ORDER_PENDING')->count(),
+                'processing' => Order::whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+                    ->where('status_key_code', 'ORDER_PROCESSING')->count(),
+                'shipped' => Order::whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+                    ->where('status_key_code', 'ORDER_SHIPPED')->count(),
+                'delivered' => Order::whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+                    ->where('status_key_code', 'ORDER_DELIVERED')->count(),
+                'cancelled' => Order::whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+                    ->where('status_key_code', 'ORDER_CANCELLED')->count(),
+                'refunded' => Order::whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+                    ->where('is_refunded', true)->count(),
+            ];
+
+            // Sales trend (daily data)
+            $salesTrend = $this->getSalesTrend($dateFrom, $dateTo);
+
+            // Revenue by source
+            $revenueBySource = Order::whereBetween('created_at', [
+                $dateFrom . ' 00:00:00',
+                $dateTo . ' 23:59:59'
+            ])
+                ->select('order_source', DB::raw('SUM(total_amount) as revenue'))
+                ->groupBy('order_source')
+                ->get();
+
+            $revenueBySourceData = [
+                'labels' => $revenueBySource->pluck('order_source')->map(fn($s) => ucfirst($s))->toArray(),
+                'data' => $revenueBySource->pluck('revenue')->toArray(),
+            ];
+
+            // Payment methods
+            $paymentMethods = Order::whereBetween('created_at', [
+                $dateFrom . ' 00:00:00',
+                $dateTo . ' 23:59:59'
+            ])
+                ->whereNotNull('payment_method')
+                ->select('payment_method', DB::raw('COUNT(*) as count'))
+                ->groupBy('payment_method')
+                ->get();
+
+            $paymentMethodsData = [
+                'labels' => $paymentMethods->pluck('payment_method')->map(fn($p) => ucfirst(str_replace('_', ' ', $p)))->toArray(),
+                'data' => $paymentMethods->pluck('count')->toArray(),
+            ];
+
+            // Top products
+            $topProducts = DB::table('order_items')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->whereBetween('orders.created_at', [
+                    $dateFrom . ' 00:00:00',
+                    $dateTo . ' 23:59:59'
+                ])
+                ->whereNull('order_items.deleted_at')
+                ->select(
+                    'order_items.product_name as name',
+                    DB::raw('SUM(order_items.quantity) as quantity'),
+                    DB::raw('SUM(order_items.total) as revenue')
+                )
+                ->groupBy('order_items.product_id', 'order_items.product_name')
+                ->orderByDesc('revenue')
+                ->limit(10)
+                ->get();
+
+            // Top customers
+            $topCustomers = Order::whereBetween('created_at', [
+                $dateFrom . ' 00:00:00',
+                $dateTo . ' 23:59:59'
+            ])
+                ->whereNotNull('customer_id')
+                ->with('customer')
+                ->get()
+                ->groupBy('customer_id')
+                ->map(function ($orders) {
+                    $customer = $orders->first()->customer;
+                    return [
+                        'name' => $customer ? $customer->getFullName() : 'Unknown',
+                        'orders' => $orders->count(),
+                        'total_spent' => $orders->sum('total_amount'),
+                    ];
+                })
+                ->sortByDesc('total_spent')
+                ->take(10)
+                ->values();
+
+            // Performance metrics
+            $avgProcessingTime = Order::whereBetween('created_at', [
+                $dateFrom . ' 00:00:00',
+                $dateTo . ' 23:59:59'
+            ])
+                ->whereNotNull('confirmed_at')
+                ->whereNotNull('shipped_at')
+                ->get()
+                ->map(function ($order) {
+                    return $order->confirmed_at->diffInHours($order->shipped_at);
+                })
+                ->avg();
+
+            $avgDeliveryTime = Order::whereBetween('created_at', [
+                $dateFrom . ' 00:00:00',
+                $dateTo . ' 23:59:59'
+            ])
+                ->whereNotNull('shipped_at')
+                ->whereNotNull('delivered_at')
+                ->get()
+                ->map(function ($order) {
+                    return $order->shipped_at->diffInDays($order->delivered_at);
+                })
+                ->avg();
+
+            return response()->json([
+                'success' => true,
+                'total_orders' => $totalOrders,
+                'total_revenue' => $totalRevenue,
+                'avg_order_value' => $avgOrderValue,
+                'pending_orders' => $pendingOrders,
+                'status_breakdown' => $statusBreakdown,
+                'sales_trend' => $salesTrend,
+                'revenue_by_source' => $revenueBySourceData,
+                'payment_methods' => $paymentMethodsData,
+                'top_products' => $topProducts,
+                'top_customers' => $topCustomers,
+                'avg_processing_time' => $avgProcessingTime ? round($avgProcessingTime, 1) . ' hours' : '-',
+                'avg_delivery_time' => $avgDeliveryTime ? round($avgDeliveryTime, 1) . ' days' : '-',
+                'customer_satisfaction' => 'N/A', // Implement if you have reviews
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Reports data error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load report data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate sales trend data
+     */
+    private function getSalesTrend($dateFrom, $dateTo)
+    {
+        $startDate = \Carbon\Carbon::parse($dateFrom);
+        $endDate = \Carbon\Carbon::parse($dateTo);
+        $daysDiff = $startDate->diffInDays($endDate);
+
+        // Determine grouping based on date range
+        if ($daysDiff <= 7) {
+            // Daily for 7 days or less
+            $groupBy = 'DATE(created_at)';
+            $format = 'M d';
+        } elseif ($daysDiff <= 31) {
+            // Daily for up to 31 days
+            $groupBy = 'DATE(created_at)';
+            $format = 'M d';
+        } elseif ($daysDiff <= 90) {
+            // Weekly for up to 3 months
+            $groupBy = 'YEARWEEK(created_at)';
+            $format = 'W\eek W';
+        } else {
+            // Monthly for longer periods
+            $groupBy = 'DATE_FORMAT(created_at, "%Y-%m")';
+            $format = 'M Y';
+        }
+
+        $salesData = Order::whereBetween('created_at', [
+            $dateFrom . ' 00:00:00',
+            $dateTo . ' 23:59:59'
+        ])
+            ->select(
+                DB::raw($groupBy . ' as date_group'),
+                DB::raw('SUM(total_amount) as revenue'),
+                DB::raw('COUNT(*) as orders')
+            )
+            ->groupBy('date_group')
+            ->orderBy('date_group')
+            ->get();
+
+        $labels = [];
+        $revenue = [];
+
+        foreach ($salesData as $data) {
+            if ($daysDiff <= 31) {
+                // For daily data, format the date
+                $date = \Carbon\Carbon::parse($data->date_group);
+                $labels[] = $date->format($format);
+            } else {
+                // For weekly/monthly, use the group directly
+                $labels[] = $data->date_group;
+            }
+            $revenue[] = (float) $data->revenue;
+        }
+
+        return [
+            'labels' => $labels,
+            'revenue' => $revenue,
+        ];
+    }
+
+    /**
+     * Bulk update order status
+     */
+    public function bulkUpdateStatus(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'order_ids' => 'required|array|min:1',
+                'order_ids.*' => 'required|uuid|exists:orders,id',
+                'status_key_code' => 'required|string|exists:system_statuses,key_code',
+            ]);
+
+            DB::beginTransaction();
+
+            $updated = 0;
+            $failed = 0;
+            $errors = [];
+
+            foreach ($validated['order_ids'] as $orderId) {
+                try {
+                    $order = Order::findOrFail($orderId);
+
+                    // Check if order can be updated
+                    if (!$order->canUpdateStatus()) {
+                        $errors[] = "Order {$order->order_number} cannot be updated (already {$order->getStatusLabel()})";
+                        $failed++;
+                        continue;
+                    }
+
+                    // Update status
+                    $order->update([
+                        'status_key_code' => $validated['status_key_code']
+                    ]);
+
+                    // Handle stock for shipped orders
+                    if ($validated['status_key_code'] === 'ORDER_SHIPPED') {
+                        foreach ($order->items as $item) {
+                            if ($item->stock_reserved && !$item->stock_deducted) {
+                                $item->deductStock();
+                            }
+                        }
+                    }
+
+                    $updated++;
+
+                } catch (\Exception $e) {
+                    $errors[] = "Order {$orderId}: " . $e->getMessage();
+                    $failed++;
+                }
+            }
+
+            DB::commit();
+
+            $message = "$updated order(s) updated successfully";
+            if ($failed > 0) {
+                $message .= ", $failed failed";
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'updated' => $updated,
+                'failed' => $failed,
+                'errors' => $errors
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update orders: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk update payment status
+     */
+    public function bulkUpdatePaymentStatus(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'order_ids' => 'required|array|min:1',
+                'order_ids.*' => 'required|uuid|exists:orders,id',
+                'payment_status_key_code' => 'required|string|exists:system_statuses,key_code',
+            ]);
+
+            DB::beginTransaction();
+
+            $updated = 0;
+            $failed = 0;
+            $errors = [];
+
+            foreach ($validated['order_ids'] as $orderId) {
+                try {
+                    $order = Order::findOrFail($orderId);
+
+                    // Update payment status
+                    $order->update([
+                        'payment_status_key_code' => $validated['payment_status_key_code']
+                    ]);
+
+                    $updated++;
+
+                } catch (\Exception $e) {
+                    $errors[] = "Order {$orderId}: " . $e->getMessage();
+                    $failed++;
+                }
+            }
+
+            DB::commit();
+
+            $message = "$updated order(s) payment status updated successfully";
+            if ($failed > 0) {
+                $message .= ", $failed failed";
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'updated' => $updated,
+                'failed' => $failed,
+                'errors' => $errors
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update payment status: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Quick update status from index page (single order)
+     */
+    public function quickUpdateStatus(Request $request, $id)
+    {
+        try {
+            $validated = $request->validate([
+                'status_key_code' => 'nullable|string|exists:system_statuses,key_code',
+                'payment_status_key_code' => 'nullable|string|exists:system_statuses,key_code',
+            ]);
+
+            $order = Order::findOrFail($id);
+
+            DB::beginTransaction();
+
+            // Update order status if provided
+            if (isset($validated['status_key_code'])) {
+                if (!$order->canUpdateStatus()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Order cannot be updated (already ' . $order->getStatusLabel() . ')'
+                    ], 400);
+                }
+
+                $order->status_key_code = $validated['status_key_code'];
+
+                // Handle stock for shipped orders
+                if ($validated['status_key_code'] === 'ORDER_SHIPPED') {
+                    foreach ($order->items as $item) {
+                        if ($item->stock_reserved && !$item->stock_deducted) {
+                            $item->deductStock();
+                        }
+                    }
+                }
+            }
+
+            // Update payment status if provided
+            if (isset($validated['payment_status_key_code'])) {
+                $order->payment_status_key_code = $validated['payment_status_key_code'];
+            }
+
+            $order->save();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order updated successfully',
+                'order' => [
+                    'id' => $order->id,
+                    'status_badge' => $order->getStatusBadge(),
+                    'payment_badge' => $order->getPaymentStatusBadge(),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update order: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update order notes (admin and internal)
+     */
+    public function updateNotes(Request $request, $id)
+    {
+        try {
+            $validated = $request->validate([
+                'admin_notes' => 'nullable|string',
+                'internal_notes' => 'nullable|string',
+            ]);
+
+            $order = Order::findOrFail($id);
+
+            $order->update([
+                'admin_notes' => $validated['admin_notes'] ?? $order->admin_notes,
+                'internal_notes' => $validated['internal_notes'] ?? $order->internal_notes,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Notes updated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update notes: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get order data for notes modal (AJAX)
+     */
+    public function getOrderData($id)
+    {
+        try {
+            $order = Order::with(['customer'])->findOrFail($id);
+
+            return response()->json([
+                'success' => true,
+                'order_number' => $order->order_number,
+                'customer_name' => $order->customer
+                    ? $order->customer->getFullName()
+                    : ($order->guest_name ?? 'Guest Customer'),
+                'customer_email' => $order->customer
+                    ? $order->customer->email
+                    : ($order->guest_email ?? 'N/A'),
+                'customer_notes' => $order->customer_notes,
+                'admin_notes' => $order->admin_notes,
+                'internal_notes' => $order->internal_notes,
+                'status' => $order->status ? $order->status->name : 'N/A',
+                'total_amount' => $order->getFormattedTotal(),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found'
+            ], 404);
+        }
     }
 }

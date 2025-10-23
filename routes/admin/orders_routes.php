@@ -40,11 +40,12 @@ Route::prefix('orders')->name('orders.')->group(function () {
         Route::get('/shipping', [OrdersController::class, 'shipping'])->name('shipping');
         Route::get('/refunds', [OrdersController::class, 'refunds'])->name('refunds');
         Route::get('/reports', [OrdersController::class, 'reports'])->name('reports');
-
+        Route::get('/reports/data', [OrdersController::class, 'reportsData'])->name('reports.data');
         // Individual order views (dynamic routes MUST BE LAST)
         Route::get('/{id}', [OrdersController::class, 'show'])->name('show');
         Route::get('/{id}/invoice', [OrdersController::class, 'invoice'])->name('invoice');
         Route::get('/{id}/shipping-label', [OrdersController::class, 'shippingLabel'])->name('shipping-label');
+        Route::get('/{id}/data', [OrdersController::class, 'getOrderData'])->name('get-data');
     });
 
     // Update order
@@ -55,6 +56,13 @@ Route::prefix('orders')->name('orders.')->group(function () {
         Route::post('/{id}/add-note', [OrdersController::class, 'addNote'])->name('add-note');
         Route::post('/{id}/process-refund', [OrdersController::class, 'processRefund'])->name('process-refund');
         Route::delete('/{orderId}/items/{itemId}', [OrdersController::class, 'removeItem'])->name('remove-item');
+        Route::post('/{id}/mark-shipped', [OrdersController::class, 'markShipped'])->name('mark-shipped');
+        Route::post('/{id}/update-notes', [OrdersController::class, 'updateNotes'])->name('update-notes');
+        //Bulk status update routes
+        Route::post('/bulk-update-status', [OrdersController::class, 'bulkUpdateStatus'])->name('bulk-update-status');
+        Route::post('/bulk-update-payment-status', [OrdersController::class, 'bulkUpdatePaymentStatus'])->name('bulk-update-payment-status');
+        //Single quick status update (from index page)
+        Route::post('/{id}/quick-update-status', [OrdersController::class, 'quickUpdateStatus'])->name('quick-update-status');
     });
 
     // Delete order

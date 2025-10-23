@@ -1219,4 +1219,62 @@ class Order extends Model
 
         return $timeline;
     }
+
+    // Get status badge CSS class
+    public function getStatusBadgeClass()
+    {
+        return match($this->status_key_code) {
+            'ORDER_PENDING' => 'bg-warning',
+            'ORDER_CONFIRMED' => 'bg-info',
+            'ORDER_PROCESSING' => 'bg-primary',
+            'ORDER_PACKED' => 'bg-secondary',
+            'ORDER_SHIPPED' => 'bg-info',
+            'ORDER_DELIVERED' => 'bg-success',
+            'ORDER_CANCELLED' => 'bg-danger',
+            default => 'bg-secondary'
+        };
+    }
+
+    // Get payment status badge class
+    public function getPaymentStatusBadgeClass()
+    {
+        return match($this->payment_status_key_code) {
+            'PAYMENT_PAID' => 'bg-success',
+            'PAYMENT_PENDING' => 'bg-warning',
+            'PAYMENT_FAILED' => 'bg-danger',
+            default => 'bg-secondary'
+        };
+    }
+
+    // Get status label
+    public function getStatusLabel()
+    {
+        return ucfirst(strtolower(str_replace('ORDER_', '', $this->status_key_code)));
+    }
+
+    // Get payment status label
+    public function getPaymentStatusLabel()
+    {
+        return ucfirst(strtolower(str_replace(['PAYMENT_', '_'], ['', ' '], $this->payment_status_key_code)));
+    }
+
+
+    // Check if can update status
+    public function canUpdateStatus()
+    {
+        return !in_array($this->status_key_code, ['ORDER_DELIVERED', 'ORDER_CANCELLED']);
+    }
+
+    // Check if can ship
+    public function canShip()
+    {
+        return in_array($this->status_key_code, ['ORDER_PROCESSING', 'ORDER_PACKED'])
+            && $this->isPaid();
+    }
+
+    // Check if can refund
+    public function canRefund()
+    {
+        return $this->isPaid() && !$this->is_refunded;
+    }
 }

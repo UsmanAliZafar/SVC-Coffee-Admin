@@ -675,35 +675,66 @@ $(document).ready(function() {
     $(document).on('click', '.view-notes', function() {
         const orderId = $(this).data('id');
 
+        // Show loading state
+        Swal.fire({
+            title: 'Loading...',
+            text: 'Fetching order data',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
         $.ajax({
-            url: '/admin/orders/' + orderId,
+            url: '/admin/orders/' + orderId + '/data',  // Changed URL
             type: 'GET',
             success: function(response) {
-                $('#modalOrderId').val(orderId);
+                Swal.close(); // Close loading
 
-                // Order info
-                let orderInfo = '<div class="row">';
-                orderInfo += '<div class="col-md-6"><strong>Order:</strong> ' + response.order_number + '</div>';
-                orderInfo += '<div class="col-md-6"><strong>Customer:</strong> ' + response.customer_name + '</div>';
-                orderInfo += '</div>';
-                $('#orderInfoSection').html(orderInfo);
+                if (response.success) {
+                    $('#modalOrderId').val(orderId);
 
-                // Customer notes
-                if (response.customer_notes) {
-                    $('#noCustomerNotes').hide();
-                    $('#customerNotesText').text(response.customer_notes).show();
+                    // Order info
+                    let orderInfo = '<div class="row">';
+                    orderInfo += '<div class="col-md-6"><strong>Order:</strong> ' + response.order_number + '</div>';
+                    orderInfo += '<div class="col-md-6"><strong>Customer:</strong> ' + response.customer_name + '</div>';
+                    orderInfo += '<div class="col-md-6"><strong>Email:</strong> ' + response.customer_email + '</div>';
+                    orderInfo += '<div class="col-md-6"><strong>Status:</strong> ' + response.status + '</div>';
+                    orderInfo += '<div class="col-md-12 mt-2"><strong>Total:</strong> ' + response.total_amount + '</div>';
+                    orderInfo += '</div>';
+                    $('#orderInfoSection').html(orderInfo);
+
+                    // Customer notes
+                    if (response.customer_notes) {
+                        $('#noCustomerNotes').hide();
+                        $('#customerNotesText').html('<p class="mb-0">' + response.customer_notes + '</p>').show();
+                    } else {
+                        $('#noCustomerNotes').show();
+                        $('#customerNotesText').hide();
+                    }
+
+                    // Admin notes
+                    $('#adminNotesTextarea').val(response.admin_notes || '');
+
+                    // Internal notes
+                    $('#internalNotesTextarea').val(response.internal_notes || '');
+
+                    $('#notesModal').modal('show');
                 } else {
-                    $('#noCustomerNotes').show();
-                    $('#customerNotesText').hide();
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: response.message || 'Failed to load order data'
+                    });
                 }
-
-                // Admin notes
-                $('#adminNotesTextarea').val(response.admin_notes || '');
-
-                // Internal notes
-                $('#internalNotesTextarea').val(response.internal_notes || '');
-
-                $('#notesModal').modal('show');
+            },
+            error: function(xhr) {
+                Swal.close();
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'Failed to load order data'
+                });
             }
         });
     });

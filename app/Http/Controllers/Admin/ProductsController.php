@@ -3,6 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Support\Facades\Log;
+// Models
 use App\Models\Product;
 use App\Models\ProductsCategories;
 use App\Models\ProductTag;
@@ -11,12 +19,6 @@ use App\Models\ProductVariant;
 use App\Models\UrlRedirect;
 use App\Models\SystemStatus;
 use App\Models\Vendor;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
-use Yajra\DataTables\Facades\DataTables;
 
 class ProductsController extends Controller
 {
@@ -382,7 +384,6 @@ class ProductsController extends Controller
             'description' => 'nullable|string',
             'status_key_code' => 'required|string',
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'stock_quantity' => 'nullable|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'session_id' => 'nullable|string',
             'is_taxable' => 'nullable',
@@ -409,7 +410,7 @@ class ProductsController extends Controller
                 'category_id', 'vendor_id', 'product_type', 'curency',
                 'price', 'sale_price', 'cost_price', 'status_key_code',
                 'is_featured', 'show_on_home', 'is_available', 'track_inventory',
-                'stock_quantity', 'low_stock_threshold',
+                'low_stock_threshold',
                 'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
                 'is_taxable', 'tax_type', 'tax_percentage', 'tax_class',
             ]);
@@ -440,10 +441,6 @@ class ProductsController extends Controller
                 $productData['product_type'] = 'simple';
             }
 
-            // Set default stock values
-            if (!isset($productData['stock_quantity'])) {
-                $productData['stock_quantity'] = 0;
-            }
             if (!isset($productData['low_stock_threshold'])) {
                 $productData['low_stock_threshold'] = 10;
             }
@@ -472,6 +469,15 @@ class ProductsController extends Controller
 
             // Create product
             $product = Product::create($productData);
+
+            // Handle initial stock AFTER product is created
+            if ($request->filled('stock_quantity') && $request->stock_quantity > 0 && $request->has('track_inventory')) {
+                $product->setStock(
+                    (int) $request->stock_quantity,  // quantity (positional parameter)
+                    null,                             // warehouseId (positional parameter)
+                    'Initial stock on product creation' // reason (positional parameter)
+                );
+            }
 
             // Attach tags if provided
             if ($request->filled('tags')) {
@@ -670,7 +676,6 @@ class ProductsController extends Controller
             $productData['is_available'] = $request->has('is_available');
             $productData['track_inventory'] = $request->has('track_inventory');
             $productData['is_taxable'] = $request->has('is_taxable');
-
             // Set updated_by
             $productData['updated_by'] = auth('admin')->id();
             // Attach features if provided
@@ -694,6 +699,19 @@ class ProductsController extends Controller
             // Update product
             $product->update($productData);
 
+            // Handle stock update AFTER product is updated
+            if ($request->filled('stock_quantity') && $productData['track_inventory']) {
+                $newStock = (int) $request->stock_quantity;
+                $currentStock = $product->fresh()->stock_quantity;
+
+                if ($newStock != $currentStock) {
+                    $product->setStock(
+                        $newStock,
+                        null,
+                        'Stock updated from admin panel'
+                    );
+                }
+            }
             // Sync tags
             if ($request->has('tags')) {
                 $tags = $request->tags;

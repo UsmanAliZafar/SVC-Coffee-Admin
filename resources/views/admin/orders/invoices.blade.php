@@ -107,9 +107,9 @@
                 <button class="btn btn-outline-primary btn-sm" id="bulkDownloadBtn">
                     <i class="bi bi-download"></i> Bulk Download
                 </button>
-                <button class="btn btn-outline-success btn-sm" id="bulkEmailBtn">
+                {{-- <button class="btn btn-outline-success btn-sm" id="bulkEmailBtn">
                     <i class="bi bi-envelope"></i> Bulk Email
-                </button>
+                </button> --}}
                 <button class="btn btn-outline-info btn-sm" id="exportBtn">
                     <i class="bi bi-file-earmark-excel"></i> Export to Excel
                 </button>
@@ -225,9 +225,9 @@
                     <button type="button" class="btn btn-sm btn-primary" id="downloadSelectedBtn">
                         <i class="bi bi-download"></i> Download
                     </button>
-                    <button type="button" class="btn btn-sm btn-success" id="emailSelectedBtn">
+                    {{-- <button type="button" class="btn btn-sm btn-success" id="emailSelectedBtn">
                         <i class="bi bi-envelope"></i> Email
-                    </button>
+                    </button> --}}
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="clearSelection">
                         Clear
                     </button>
@@ -366,7 +366,7 @@ $(document).ready(function() {
                         if (row.invoice_number) {
                             actions += '<a href="/admin/orders/' + data + '/invoice" class="btn btn-outline-primary" title="View Invoice" target="_blank"><i class="bi bi-eye"></i></a>';
                             actions += '<a href="/admin/orders/' + data + '/invoice" class="btn btn-outline-success" title="Download" download><i class="bi bi-download"></i></a>';
-                            actions += '<button class="btn btn-outline-info email-invoice" data-id="' + data + '" data-email="' + (row.customer_email || row.guest_email) + '" title="Email"><i class="bi bi-envelope"></i></button>';
+                            // actions += '<button class="btn btn-outline-info email-invoice" data-id="' + data + '" data-email="' + (row.customer_email || row.guest_email) + '" title="Email"><i class="bi bi-envelope"></i></button>';
                         } else {
                             actions += '<button class="btn btn-outline-warning generate-invoice" data-id="' + data + '" title="Generate Invoice"><i class="bi bi-file-earmark-plus"></i></button>';
                         }

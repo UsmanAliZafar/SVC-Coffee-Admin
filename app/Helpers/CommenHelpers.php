@@ -15,7 +15,7 @@ if (!function_exists('get_all_currencies')) {
     function get_all_currencies(): array
     {
         return [
-            // 'USD' => 'US Dollar ($)',
+            'USD' => 'US Dollar ($)',
             // 'EUR' => 'Euro (€)',
             // 'GBP' => 'British Pound (£)',
             // 'PKR' => 'Pakistani Rupee (₨)',

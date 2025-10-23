@@ -280,11 +280,9 @@
                         <div class="mb-3">
                             <label for="currency" class="form-label">Currency <span class="text-danger">*</span></label>
                             <select class="form-select" id="currency" name="currency" required>
-                                <option value="USD" {{ $order->currency === 'USD' ? 'selected' : '' }}>US Dollar ($)</option>
-                                <option value="EUR" {{ $order->currency === 'EUR' ? 'selected' : '' }}>Euro (€)</option>
-                                <option value="GBP" {{ $order->currency === 'GBP' ? 'selected' : '' }}>British Pound (£)</option>
-                                <option value="PKR" {{ $order->currency === 'PKR' ? 'selected' : '' }}>Pakistani Rupee (₨)</option>
-                                <option value="AED" {{ $order->currency === 'AED' ? 'selected' : '' }}>UAE Dirham (د.إ)</option>
+                                @foreach($currencies as $code => $name)
+                                <option value="{{ $code }}" {{ $order->currency === $code ? 'selected' : '' }}>{{ $name }}</option>
+                                @endforeach
                             </select>
                         </div>
 

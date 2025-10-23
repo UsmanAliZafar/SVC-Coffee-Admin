@@ -133,7 +133,28 @@
             </div>
         </div>
     </div>
-
+    {{-- Bulk Actions Bar --}}
+    <div id="bulkActionsBar" class="alert alert-info d-none mb-0 border-0 rounded-0" role="alert">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <strong><span id="selectedCount">0</span> order(s) selected</strong>
+            </div>
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-primary" id="bulkUpdateStatusBtn">
+                    <i class="bi bi-arrow-repeat"></i> Update Status
+                </button>
+                <button type="button" class="btn btn-success" id="bulkUpdatePaymentBtn">
+                    <i class="bi bi-credit-card"></i> Update Payment
+                </button>
+                <button type="button" class="btn btn-danger" id="bulkDeleteBtn">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+                <button type="button" class="btn btn-secondary" id="clearSelectionBtn">
+                    <i class="bi bi-x"></i> Clear
+                </button>
+            </div>
+        </div>
+    </div>
     {{-- Main Orders Table --}}
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white border-0 py-3">
@@ -276,6 +297,98 @@
         </div>
     </div>
 </div>
+{{-- Bulk Update Status Modal --}}
+<div class="modal fade" id="bulkStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Order Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Update status for <strong><span id="bulkStatusCount">0</span> order(s)</strong></p>
+                <div class="mb-3">
+                    <label class="form-label">New Status</label>
+                    <select class="form-select" id="bulkStatusSelect">
+                        <option value="">-- Select Status --</option>
+                        @foreach($statusList as $status)
+                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmBulkStatus">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Bulk Update Payment Status Modal --}}
+<div class="modal fade" id="bulkPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Payment Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Update payment status for <strong><span id="bulkPaymentCount">0</span> order(s)</strong></p>
+                <div class="mb-3">
+                    <label class="form-label">New Payment Status</label>
+                    <select class="form-select" id="bulkPaymentSelect">
+                        <option value="">-- Select Payment Status --</option>
+                        @foreach($paymentStatusList as $status)
+                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmBulkPayment">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Quick Status Update Modal (Single Order) --}}
+<div class="modal fade" id="quickStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Update</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="quickUpdateOrderId">
+                <div class="mb-3">
+                    <label class="form-label">Order Status</label>
+                    <select class="form-select" id="quickStatusSelect">
+                        <option value="">-- No Change --</option>
+                        @foreach($statusList as $status)
+                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Payment Status</label>
+                    <select class="form-select" id="quickPaymentSelect">
+                        <option value="">-- No Change --</option>
+                        @foreach($paymentStatusList as $status)
+                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmQuickUpdate">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('styles')
@@ -338,7 +451,7 @@ $(document).ready(function() {
             order: [[8, 'desc']],
             pageLength: 25,
             language: {
-            processing: `
+                processing: `
                     <div class="text-center">
                         <div class="spinner-border text-success" role="status">
                             <span class="visually-hidden">Loading...</span>
@@ -422,7 +535,246 @@ $(document).ready(function() {
         }
     }
 
-    // Delete Order
+    // Clear Selection
+    $('#clearSelectionBtn').on('click', function() {
+        selectedOrders = [];
+        $('.order-checkbox').prop('checked', false);
+        $('#selectAll').prop('checked', false);
+        updateBulkActionsBar();
+    });
+
+    // ====================================
+    // BULK UPDATE STATUS
+    // ====================================
+    $('#bulkUpdateStatusBtn').on('click', function() {
+        if (selectedOrders.length === 0) return;
+
+        $('#bulkStatusCount').text(selectedOrders.length);
+        $('#bulkStatusModal').modal('show');
+    });
+
+    $('#confirmBulkStatus').on('click', function() {
+        const statusCode = $('#bulkStatusSelect').val();
+
+        if (!statusCode) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Please select a status'
+            });
+            return;
+        }
+
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
+
+        $.ajax({
+            url: '{{ route("admin.orders.bulk-update-status") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                order_ids: selectedOrders,
+                status_key_code: statusCode
+            },
+            success: function(response) {
+                $('#bulkStatusModal').modal('hide');
+                $('#confirmBulkStatus').prop('disabled', false).html('Update');
+                $('#bulkStatusSelect').val('');
+
+                if (response.success) {
+                    let message = response.message;
+                    if (response.errors && response.errors.length > 0) {
+                        message += '<br><br><small class="text-danger">' + response.errors.join('<br>') + '</small>';
+                    }
+
+                    Swal.fire({
+                        icon: response.failed > 0 ? 'warning' : 'success',
+                        title: response.failed > 0 ? 'Partially Completed' : 'Success!',
+                        html: message,
+                        timer: 3000
+                    });
+
+                    // Reload table and clear selection
+                    ordersTable.ajax.reload();
+                    selectedOrders = [];
+                    $('#selectAll').prop('checked', false);
+                    updateBulkActionsBar();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: response.message
+                    });
+                }
+            },
+            error: function(xhr) {
+                $('#bulkStatusModal').modal('hide');
+                $('#confirmBulkStatus').prop('disabled', false).html('Update');
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'An error occurred'
+                });
+            }
+        });
+    });
+
+    // ====================================
+    // BULK UPDATE PAYMENT STATUS
+    // ====================================
+    $('#bulkUpdatePaymentBtn').on('click', function() {
+        if (selectedOrders.length === 0) return;
+
+        $('#bulkPaymentCount').text(selectedOrders.length);
+        $('#bulkPaymentModal').modal('show');
+    });
+
+    $('#confirmBulkPayment').on('click', function() {
+        const paymentStatusCode = $('#bulkPaymentSelect').val();
+
+        if (!paymentStatusCode) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                text: 'Please select a payment status'
+            });
+            return;
+        }
+
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
+
+        $.ajax({
+            url: '{{ route("admin.orders.bulk-update-payment-status") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                order_ids: selectedOrders,
+                payment_status_key_code: paymentStatusCode
+            },
+            success: function(response) {
+                $('#bulkPaymentModal').modal('hide');
+                $('#confirmBulkPayment').prop('disabled', false).html('Update');
+                $('#bulkPaymentSelect').val('');
+
+                if (response.success) {
+                    let message = response.message;
+                    if (response.errors && response.errors.length > 0) {
+                        message += '<br><br><small class="text-danger">' + response.errors.join('<br>') + '</small>';
+                    }
+
+                    Swal.fire({
+                        icon: response.failed > 0 ? 'warning' : 'success',
+                        title: response.failed > 0 ? 'Partially Completed' : 'Success!',
+                        html: message,
+                        timer: 3000
+                    });
+
+                    // Reload table and clear selection
+                    ordersTable.ajax.reload();
+                    selectedOrders = [];
+                    $('#selectAll').prop('checked', false);
+                    updateBulkActionsBar();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: response.message
+                    });
+                }
+            },
+            error: function(xhr) {
+                $('#bulkPaymentModal').modal('hide');
+                $('#confirmBulkPayment').prop('disabled', false).html('Update');
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'An error occurred'
+                });
+            }
+        });
+    });
+
+    // ====================================
+    // QUICK UPDATE SINGLE ORDER
+    // ====================================
+    $(document).on('click', '.quick-update-btn', function() {
+        const orderId = $(this).data('id');
+        const currentStatus = $(this).data('status');
+        const currentPayment = $(this).data('payment');
+
+        $('#quickUpdateOrderId').val(orderId);
+        $('#quickStatusSelect').val(currentStatus);
+        $('#quickPaymentSelect').val(currentPayment);
+        $('#quickStatusModal').modal('show');
+    });
+
+    $('#confirmQuickUpdate').on('click', function() {
+        const orderId = $('#quickUpdateOrderId').val();
+        const statusCode = $('#quickStatusSelect').val();
+        const paymentCode = $('#quickPaymentSelect').val();
+
+        if (!statusCode && !paymentCode) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Changes',
+                text: 'Please select at least one status to update'
+            });
+            return;
+        }
+
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
+
+        const data = {
+            _token: '{{ csrf_token() }}'
+        };
+
+        if (statusCode) data.status_key_code = statusCode;
+        if (paymentCode) data.payment_status_key_code = paymentCode;
+
+        $.ajax({
+            url: `/admin/orders/${orderId}/quick-update-status`,
+            type: 'POST',
+            data: data,
+            success: function(response) {
+                $('#quickStatusModal').modal('hide');
+                $('#confirmQuickUpdate').prop('disabled', false).html('Update');
+
+                if (response.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: response.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    // Reload table without resetting pagination
+                    ordersTable.ajax.reload(null, false);
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: response.message
+                    });
+                }
+            },
+            error: function(xhr) {
+                $('#quickStatusModal').modal('hide');
+                $('#confirmQuickUpdate').prop('disabled', false).html('Update');
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'An error occurred'
+                });
+            }
+        });
+    });
+
+    // ====================================
+    // DELETE ORDER (SINGLE)
+    // ====================================
     $(document).on('click', '.delete-order', function() {
         deleteOrderId = $(this).data('id');
         $('#deleteModal').modal('show');
@@ -481,25 +833,66 @@ $(document).ready(function() {
         }
     });
 
-    // Bulk Delete
+    // ====================================
+    // BULK DELETE
+    // ====================================
     $('#bulkDeleteBtn').on('click', function() {
         if (selectedOrders.length === 0) return;
 
         Swal.fire({
             icon: 'warning',
             title: 'Confirm Bulk Delete',
-            text: `Are you sure you want to delete ${selectedOrders.length} order(s)?`,
+            html: `Are you sure you want to delete <strong>${selectedOrders.length}</strong> order(s)?<br><small class="text-muted">This action cannot be undone.</small>`,
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
             confirmButtonText: 'Yes, delete them!',
             cancelButtonText: 'Cancel'
         }).then((result) => {
             if (result.isConfirmed) {
-                // Implement bulk delete logic here
+                // Show processing indicator
                 Swal.fire({
-                    icon: 'info',
-                    title: 'Coming Soon',
-                    text: 'Bulk delete functionality will be implemented.'
+                    title: 'Processing...',
+                    html: 'Deleting orders, please wait...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                // Process deletions
+                let deleted = 0;
+                let failed = 0;
+                const errors = [];
+
+                Promise.all(selectedOrders.map(orderId => {
+                    return $.ajax({
+                        url: `/admin/orders/${orderId}`,
+                        type: 'DELETE',
+                        data: { _token: '{{ csrf_token() }}' }
+                    })
+                    .then(() => deleted++)
+                    .catch(xhr => {
+                        failed++;
+                        errors.push(xhr.responseJSON?.message || 'Unknown error');
+                    });
+                })).then(() => {
+                    let errorHtml = '';
+                    if (errors.length > 0) {
+                        errorHtml = '<br><br><small class="text-danger">' + errors.slice(0, 5).join('<br>') + '</small>';
+                    }
+
+                    Swal.fire({
+                        icon: failed > 0 ? 'warning' : 'success',
+                        title: 'Bulk Delete Complete',
+                        html: `${deleted} order(s) deleted successfully${failed > 0 ? `, ${failed} failed` : ''}${errorHtml}`,
+                        timer: 3000
+                    });
+
+                    // Reload table and clear selection
+                    ordersTable.ajax.reload();
+                    selectedOrders = [];
+                    $('#selectAll').prop('checked', false);
+                    updateBulkActionsBar();
                 });
             }
         });
