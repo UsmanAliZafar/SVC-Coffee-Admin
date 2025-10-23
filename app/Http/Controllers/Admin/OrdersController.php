@@ -188,8 +188,8 @@ class OrdersController extends Controller
         try {
             $validated = $request->validate([
                 'customer_id' => 'nullable|uuid|exists:customers,id',
-                'guest_email' => 'required_without:customer_id|email',
-                'guest_name' => 'required_without:customer_id|string|max:255',
+                'guest_email' => 'required_without:customer_id|nullable|email',
+                'guest_name' => 'required_without:customer_id|nullable|string|max:255',
                 'guest_phone' => 'nullable|string|max:20',
 
                 'items' => 'required|array|min:1',
@@ -365,9 +365,11 @@ class OrdersController extends Controller
 
             \Log::info('Order saved successfully', ['order_id' => $order->id]);
 
-            return redirect()
-                ->route('admin.orders.show', $order->id)
-                ->with('success', "Order #{$order->order_number} created successfully!");
+            return response()->json([
+                'success' => true,
+                'message' => "Order #{$order->order_number} created successfully!",
+                'redirect' => route('admin.orders.show', $order->id)
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -377,9 +379,10 @@ class OrdersController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return back()
-                ->withInput()
-                ->with('error', 'Failed to create order: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create order: ' . $e->getMessage()
+            ], 500);
         }
     }
 
