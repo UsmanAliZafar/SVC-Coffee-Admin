@@ -40,5 +40,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         require __DIR__ . '/admin/reports_routes.php';
         require __DIR__ . '/admin/user_management_routes.php';
         require __DIR__ . '/admin/settings_routes.php';
+        require __DIR__ . '/admin/profile_routes.php';
     });
 });

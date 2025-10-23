@@ -371,33 +371,58 @@
                 </li>
             @endif
             {{-- End Customers Management --}}
-
-            {{-- Coffee Categories Section --}}
-            <li class="nav-item section-divider">
-                <span class="section-title">Top Categories</span>
+            <li class="section-divider">
+                <span class="section-title">Reports</span>
             </li>
-
-            {{-- <li class="nav-item">
-                <span class="nav-text">Some Categories will be here</span>
-            </li> --}}
-            {{-- System Section --}}
-            <li class="nav-item section-divider">
-                <span class="section-title">System</span>
-            </li>
-
+            {{-- Reports & Analytics --}}
             @if(auth('admin')->user()->hasPermission('reports.read'))
-            <li class="nav-item">
+            <li class="nav-item has-dropdown {{ request()->routeIs('admin.reports.*') ? 'open' : '' }}">
                 <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}"
                    href="#" data-tooltip="Reports">
                     <i class="bi bi-graph-up"></i>
                     <span class="nav-text">Reports</span>
+                    <i class="bi bi-chevron-down dropdown-arrow"></i>
                 </a>
+                <ul class="submenu">
+                    @if(auth('admin')->user()->hasPermission('reports.read'))
+                    <li><a href=""><i class="bi bi-cash-stack"></i> Sales Report</a></li>
+                    <li><a href=""><i class="bi bi-currency-dollar"></i> Revenue</a></li>
+                    <li><a href=""><i class="bi bi-box-seam"></i> Products</a></li>
+                    <li><a href=""><i class="bi bi-person-badge"></i> Customers</a></li>
+                    <li><a href=""><i class="bi bi-boxes"></i> Inventory</a></li>
+                    @endif
+                </ul>
             </li>
             @endif
+            {{-- Reports & Analytics --}}
+
+             {{-- Divider --}}
+            <li class="section-divider">
+                <span class="section-title">System</span>
+            </li>
+            {{-- Content Management --}}
+            @if(auth('admin')->user()->hasPermission('content.read'))
+            <li class="nav-item has-dropdown {{ request()->routeIs('admin.content.*') ? 'open' : '' }}">
+                <a class="nav-link {{ request()->routeIs('admin.content.*') ? 'active' : '' }}"
+                   href="#" data-tooltip="Content">
+                    <i class="bi bi-file-text"></i>
+                    <span class="nav-text">Content</span>
+                    <i class="bi bi-chevron-down dropdown-arrow"></i>
+                </a>
+                <ul class="submenu">
+                    @if(auth('admin')->user()->hasPermission('content.read'))
+                    <li><a href=""><i class="bi bi-file-earmark"></i> Pages</a></li>
+                    <li><a href=""><i class="bi bi-image"></i> Banners</a></li>
+                    <li><a href=""><i class="bi bi-envelope-paper"></i> Email Templates</a></li>
+                    @endif
+                </ul>
+            </li>
+            @endif
+            {{-- Content Management --}}
 
             {{-- Admin Users Management --}}
             @if(auth('admin')->user()->hasPermission('admin_users.read') || auth('admin')->user()->hasPermission('roles.read') || auth('admin')->user()->hasRole('super_admin'))
-            <li class="nav-item has-dropdown">
+            <li class="nav-item has-dropdown {{ request()->routeIs('admin.*') ? 'open' : '' }}">
                 <a class="nav-link {{ request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*') || request()->routeIs('admin.permissions.*') ? 'active' : '' }}"
                    href="{{ route('admin.users.index') }}"
                    data-tooltip="Admin Users">
@@ -418,7 +443,7 @@
                     @if(auth('admin')->user()->hasRole('super_admin'))
                     <li><a href="{{ route('admin.permissions.index') }}"><i class="bi bi-key"></i> Permissions</a></li>
                     @endif
-                    <li><a href=""><i class="bi bi-person-circle"></i> My Profile</a></li>
+                    <li><a href="{{ route('admin.profile.edit') }}"><i class="bi bi-person-circle"></i> My Profile</a></li>
                 </ul>
             </li>
             @endif

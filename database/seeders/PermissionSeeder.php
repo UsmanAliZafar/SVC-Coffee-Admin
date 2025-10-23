@@ -42,6 +42,7 @@ class PermissionSeeder extends Seeder
             'permissions' => ['read', 'update'],
             'tags' => ['create', 'read', 'update', 'delete'],
             'vendors' => ['create', 'read', 'update', 'delete'],
+            'content' => ['create', 'read', 'update', 'delete'],
         ];
 
         // Create permissions
