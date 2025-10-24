@@ -374,22 +374,22 @@
             <li class="section-divider">
                 <span class="section-title">Reports</span>
             </li>
-            {{-- Reports & Analytics --}}
+           {{-- Reports & Analytics --}}
             @if(auth('admin')->user()->hasPermission('reports.read'))
             <li class="nav-item has-dropdown {{ request()->routeIs('admin.reports.*') ? 'open' : '' }}">
                 <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}"
-                   href="#" data-tooltip="Reports">
+                href="{{ route('admin.reports.index') }}" data-tooltip="Reports">
                     <i class="bi bi-graph-up"></i>
                     <span class="nav-text">Reports</span>
                     <i class="bi bi-chevron-down dropdown-arrow"></i>
                 </a>
                 <ul class="submenu">
                     @if(auth('admin')->user()->hasPermission('reports.read'))
-                    <li><a href=""><i class="bi bi-cash-stack"></i> Sales Report</a></li>
-                    <li><a href=""><i class="bi bi-currency-dollar"></i> Revenue</a></li>
-                    <li><a href=""><i class="bi bi-box-seam"></i> Products</a></li>
-                    <li><a href=""><i class="bi bi-person-badge"></i> Customers</a></li>
-                    <li><a href=""><i class="bi bi-boxes"></i> Inventory</a></li>
+                    <li><a href="{{ route('admin.reports.sales.monthly') }}"><i class="bi bi-cash-stack"></i> Sales Report</a></li>
+                    <li><a href="{{ route('admin.reports.revenue.index') }}"><i class="bi bi-currency-dollar"></i> Revenue</a></li>
+                    <li><a href="{{ route('admin.reports.products.top-selling') }}"><i class="bi bi-box-seam"></i> Products</a></li>
+                    <li><a href="{{ route('admin.reports.customers.index') }}"><i class="bi bi-person-badge"></i> Customers</a></li>
+                    <li><a href="{{ route('admin.reports.inventory.index') }}"><i class="bi bi-boxes"></i> Inventory</a></li>
                     @endif
                 </ul>
             </li>
