@@ -299,29 +299,32 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="timezone" class="form-label">Timezone <span class="text-danger">*</span></label>
-                                <select class="form-select @error('timezone') is-invalid @enderror" id="timezone" name="timezone" required>
-                                    <option value="Asia/Karachi" {{ $settings->timezone == 'Asia/Karachi' ? 'selected' : '' }}>Asia/Karachi (PKT)</option>
-                                    <option value="UTC" {{ $settings->timezone == 'UTC' ? 'selected' : '' }}>UTC</option>
-                                    <option value="America/New_York" {{ $settings->timezone == 'America/New_York' ? 'selected' : '' }}>America/New_York (EST)</option>
-                                    <option value="America/Chicago" {{ $settings->timezone == 'America/Chicago' ? 'selected' : '' }}>America/Chicago (CST)</option>
-                                    <option value="America/Los_Angeles" {{ $settings->timezone == 'America/Los_Angeles' ? 'selected' : '' }}>America/Los_Angeles (PST)</option>
-                                    <option value="Europe/London" {{ $settings->timezone == 'Europe/London' ? 'selected' : '' }}>Europe/London (GMT)</option>
-                                    <option value="Asia/Dubai" {{ $settings->timezone == 'Asia/Dubai' ? 'selected' : '' }}>Asia/Dubai (GST)</option>
-                                    <option value="Asia/Kolkata" {{ $settings->timezone == 'Asia/Kolkata' ? 'selected' : '' }}>Asia/Kolkata (IST)</option>
+                                <select class="form-select @error('timezone') is-invalid @enderror"
+                                        id="timezone" name="timezone" required>
+                                    <option value="">-- Select Timezone --</option>
+                                    @foreach(get_all_timezones() as $tzValue => $tzLabel)
+                                        <option value="{{ $tzValue }}"
+                                                {{ old('timezone', $settings->timezone) == $tzValue ? 'selected' : '' }}>
+                                            {{ $tzLabel }}
+                                        </option>
+                                    @endforeach
                                 </select>
+                                <small class="text-muted">Set your store's timezone</small>
                                 @error('timezone')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                    <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
                             <div class="col-md-6 mb-3">
                                 <label for="date_format" class="form-label">Date Format <span class="text-danger">*</span></label>
                                 <select class="form-select @error('date_format') is-invalid @enderror" id="date_format" name="date_format" required>
-                                    <option value="Y-m-d" {{ $settings->date_format == 'Y-m-d' ? 'selected' : '' }}>2024-01-15</option>
-                                    <option value="d/m/Y" {{ $settings->date_format == 'd/m/Y' ? 'selected' : '' }}>15/01/2024</option>
-                                    <option value="m/d/Y" {{ $settings->date_format == 'm/d/Y' ? 'selected' : '' }}>01/15/2024</option>
-                                    <option value="F j, Y" {{ $settings->date_format == 'F j, Y' ? 'selected' : '' }}>January 15, 2024</option>
-                                    <option value="d-M-Y" {{ $settings->date_format == 'd-M-Y' ? 'selected' : '' }}>15-Jan-2024</option>
+                                    <option value="">-- Select Date Format --</option>
+                                    @foreach(get_all_date_formats() as $formatValue => $formatLabel)
+                                        <option value="{{ $formatValue }}"
+                                                {{ old('date_format', $settings->date_format) == $formatValue ? 'selected' : '' }}>
+                                            {{ $formatLabel }}
+                                        </option>
+                                    @endforeach
                                 </select>
                                 @error('date_format')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -331,9 +334,13 @@
                             <div class="col-md-6 mb-3">
                                 <label for="time_format" class="form-label">Time Format <span class="text-danger">*</span></label>
                                 <select class="form-select @error('time_format') is-invalid @enderror" id="time_format" name="time_format" required>
-                                    <option value="H:i:s" {{ $settings->time_format == 'H:i:s' ? 'selected' : '' }}>14:30:00 (24-hour)</option>
-                                    <option value="h:i A" {{ $settings->time_format == 'h:i A' ? 'selected' : '' }}>02:30 PM (12-hour)</option>
-                                    <option value="h:i:s A" {{ $settings->time_format == 'h:i:s A' ? 'selected' : '' }}>02:30:00 PM (12-hour)</option>
+                                    <option value="">-- Select Time Format --</option>
+                                    @foreach(get_all_time_formats() as $formatValue => $formatLabel)
+                                        <option value="{{ $formatValue }}"
+                                                {{ old('time_format', $settings->time_format) == $formatValue ? 'selected' : '' }}>
+                                            {{ $formatLabel }}
+                                        </option>
+                                    @endforeach
                                 </select>
                                 @error('time_format')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -343,53 +350,86 @@
                             <div class="col-md-6 mb-3">
                                 <label for="currency_code" class="form-label">Currency Code <span class="text-danger">*</span></label>
                                 <select class="form-select @error('currency_code') is-invalid @enderror" id="currency_code" name="currency_code" required>
-                                    <option value="PKR" {{ $settings->currency_code == 'PKR' ? 'selected' : '' }}>PKR - Pakistani Rupee</option>
-                                    <option value="USD" {{ $settings->currency_code == 'USD' ? 'selected' : '' }}>USD - US Dollar</option>
-                                    <option value="EUR" {{ $settings->currency_code == 'EUR' ? 'selected' : '' }}>EUR - Euro</option>
-                                    <option value="GBP" {{ $settings->currency_code == 'GBP' ? 'selected' : '' }}>GBP - British Pound</option>
-                                    <option value="AED" {{ $settings->currency_code == 'AED' ? 'selected' : '' }}>AED - UAE Dirham</option>
-                                    <option value="INR" {{ $settings->currency_code == 'INR' ? 'selected' : '' }}>INR - Indian Rupee</option>
+                                    <option value="">-- Select Currency --</option>
+                                    @foreach(get_all_currencies() as $currencyCode => $currencyName)
+                                        <option value="{{ $currencyCode }}"
+                                                data-symbol="{{ get_currency_symbol($currencyCode) }}"
+                                                {{ old('currency_code', $settings->currency_code) == $currencyCode ? 'selected' : '' }}>
+                                            {{ $currencyName }}
+                                        </option>
+                                    @endforeach
                                 </select>
                                 @error('currency_code')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
-                            <div class="col-md-6 mb-3">
-                                <label for="currency_symbol" class="form-label">Currency Symbol <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('currency_symbol') is-invalid @enderror"
-                                       id="currency_symbol" name="currency_symbol" value="{{ old('currency_symbol', $settings->currency_symbol) }}" required>
+                             <div class="col-md-6 mb-3">
+                                <label for="currency_symbol" class="form-label">
+                                    Currency Symbol <span class="text-danger">*</span>
+                                </label>
+                                <input type="text"
+                                    class="form-control @error('currency_symbol') is-invalid @enderror"
+                                    id="currency_symbol"
+                                    name="currency_symbol"
+                                    value="{{ old('currency_symbol', $settings->currency_symbol) }}"
+                                    required readonly>
+                                <small class="text-muted">Auto-filled based on currency selection</small>
                                 @error('currency_symbol')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                    <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
                             <div class="col-md-6 mb-3">
                                 <label for="currency_position" class="form-label">Currency Position <span class="text-danger">*</span></label>
                                 <select class="form-select @error('currency_position') is-invalid @enderror" id="currency_position" name="currency_position" required>
-                                    <option value="left" {{ $settings->currency_position == 'left' ? 'selected' : '' }}>Left (Rs.1,500)</option>
-                                    <option value="right" {{ $settings->currency_position == 'right' ? 'selected' : '' }}>Right (1,500Rs.)</option>
+                                    <option value="">-- Select Position --</option>
+                                    @foreach(get_currency_positions() as $posValue => $posLabel)
+                                        <option value="{{ $posValue }}"
+                                                {{ old('currency_position', $settings->currency_position) == $posValue ? 'selected' : '' }}>
+                                            {{ $posLabel }}
+                                        </option>
+                                    @endforeach
                                 </select>
                                 @error('currency_position')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
-                            <div class="col-md-4 mb-3">
-                                <label for="decimal_places" class="form-label">Decimal Places <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control @error('decimal_places') is-invalid @enderror"
-                                       id="decimal_places" name="decimal_places" value="{{ old('decimal_places', $settings->decimal_places) }}" min="0" max="4" required>
+                            <div class="col-md-6 mb-3">
+                                <label for="decimal_places" class="form-label">
+                                    Decimal Places <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select @error('decimal_places') is-invalid @enderror"
+                                        id="decimal_places" name="decimal_places" required>
+                                    <option value="0" {{ old('decimal_places', $settings->decimal_places) == 0 ? 'selected' : '' }}>0 (100)</option>
+                                    <option value="1" {{ old('decimal_places', $settings->decimal_places) == 1 ? 'selected' : '' }}>1 (100.0)</option>
+                                    <option value="2" {{ old('decimal_places', $settings->decimal_places) == 2 ? 'selected' : '' }}>2 (100.00)</option>
+                                    <option value="3" {{ old('decimal_places', $settings->decimal_places) == 3 ? 'selected' : '' }}>3 (100.000)</option>
+                                    <option value="4" {{ old('decimal_places', $settings->decimal_places) == 4 ? 'selected' : '' }}>4 (100.0000)</option>
+                                </select>
+                                <small class="text-muted">Number of decimal places for prices</small>
                                 @error('decimal_places')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                    <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
-                            <div class="col-md-4 mb-3">
-                                <label for="thousand_separator" class="form-label">Thousand Separator <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('thousand_separator') is-invalid @enderror"
-                                       id="thousand_separator" name="thousand_separator" value="{{ old('thousand_separator', $settings->thousand_separator) }}" maxlength="1" required>
+                            <div class="col-md-6 mb-3">
+                                <label for="thousand_separator" class="form-label">
+                                    Thousand Separator <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select @error('thousand_separator') is-invalid @enderror"
+                                        id="thousand_separator" name="thousand_separator" required>
+                                    @foreach(get_thousand_separators() as $sepValue => $sepLabel)
+                                        <option value="{{ $sepValue }}"
+                                                {{ old('thousand_separator', $settings->thousand_separator) == $sepValue ? 'selected' : '' }}>
+                                            {{ $sepLabel }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <small class="text-muted">Separator for thousands</small>
                                 @error('thousand_separator')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                    <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
@@ -997,7 +1037,82 @@
     border-radius: 8px;
 }
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const currencySelect = document.getElementById('currency_code');
+    const symbolInput = document.getElementById('currency_symbol');
+    const positionSelect = document.getElementById('currency_position');
+    const decimalPlaces = document.getElementById('decimal_places');
+    const thousandSep = document.getElementById('thousand_separator');
+    const decimalSep = document.getElementById('decimal_separator');
+    const pricePreview = document.getElementById('price-preview');
 
+    // Update currency symbol when currency code changes
+    if (currencySelect && symbolInput) {
+        currencySelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const symbol = selectedOption.getAttribute('data-symbol');
+            if (symbol) {
+                symbolInput.value = symbol;
+                updatePreview();
+            }
+        });
+    }
+
+    // Update preview when any format setting changes
+    [positionSelect, decimalPlaces, thousandSep, decimalSep].forEach(element => {
+        if (element) {
+            element.addEventListener('change', updatePreview);
+        }
+    });
+
+    function updatePreview() {
+        const symbol = symbolInput.value || '$';
+        const position = positionSelect.value || 'left';
+        const decimals = parseInt(decimalPlaces.value) || 2;
+        const thousand = thousandSep.value || ',';
+        const decimal = decimalSep.value || '.';
+
+        // Format number 1234.56
+        let amount = 1234.56;
+        let formatted = amount.toFixed(decimals);
+
+        // Split into integer and decimal parts
+        let parts = formatted.split('.');
+
+        // Add thousand separator
+        if (thousand !== '') {
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, thousand);
+        }
+
+        // Join with decimal separator
+        formatted = parts.join(decimal);
+
+        // Apply currency position
+        let result = '';
+        switch(position) {
+            case 'left':
+                result = symbol + formatted;
+                break;
+            case 'right':
+                result = formatted + symbol;
+                break;
+            case 'left_space':
+                result = symbol + ' ' + formatted;
+                break;
+            case 'right_space':
+                result = formatted + ' ' + symbol;
+                break;
+            default:
+                result = symbol + formatted;
+        }
+
+        if (pricePreview) {
+            pricePreview.textContent = result;
+        }
+    }
+});
+</script>
 <script>
 // Auto-dismiss alerts after 5 seconds
 setTimeout(function() {
@@ -1019,4 +1134,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 @endif
 </script>
+
 @endsection

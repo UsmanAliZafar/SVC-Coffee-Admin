@@ -29,7 +29,8 @@
         },
         "files": [
             "app/Helpers/CommenHelpers.php",
-            "app/Helpers/SystemStatusesHelper.php"
+            "app/Helpers/SystemStatusesHelper.php",
+            "app/Helpers/StoreSettingsHelper.php"
         ]
     },
     "autoload-dev": {

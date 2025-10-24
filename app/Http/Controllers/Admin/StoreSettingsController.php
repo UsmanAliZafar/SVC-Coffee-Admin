@@ -7,6 +7,7 @@ use App\Models\StoreSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class StoreSettingsController extends Controller
 {
@@ -191,14 +192,20 @@ class StoreSettingsController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'order_prefix' => 'required|string|max:10',
+            'order_prefix' => 'required|string|max:12',
             'order_number_start' => 'required|integer|min:1',
             'order_number_length' => 'required|integer|min:4|max:10',
-            'order_auto_confirm' => 'boolean',
-            'order_notification_email' => 'boolean',
+            'order_auto_confirm' =>'sometimes|accepted',
+            'order_notification_email' => 'sometimes|accepted',
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Validation failed while submitting order section.', [
+                'errors' => $validator->errors()->toArray(),
+                'input' => request()->all(),
+                'user_id' => auth()->id() ?? 'guest',
+                'section' => 'order'
+            ]);
             return redirect()->back()
                            ->withErrors($validator)
                            ->withInput()

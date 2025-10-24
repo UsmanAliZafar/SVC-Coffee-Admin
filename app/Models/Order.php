@@ -257,11 +257,11 @@ class Order extends Model
      */
     public static function generateOrderNumber(): string
     {
-        do {
-            $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(Str::random(6));
-        } while (static::where('order_number', $orderNumber)->exists());
+        // do {
+        //     $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(Str::random(6));
+        // } while (static::where('order_number', $orderNumber)->exists());
 
-        return $orderNumber;
+        return generate_order_number();;
     }
 
     /**

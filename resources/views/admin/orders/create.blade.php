@@ -878,7 +878,7 @@ $(document).ready(function() {
             }
         });
     });
-    let currentCurrency = '$';
+    let currentCurrency = '{{ store_currency_symbol() }}';
     $('#currency').on('change', function() {
         const selected = $(this).find('option:selected').text();
         currentCurrency = selected.match(/\(([^)]+)\)/)[1]; // Extract symbol from parentheses
