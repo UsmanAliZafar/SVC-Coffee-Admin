@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
  *
  * Usage: Add to Product model: use InventoryManager;
  */
+
 trait InventoryManager
 {
     /**
