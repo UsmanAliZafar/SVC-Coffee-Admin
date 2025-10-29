@@ -6,19 +6,14 @@ namespace App\Http\Controllers\Api;
  * @OA\Info(
  *     version="1.0.0",
  *     title="SVC Ecommerce API",
- *     description="API documentation for Coffee Ecommerce Platform",
+ *     description="API documentation for SVC Coffee Ecommerce Platform",
  *     @OA\Contact(
- *         email="support@coffeeecommerce.com"
+ *         email="usman@workforcecommerce.com"
  *     )
  * )
  *
  * @OA\Server(
  *     url="https://svc-dev-dashboard.wfcservers.site",
- *     description="Production Server"
- * )
- *
- * @OA\Server(
- *     url="http://localhost:8000",
  *     description="Local Development Server"
  * )
  *
@@ -41,15 +36,12 @@ namespace App\Http\Controllers\Api;
  * )
  *
  * @OA\Tag(
- *     name="Category Products",
- *     description="Category product operations"
- * )
- *
- * @OA\Tag(
  *     name="Products",
  *     description="Product management"
  * )
  */
+
+
 class SwaggerAnnotations
 {
     // This class is just for Swagger annotations
