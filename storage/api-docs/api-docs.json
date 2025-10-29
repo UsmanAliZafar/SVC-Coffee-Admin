@@ -2,9 +2,9 @@
     "openapi": "3.0.0",
     "info": {
         "title": "SVC Ecommerce API",
-        "description": "API documentation for Coffee Ecommerce Platform",
+        "description": "API documentation for SVC Coffee Ecommerce Platform",
         "contact": {
-            "email": "support@coffeeecommerce.com"
+            "email": "usman@workforcecommerce.com"
         },
         "version": "1.0.0"
     },
