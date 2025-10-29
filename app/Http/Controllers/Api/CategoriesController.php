@@ -138,12 +138,6 @@ class CategoriesController extends Controller
         }
     }
 
-    /**
-     * Get category by slug
-     *
-     * @param string $slug
-     * @return JsonResponse
-     */
     public function getBySlug(string $slug): JsonResponse
     {
         try {
@@ -859,3 +853,4 @@ class CategoriesController extends Controller
         return $data;
     }
 }
+
