@@ -13,7 +13,7 @@ namespace App\Http\Controllers\Api;
  * )
  *
  * @OA\Server(
- *     url="https://svc-dev-dashboard.wfcservers.site",
+ *     url="http://localhost:8000",
  *     description="Local Development Server"
  * )
  *
