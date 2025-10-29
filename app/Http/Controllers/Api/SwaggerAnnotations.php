@@ -6,9 +6,9 @@ namespace App\Http\Controllers\Api;
  * @OA\Info(
  *     version="1.0.0",
  *     title="SVC Ecommerce API",
- *     description="API documentation for Coffee Ecommerce Platform",
+ *     description="API documentation for SVC Coffee Ecommerce Platform",
  *     @OA\Contact(
- *         email="support@coffeeecommerce.com"
+ *         email="usman@workforcecommerce.com"
  *     )
  * )
  *
