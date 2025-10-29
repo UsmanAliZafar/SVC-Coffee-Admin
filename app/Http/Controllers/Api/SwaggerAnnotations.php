@@ -50,7 +50,6 @@ namespace App\Http\Controllers\Api;
  *     description="Product management"
  * )
  */
-
 class SwaggerAnnotations
 {
     // This class is just for Swagger annotations

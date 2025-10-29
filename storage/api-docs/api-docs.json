@@ -2,13 +2,17 @@
     "openapi": "3.0.0",
     "info": {
         "title": "SVC Ecommerce API",
-        "description": "API documentation for SVC Coffee Ecommerce Platform",
+        "description": "API documentation for Coffee Ecommerce Platform",
         "contact": {
-            "email": "usman@workforcecommerce.com"
+            "email": "support@coffeeecommerce.com"
         },
         "version": "1.0.0"
     },
     "servers": [
+        {
+            "url": "https://svc-dev-dashboard.wfcservers.site",
+            "description": "Production Server"
+        },
         {
             "url": "http://localhost:8000",
             "description": "Local Development Server"
@@ -1015,12 +1019,12 @@
             "description": "Category management"
         },
         {
-            "name": "Products",
-            "description": "Product management"
+            "name": "Category Products",
+            "description": "Category product operations"
         },
         {
-            "name": "Category Products",
-            "description": "Category Products"
+            "name": "Products",
+            "description": "Product management"
         }
     ],
     "security": [
