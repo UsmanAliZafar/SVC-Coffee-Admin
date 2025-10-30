@@ -6,17 +6,26 @@ use App\Http\Controllers\Admin\CouponController;
 
 Route::prefix('coupons')->name('coupons.')->middleware(['auth:admin'])->group(function () {
 
-    // List all coupons with filters
+    // List all coupons (Blade view)
     Route::get('/', [CouponController::class, 'index'])->name('index');
+
+    // DataTable Ajax endpoint
+    Route::get('/data', [CouponController::class, 'getData'])->name('data');
+
+    // Create coupon form
+    Route::get('/create', [CouponController::class, 'create'])->name('create');
+
+    // Store new coupon
+    Route::post('/', [CouponController::class, 'store'])->name('store');
 
     // Generate random coupon code
     Route::get('/generate-code', [CouponController::class, 'generateCode'])->name('generate-code');
 
-    // Get single coupon details
+    // Show coupon details
     Route::get('/{id}', [CouponController::class, 'show'])->name('show');
 
-    // Create new coupon
-    Route::post('/', [CouponController::class, 'store'])->name('store');
+    // Edit coupon form
+    Route::get('/{id}/edit', [CouponController::class, 'edit'])->name('edit');
 
     // Update coupon
     Route::put('/{id}', [CouponController::class, 'update'])->name('update');

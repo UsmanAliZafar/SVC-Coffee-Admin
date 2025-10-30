@@ -175,11 +175,26 @@ class CouponSeeder extends Seeder
             ],
         ];
 
+        $created = 0;
+        $skipped = 0;
+
         foreach ($coupons as $couponData) {
+            // Check if coupon code already exists
+            if (Coupon::where('code', $couponData['code'])->exists()) {
+                $skipped++;
+                $this->command->warn('Skipped: ' . $couponData['code'] . ' (already exists)');
+                continue;
+            }
+
             Coupon::create($couponData);
+            $created++;
+            $this->command->info('Created: ' . $couponData['code']);
         }
 
-        $this->command->info('Sample coupons created successfully!');
-        $this->command->info('Total coupons: ' . count($coupons));
+        $this->command->info('─────────────────────────────────');
+        $this->command->info('Sample coupons seeding completed!');
+        $this->command->info('Created: ' . $created);
+        $this->command->info('Skipped: ' . $skipped);
+        $this->command->info('Total: ' . count($coupons));
     }
 }

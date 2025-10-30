@@ -371,6 +371,111 @@
                 </li>
             @endif
             {{-- End Customers Management --}}
+
+            {{-- Coupons Management --}}
+            @if(auth('admin')->user()->hasPermission('coupons.read'))
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.coupons.*') ? 'open' : '' }}">
+                    <a class="nav-link {{ request()->routeIs('admin.coupons.*') ? 'active' : '' }}"
+                    href="{{ route('admin.coupons.index') }}"
+                    data-tooltip="Coupons">
+                        <i class="bi bi-ticket-perforated"></i>
+                        <span class="nav-text">Coupons</span>
+                        <i class="bi bi-chevron-down dropdown-arrow"></i>
+                    </a>
+                    <ul class="submenu">
+                        {{-- All Coupons --}}
+                        <li>
+                            <a href="{{ route('admin.coupons.index') }}"
+                            class="{{ request()->routeIs('admin.coupons.index') ? 'active' : '' }}">
+                                <i class="bi bi-ticket-perforated"></i> All Coupons
+                            </a>
+                        </li>
+
+                        {{-- Create Coupon --}}
+                        @if(auth('admin')->user()->hasPermission('coupons.create'))
+                        <li>
+                            <a href="{{ route('admin.coupons.create') }}"
+                            class="{{ request()->routeIs('admin.coupons.create') ? 'active' : '' }}">
+                                <i class="bi bi-plus-circle"></i> Create Coupon
+                            </a>
+                        </li>
+                        @endif
+
+                        <li class="submenu-divider"></li>
+
+                        {{-- Coupon Types --}}
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['discount_type' => 'percentage']) }}"
+                            class="{{ request()->get('discount_type') === 'percentage' ? 'active' : '' }}">
+                                <i class="bi bi-percent text-primary"></i> Percentage Discounts
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['discount_type' => 'fixed_amount']) }}"
+                            class="{{ request()->get('discount_type') === 'fixed_amount' ? 'active' : '' }}">
+                                <i class="bi bi-currency-dollar text-success"></i> Fixed Amount
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['discount_type' => 'free_shipping']) }}"
+                            class="{{ request()->get('discount_type') === 'free_shipping' ? 'active' : '' }}">
+                                <i class="bi bi-truck text-info"></i> Free Shipping
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['discount_type' => 'buy_x_get_y']) }}"
+                            class="{{ request()->get('discount_type') === 'buy_x_get_y' ? 'active' : '' }}">
+                                <i class="bi bi-gift text-warning"></i> Buy X Get Y
+                            </a>
+                        </li>
+
+                        <li class="submenu-divider"></li>
+
+                        {{-- Coupon Status --}}
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['status' => 'active']) }}"
+                            class="{{ request()->get('status') === 'active' ? 'active' : '' }}">
+                                <i class="bi bi-check-circle text-success"></i> Active Coupons
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['status' => 'inactive']) }}"
+                            class="{{ request()->get('status') === 'inactive' ? 'active' : '' }}">
+                                <i class="bi bi-x-circle text-secondary"></i> Inactive
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['status' => 'expired']) }}"
+                            class="{{ request()->get('status') === 'expired' ? 'active' : '' }}">
+                                <i class="bi bi-calendar-x text-danger"></i> Expired
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['status' => 'scheduled']) }}"
+                            class="{{ request()->get('status') === 'scheduled' ? 'active' : '' }}">
+                                <i class="bi bi-clock text-info"></i> Scheduled
+                            </a>
+                        </li>
+
+                        <li class="submenu-divider"></li>
+
+                        {{-- Featured Coupons --}}
+                        <li>
+                            <a href="{{ route('admin.coupons.index', ['is_featured' => '1']) }}"
+                            class="{{ request()->get('is_featured') === '1' ? 'active' : '' }}">
+                                <i class="bi bi-star-fill text-warning"></i> Featured Coupons
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            @endif
+            {{-- End Coupons Management --}}
             <li class="section-divider">
                 <span class="section-title">Reports</span>
             </li>
