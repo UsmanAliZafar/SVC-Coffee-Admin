@@ -21,8 +21,10 @@ Route::prefix('cart')->name('cart.')->group(function () {
     // Clear entire cart
     Route::delete('/clear', [CartController::class, 'clear'])->name('clear');
 
-    // Apply coupon code (placeholder - not implemented yet)
+    // Apply coupon code
     Route::post('/coupon', [CartController::class, 'applyCoupon'])->name('apply-coupon');
+    // Remove coupon code
+    Route::delete('/coupon', [CartController::class, 'removeCoupon'])->name('remove-coupon');
 
     // Get cart item count (optional - you may want to add this method)
     // Route::get('/count', [CartController::class, 'getCount'])->name('count');
