@@ -1,19 +1,18 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Product;
 use App\Models\Coupon;
-use App\Models\CouponUsage;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Cache;
 
-class CouponController extends Controller
+class CartController extends Controller
 {
     /**
-     * Get all coupons with pagination and filters
+     * Get cart contents
      *
      * @param Request $request
      * @return JsonResponse
@@ -21,577 +20,611 @@ class CouponController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Coupon::with(['createdBy', 'updatedBy']);
+            $cartId = $request->input('cart_id') ?? $request->header('X-Cart-ID');
 
-            // Search
-            if ($request->has('search')) {
-                $search = $request->search;
-                $query->where(function ($q) use ($search) {
-                    $q->where('code', 'like', "%{$search}%")
-                      ->orWhere('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
-                });
+            if (!$cartId) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Cart is empty',
+                    'data' => [
+                        'items' => [],
+                        'totals' => $this->calculateTotals([]),
+                    ],
+                ]);
             }
 
-            // Filter by status
-            if ($request->has('status')) {
-                switch ($request->status) {
-                    case 'active':
-                        $query->active()->valid();
-                        break;
-                    case 'inactive':
-                        $query->where('is_active', false);
-                        break;
-                    case 'expired':
-                        $query->where('valid_until', '<', now());
-                        break;
-                    case 'scheduled':
-                        $query->where('valid_from', '>', now());
-                        break;
-                }
-            }
+            $cart = Cache::get("cart:{$cartId}", []);
+            $cartMeta = Cache::get("cart_meta:{$cartId}", []);
 
-            // Filter by discount type
-            if ($request->has('discount_type')) {
-                $query->where('discount_type', $request->discount_type);
-            }
+            // Refresh product data and validate stock
+            $cart = $this->refreshCartData($cart);
 
-            // Filter by featured
-            if ($request->has('is_featured')) {
-                $query->where('is_featured', $request->boolean('is_featured'));
-            }
-
-            // Date range filter
-            if ($request->has('date_from')) {
-                $query->whereDate('created_at', '>=', $request->date_from);
-            }
-            if ($request->has('date_to')) {
-                $query->whereDate('created_at', '<=', $request->date_to);
-            }
-
-            // Sorting
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = $request->get('sort_order', 'desc');
-            $query->orderBy($sortBy, $sortOrder);
-
-            // Pagination
-            $perPage = min($request->get('per_page', 20), 100);
-            $coupons = $query->paginate($perPage);
-
-            // Transform data
-            $coupons->getCollection()->transform(function ($coupon) {
-                return $this->transformCoupon($coupon);
-            });
+            $totals = isset($cartMeta['coupon'])
+                ? $this->calculateTotalsWithCoupon($cart, $cartMeta)
+                : $this->calculateTotals($cart);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Coupons retrieved successfully',
-                'data' => $coupons->items(),
-                'pagination' => [
-                    'total' => $coupons->total(),
-                    'per_page' => $coupons->perPage(),
-                    'current_page' => $coupons->currentPage(),
-                    'last_page' => $coupons->lastPage(),
+                'message' => 'Cart retrieved successfully',
+                'data' => [
+                    'cart_id' => $cartId,
+                    'items' => $cart,
+                    'coupon' => $cartMeta['coupon'] ?? null,
+                    'totals' => $totals,
                 ],
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve coupons',
+                'message' => 'Failed to retrieve cart',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Get single coupon details
-     *
-     * @param string $id
-     * @return JsonResponse
-     */
-    public function show(string $id): JsonResponse
-    {
-        try {
-            $coupon = Coupon::with(['createdBy', 'updatedBy', 'usages'])
-                ->findOrFail($id);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Coupon retrieved successfully',
-                'data' => $this->transformCoupon($coupon, true),
-            ]);
-
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Coupon not found',
-            ], 404);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve coupon',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Create new coupon
+     * Add item to cart
      *
      * @param Request $request
      * @return JsonResponse
      */
-    public function store(Request $request): JsonResponse
+    public function addItem(Request $request): JsonResponse
     {
         try {
             $validated = $request->validate([
-                'code' => [
-                    'required',
-                    'string',
-                    'max:50',
-                    'regex:/^[A-Z0-9_-]+$/',
-                    Rule::unique('coupons')->whereNull('deleted_at')
-                ],
-                'name' => 'required|string|max:255',
-                'description' => 'nullable|string|max:1000',
-                'discount_type' => 'required|in:percentage,fixed_amount,free_shipping,buy_x_get_y',
-                'discount_value' => 'required_unless:discount_type,free_shipping|numeric|min:0',
-                'max_discount_amount' => 'nullable|numeric|min:0',
-                'min_purchase_amount' => 'nullable|numeric|min:0',
-                'min_items_count' => 'nullable|integer|min:0',
-                'usage_limit_total' => 'nullable|integer|min:1',
-                'usage_limit_per_customer' => 'required|integer|min:1',
-                'valid_from' => 'nullable|date',
-                'valid_until' => 'nullable|date|after:valid_from',
-                'applies_to_sale_items' => 'boolean',
-                'first_order_only' => 'boolean',
-                'applicable_product_ids' => 'nullable|array',
-                'applicable_product_ids.*' => 'uuid|exists:products,id',
-                'applicable_category_ids' => 'nullable|array',
-                'applicable_category_ids.*' => 'uuid|exists:categories,id',
-                'excluded_product_ids' => 'nullable|array',
-                'excluded_product_ids.*' => 'uuid|exists:products,id',
-                'excluded_category_ids' => 'nullable|array',
-                'excluded_category_ids.*' => 'uuid|exists:categories,id',
-                'buy_quantity' => 'required_if:discount_type,buy_x_get_y|nullable|integer|min:1',
-                'get_quantity' => 'required_if:discount_type,buy_x_get_y|nullable|integer|min:1',
-                'buy_product_id' => 'required_if:discount_type,buy_x_get_y|nullable|uuid|exists:products,id',
-                'get_product_id' => 'required_if:discount_type,buy_x_get_y|nullable|uuid|exists:products,id',
-                'applicable_customer_ids' => 'nullable|array',
-                'applicable_customer_ids.*' => 'uuid|exists:customers,id',
-                'applicable_customer_groups' => 'nullable|array',
-                'is_active' => 'boolean',
-                'is_featured' => 'boolean',
-                'admin_notes' => 'nullable|string|max:2000',
+                'cart_id' => 'nullable|string',
+                'product_id' => 'required|uuid|exists:products,id',
+                'quantity' => 'required|integer|min:1',
+                'variant_id' => 'nullable|uuid|exists:product_variants,id',
             ]);
 
-            // Additional validation for percentage discount
-            if ($validated['discount_type'] === 'percentage' && $validated['discount_value'] > 100) {
+            $cartId = $validated['cart_id'] ?? \Str::uuid();
+            $cart = Cache::get("cart:{$cartId}", []);
+            $cartMeta = Cache::get("cart_meta:{$cartId}", []);
+
+            $product = Product::with(['images'])->findOrFail($validated['product_id']);
+
+            // Check stock availability
+            if ($product->track_inventory && $product->stock_quantity < $validated['quantity']) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Percentage discount cannot exceed 100%',
-                ], 422);
-            }
-
-            DB::beginTransaction();
-
-            $validated['created_by'] = auth()->id(); // Assuming admin authentication
-            $coupon = Coupon::create($validated);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Coupon created successfully',
-                'data' => $this->transformCoupon($coupon),
-            ], 201);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $e->errors(),
-            ], 422);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create coupon',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Update coupon
-     *
-     * @param Request $request
-     * @param string $id
-     * @return JsonResponse
-     */
-    public function update(Request $request, string $id): JsonResponse
-    {
-        try {
-            $coupon = Coupon::findOrFail($id);
-
-            $validated = $request->validate([
-                'code' => [
-                    'sometimes',
-                    'required',
-                    'string',
-                    'max:50',
-                    'regex:/^[A-Z0-9_-]+$/',
-                    Rule::unique('coupons')->ignore($id)->whereNull('deleted_at')
-                ],
-                'name' => 'sometimes|required|string|max:255',
-                'description' => 'nullable|string|max:1000',
-                'discount_type' => 'sometimes|required|in:percentage,fixed_amount,free_shipping,buy_x_get_y',
-                'discount_value' => 'sometimes|required_unless:discount_type,free_shipping|numeric|min:0',
-                'max_discount_amount' => 'nullable|numeric|min:0',
-                'min_purchase_amount' => 'nullable|numeric|min:0',
-                'min_items_count' => 'nullable|integer|min:0',
-                'usage_limit_total' => 'nullable|integer|min:1',
-                'usage_limit_per_customer' => 'sometimes|required|integer|min:1',
-                'valid_from' => 'nullable|date',
-                'valid_until' => 'nullable|date|after:valid_from',
-                'applies_to_sale_items' => 'boolean',
-                'first_order_only' => 'boolean',
-                'applicable_product_ids' => 'nullable|array',
-                'applicable_category_ids' => 'nullable|array',
-                'excluded_product_ids' => 'nullable|array',
-                'excluded_category_ids' => 'nullable|array',
-                'buy_quantity' => 'nullable|integer|min:1',
-                'get_quantity' => 'nullable|integer|min:1',
-                'buy_product_id' => 'nullable|uuid|exists:products,id',
-                'get_product_id' => 'nullable|uuid|exists:products,id',
-                'applicable_customer_ids' => 'nullable|array',
-                'applicable_customer_groups' => 'nullable|array',
-                'is_active' => 'boolean',
-                'is_featured' => 'boolean',
-                'admin_notes' => 'nullable|string|max:2000',
-            ]);
-
-            DB::beginTransaction();
-
-            $validated['updated_by'] = auth()->id();
-            $coupon->update($validated);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Coupon updated successfully',
-                'data' => $this->transformCoupon($coupon->fresh()),
-            ]);
-
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Coupon not found',
-            ], 404);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $e->errors(),
-            ], 422);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update coupon',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Delete coupon (soft delete)
-     *
-     * @param string $id
-     * @return JsonResponse
-     */
-    public function destroy(string $id): JsonResponse
-    {
-        try {
-            $coupon = Coupon::findOrFail($id);
-
-            // Check if coupon has been used
-            $usageCount = $coupon->usages()->count();
-
-            if ($usageCount > 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Cannot delete coupon that has been used {$usageCount} time(s). Consider deactivating it instead.",
+                    'message' => 'Insufficient stock available',
+                    'available_quantity' => $product->stock_quantity,
                 ], 400);
             }
 
-            $coupon->delete();
+            // Check if product already in cart
+            $itemKey = $validated['product_id'] . ($validated['variant_id'] ?? '');
+
+            if (isset($cart[$itemKey])) {
+                $cart[$itemKey]['quantity'] += $validated['quantity'];
+            } else {
+                $cart[$itemKey] = [
+                    'product_id' => $product->id,
+                    'variant_id' => $validated['variant_id'] ?? null,
+                    'name' => $product->name,
+                    'slug' => $product->slug,
+                    'sku' => $product->sku,
+                    'image' => $product->getMainImageUrl(),
+                    'price' => $product->getFinalPrice(),
+                    'regular_price' => (float) $product->price,
+                    'quantity' => $validated['quantity'],
+                    'is_taxable' => $product->is_taxable,
+                    'tax_rate' => $product->tax_percentage ?? 0,
+                    'max_quantity' => $product->track_inventory ? $product->stock_quantity : 999,
+                    'added_at' => now()->toIso8601String(),
+                ];
+            }
+
+            // Save cart (expires in 7 days)
+            Cache::put("cart:{$cartId}", $cart, now()->addDays(7));
+
+            // Recalculate totals
+            $totals = isset($cartMeta['coupon'])
+                ? $this->calculateTotalsWithCoupon($cart, $cartMeta)
+                : $this->calculateTotals($cart);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Coupon deleted successfully',
-            ]);
-
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Coupon not found',
-            ], 404);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete coupon',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Toggle coupon active status
-     *
-     * @param string $id
-     * @return JsonResponse
-     */
-    public function toggleStatus(string $id): JsonResponse
-    {
-        try {
-            $coupon = Coupon::findOrFail($id);
-            $coupon->is_active = !$coupon->is_active;
-            $coupon->updated_by = auth()->id();
-            $coupon->save();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Coupon status updated successfully',
+                'message' => 'Item added to cart',
                 'data' => [
-                    'is_active' => $coupon->is_active,
-                    'status_label' => $coupon->getStatusLabel(),
+                    'cart_id' => $cartId,
+                    'items' => $cart,
+                    'coupon' => $cartMeta['coupon'] ?? null,
+                    'totals' => $totals,
                 ],
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update coupon status',
+                'message' => 'Failed to add item to cart',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Get coupon usage statistics
-     *
-     * @param string $id
-     * @return JsonResponse
-     */
-    public function statistics(string $id): JsonResponse
-    {
-        try {
-            $coupon = Coupon::findOrFail($id);
-
-            $stats = [
-                'total_uses' => $coupon->total_used,
-                'remaining_uses' => $coupon->getRemainingUses(),
-                'total_discount_given' => CouponUsage::where('coupon_id', $id)
-                    ->sum('discount_amount'),
-                'total_orders' => $coupon->usages()->count(),
-                'unique_customers' => $coupon->usages()
-                    ->distinct('customer_id')
-                    ->count('customer_id'),
-                'average_order_value' => $coupon->usages()->avg('order_total'),
-                'usage_by_day' => $this->getUsageByDay($id),
-                'recent_usage' => $this->getRecentUsage($id, 10),
-            ];
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Coupon statistics retrieved successfully',
-                'data' => $stats,
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve statistics',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Generate random coupon code
+     * Update cart item quantity
      *
      * @param Request $request
      * @return JsonResponse
      */
-    public function generateCode(Request $request): JsonResponse
-    {
-        try {
-            $length = $request->input('length', 8);
-            $length = min(max($length, 6), 20); // Between 6 and 20
-
-            $code = Coupon::generateUniqueCode($length);
-
-            return response()->json([
-                'success' => true,
-                'data' => ['code' => $code],
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to generate code',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Bulk activate/deactivate coupons
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function bulkUpdateStatus(Request $request): JsonResponse
+    public function updateItem(Request $request): JsonResponse
     {
         try {
             $validated = $request->validate([
-                'coupon_ids' => 'required|array',
-                'coupon_ids.*' => 'uuid|exists:coupons,id',
-                'is_active' => 'required|boolean',
+                'cart_id' => 'required|string',
+                'product_id' => 'required|uuid',
+                'variant_id' => 'nullable|uuid',
+                'quantity' => 'required|integer|min:0',
             ]);
 
-            $updated = Coupon::whereIn('id', $validated['coupon_ids'])
-                ->update([
-                    'is_active' => $validated['is_active'],
-                    'updated_by' => auth()->id(),
-                    'updated_at' => now(),
-                ]);
+            $cart = Cache::get("cart:{$validated['cart_id']}", []);
+            $cartMeta = Cache::get("cart_meta:{$validated['cart_id']}", []);
+            $itemKey = $validated['product_id'] . ($validated['variant_id'] ?? '');
+
+            if (!isset($cart[$itemKey])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Item not found in cart',
+                ], 404);
+            }
+
+            if ($validated['quantity'] === 0) {
+                // Remove item if quantity is 0
+                unset($cart[$itemKey]);
+            } else {
+                // Check stock
+                $product = Product::find($validated['product_id']);
+                if ($product->track_inventory && $product->stock_quantity < $validated['quantity']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Insufficient stock available',
+                        'available_quantity' => $product->stock_quantity,
+                    ], 400);
+                }
+
+                $cart[$itemKey]['quantity'] = $validated['quantity'];
+            }
+
+            Cache::put("cart:{$validated['cart_id']}", $cart, now()->addDays(7));
+
+            // Revalidate coupon if exists
+            if (isset($cartMeta['coupon'])) {
+                $cartMeta = $this->revalidateCoupon($cart, $cartMeta, $validated['cart_id']);
+            }
+
+            $totals = isset($cartMeta['coupon'])
+                ? $this->calculateTotalsWithCoupon($cart, $cartMeta)
+                : $this->calculateTotals($cart);
 
             return response()->json([
                 'success' => true,
-                'message' => "{$updated} coupon(s) updated successfully",
+                'message' => 'Cart updated successfully',
+                'data' => [
+                    'cart_id' => $validated['cart_id'],
+                    'items' => $cart,
+                    'coupon' => $cartMeta['coupon'] ?? null,
+                    'totals' => $totals,
+                ],
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update coupons',
+                'message' => 'Failed to update cart',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Transform coupon data for API response
+     * Remove item from cart
      *
-     * @param Coupon $coupon
-     * @param bool $detailed
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function removeItem(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'cart_id' => 'required|string',
+                'product_id' => 'required|uuid',
+                'variant_id' => 'nullable|uuid',
+            ]);
+
+            $cart = Cache::get("cart:{$validated['cart_id']}", []);
+            $cartMeta = Cache::get("cart_meta:{$validated['cart_id']}", []);
+            $itemKey = $validated['product_id'] . ($validated['variant_id'] ?? '');
+
+            if (!isset($cart[$itemKey])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Item not found in cart',
+                ], 404);
+            }
+
+            unset($cart[$itemKey]);
+            Cache::put("cart:{$validated['cart_id']}", $cart, now()->addDays(7));
+
+            // Revalidate coupon if exists
+            if (isset($cartMeta['coupon'])) {
+                $cartMeta = $this->revalidateCoupon($cart, $cartMeta, $validated['cart_id']);
+            }
+
+            $totals = isset($cartMeta['coupon'])
+                ? $this->calculateTotalsWithCoupon($cart, $cartMeta)
+                : $this->calculateTotals($cart);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Item removed from cart',
+                'data' => [
+                    'cart_id' => $validated['cart_id'],
+                    'items' => $cart,
+                    'coupon' => $cartMeta['coupon'] ?? null,
+                    'totals' => $totals,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove item',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Clear cart
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function clear(Request $request): JsonResponse
+    {
+        try {
+            $cartId = $request->input('cart_id');
+
+            if ($cartId) {
+                Cache::forget("cart:{$cartId}");
+                Cache::forget("cart_meta:{$cartId}");
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cart cleared successfully',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear cart',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Apply coupon code
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function applyCoupon(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'cart_id' => 'required|string',
+                'coupon_code' => 'required|string|max:50',
+                'customer_id' => 'nullable|uuid',
+                'customer_email' => 'nullable|email',
+            ]);
+
+            $cart = Cache::get("cart:{$validated['cart_id']}", []);
+
+            if (empty($cart)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cart is empty',
+                ], 400);
+            }
+
+            // Find the coupon
+            $coupon = Coupon::byCode($validated['coupon_code'])
+                ->active()
+                ->valid()
+                ->first();
+
+            if (!$coupon) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid or expired coupon code',
+                ], 404);
+            }
+
+            // Validate coupon basic validity
+            if (!$coupon->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This coupon is no longer valid',
+                ], 400);
+            }
+
+            // Check customer eligibility
+            $customerCheck = $coupon->canBeUsedByCustomer(
+                $validated['customer_id'] ?? null,
+                $validated['customer_email'] ?? null
+            );
+
+            if (!$customerCheck['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $customerCheck['message'],
+                ], 400);
+            }
+
+            // Calculate cart totals
+            $cartTotals = $this->calculateTotals($cart);
+
+            // Check cart applicability
+            $cartCheck = $coupon->isApplicableToCart(
+                $cart,
+                $cartTotals['subtotal'],
+                $cartTotals['total_items']
+            );
+
+            if (!$cartCheck['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $cartCheck['message'],
+                ], 400);
+            }
+
+            // Calculate discount
+            $discountDetails = $coupon->calculateDiscount($cart, $cartTotals['subtotal']);
+
+            // Store coupon in cart
+            $cartData = Cache::get("cart:{$validated['cart_id']}", []);
+            $cartMeta = Cache::get("cart_meta:{$validated['cart_id']}", []);
+
+            $cartMeta['coupon'] = [
+                'id' => $coupon->id,
+                'code' => $coupon->code,
+                'name' => $coupon->name,
+                'discount_type' => $coupon->discount_type,
+                'discount_amount' => $discountDetails['discount_amount'],
+                'free_shipping' => $discountDetails['free_shipping'],
+                'applied_at' => now()->toIso8601String(),
+            ];
+
+            Cache::put("cart_meta:{$validated['cart_id']}", $cartMeta, now()->addDays(7));
+
+            // Recalculate totals with coupon
+            $newTotals = $this->calculateTotalsWithCoupon($cartData, $cartMeta);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Coupon applied successfully!',
+                'data' => [
+                    'cart_id' => $validated['cart_id'],
+                    'coupon' => $cartMeta['coupon'],
+                    'totals' => $newTotals,
+                    'savings' => round($discountDetails['discount_amount'], 2),
+                ],
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $e->errors(),
+            ], 422);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to apply coupon',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove coupon from cart
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function removeCoupon(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'cart_id' => 'required|string',
+            ]);
+
+            $cart = Cache::get("cart:{$validated['cart_id']}", []);
+            $cartMeta = Cache::get("cart_meta:{$validated['cart_id']}", []);
+
+            if (!isset($cartMeta['coupon'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No coupon applied to cart',
+                ], 400);
+            }
+
+            unset($cartMeta['coupon']);
+            Cache::put("cart_meta:{$validated['cart_id']}", $cartMeta, now()->addDays(7));
+
+            $totals = $this->calculateTotals($cart);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Coupon removed successfully',
+                'data' => [
+                    'cart_id' => $validated['cart_id'],
+                    'items' => $cart,
+                    'totals' => $totals,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove coupon',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate cart totals
+     *
+     * @param array $cart
      * @return array
      */
-    private function transformCoupon(Coupon $coupon, bool $detailed = false): array
+    private function calculateTotals(array $cart): array
     {
-        $data = [
-            'id' => $coupon->id,
-            'code' => $coupon->code,
-            'name' => $coupon->name,
-            'description' => $coupon->description,
-            'discount_type' => $coupon->discount_type,
-            'discount_value' => (float) $coupon->discount_value,
-            'formatted_discount' => $coupon->getFormattedDiscountValue(),
-            'is_active' => $coupon->is_active,
-            'is_featured' => $coupon->is_featured,
-            'status_label' => $coupon->getStatusLabel(),
-            'total_used' => $coupon->total_used,
-            'remaining_uses' => $coupon->getRemainingUses(),
-            'valid_from' => $coupon->valid_from?->toIso8601String(),
-            'valid_until' => $coupon->valid_until?->toIso8601String(),
-            'created_at' => $coupon->created_at->toIso8601String(),
-        ];
+        $subtotal = 0;
+        $taxAmount = 0;
+        $totalItems = 0;
 
-        if ($detailed) {
-            $data = array_merge($data, [
-                'max_discount_amount' => $coupon->max_discount_amount,
-                'min_purchase_amount' => (float) $coupon->min_purchase_amount,
-                'min_items_count' => $coupon->min_items_count,
-                'usage_limit_total' => $coupon->usage_limit_total,
-                'usage_limit_per_customer' => $coupon->usage_limit_per_customer,
-                'applies_to_sale_items' => $coupon->applies_to_sale_items,
-                'first_order_only' => $coupon->first_order_only,
-                'applicable_product_ids' => $coupon->applicable_product_ids,
-                'applicable_category_ids' => $coupon->applicable_category_ids,
-                'excluded_product_ids' => $coupon->excluded_product_ids,
-                'excluded_category_ids' => $coupon->excluded_category_ids,
-                'buy_quantity' => $coupon->buy_quantity,
-                'get_quantity' => $coupon->get_quantity,
-                'buy_product_id' => $coupon->buy_product_id,
-                'get_product_id' => $coupon->get_product_id,
-                'applicable_customer_ids' => $coupon->applicable_customer_ids,
-                'applicable_customer_groups' => $coupon->applicable_customer_groups,
-                'admin_notes' => $coupon->admin_notes,
-                'created_by' => [
-                    'id' => $coupon->createdBy?->id,
-                    'name' => $coupon->createdBy?->name,
-                ],
-                'updated_by' => [
-                    'id' => $coupon->updatedBy?->id,
-                    'name' => $coupon->updatedBy?->name,
-                ],
-                'updated_at' => $coupon->updated_at->toIso8601String(),
-            ]);
+        foreach ($cart as $item) {
+            $itemSubtotal = $item['price'] * $item['quantity'];
+            $subtotal += $itemSubtotal;
+            $totalItems += $item['quantity'];
+
+            if ($item['is_taxable']) {
+                $taxAmount += $itemSubtotal * ($item['tax_rate'] / 100);
+            }
         }
 
-        return $data;
+        $total = $subtotal + $taxAmount;
+
+        return [
+            'subtotal' => round($subtotal, 2),
+            'tax_amount' => round($taxAmount, 2),
+            'shipping_amount' => 0, // Calculate based on shipping method
+            'discount_amount' => 0,
+            'total_amount' => round($total, 2),
+            'total_items' => $totalItems,
+            'currency' => 'USD', // Get from config
+        ];
     }
 
     /**
-     * Get usage statistics by day
+     * Calculate cart totals with coupon applied
      *
-     * @param string $couponId
-     * @param int $days
+     * @param array $cart
+     * @param array $cartMeta
      * @return array
      */
-    private function getUsageByDay(string $couponId, int $days = 30): array
+    private function calculateTotalsWithCoupon(array $cart, array $cartMeta): array
     {
-        return CouponUsage::where('coupon_id', $couponId)
-            ->where('used_at', '>=', now()->subDays($days))
-            ->selectRaw('DATE(used_at) as date, COUNT(*) as count, SUM(discount_amount) as total_discount')
-            ->groupBy('date')
-            ->orderBy('date', 'desc')
-            ->get()
-            ->toArray();
+        $totals = $this->calculateTotals($cart);
+
+        if (isset($cartMeta['coupon'])) {
+            $couponDiscount = $cartMeta['coupon']['discount_amount'];
+            $totals['discount_amount'] = round($couponDiscount, 2);
+
+            // Apply free shipping if applicable
+            if ($cartMeta['coupon']['free_shipping']) {
+                $totals['shipping_amount'] = 0;
+                $totals['free_shipping_applied'] = true;
+            }
+
+            // Recalculate total
+            $totals['total_amount'] = round(
+                $totals['subtotal'] + $totals['tax_amount'] + $totals['shipping_amount'] - $totals['discount_amount'],
+                2
+            );
+
+            // Ensure total doesn't go negative
+            if ($totals['total_amount'] < 0) {
+                $totals['total_amount'] = 0;
+            }
+        }
+
+        return $totals;
     }
 
     /**
-     * Get recent coupon usage
+     * Refresh cart data with latest product info
      *
-     * @param string $couponId
-     * @param int $limit
+     * @param array $cart
      * @return array
      */
-    private function getRecentUsage(string $couponId, int $limit = 10): array
+    private function refreshCartData(array $cart): array
     {
-        return CouponUsage::where('coupon_id', $couponId)
-            ->with(['customer', 'order'])
-            ->orderBy('used_at', 'desc')
-            ->limit($limit)
-            ->get()
-            ->map(function ($usage) {
-                return [
-                    'order_number' => $usage->order->order_number ?? null,
-                    'customer_email' => $usage->customer_email,
-                    'discount_amount' => (float) $usage->discount_amount,
-                    'order_total' => (float) $usage->order_total,
-                    'used_at' => $usage->used_at->toIso8601String(),
-                ];
-            })
-            ->toArray();
+        $productIds = array_column($cart, 'product_id');
+        $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
+        foreach ($cart as $key => &$item) {
+            $product = $products->get($item['product_id']);
+
+            if (!$product || !$product->isAvailableForPurchase()) {
+                // Remove unavailable products
+                unset($cart[$key]);
+                continue;
+            }
+
+            // Update price and stock info
+            $item['price'] = $product->getFinalPrice();
+            $item['regular_price'] = (float) $product->price;
+            $item['max_quantity'] = $product->track_inventory ? $product->stock_quantity : 999;
+            $item['is_in_stock'] = $product->isInStock();
+        }
+
+        return $cart;
+    }
+
+    /**
+     * Revalidate coupon when cart changes
+     *
+     * @param array $cart
+     * @param array $cartMeta
+     * @param string $cartId
+     * @return array
+     */
+    private function revalidateCoupon(array $cart, array $cartMeta, string $cartId): array
+    {
+        if (!isset($cartMeta['coupon'])) {
+            return $cartMeta;
+        }
+
+        $coupon = Coupon::find($cartMeta['coupon']['id']);
+
+        if (!$coupon || !$coupon->isValid()) {
+            // Remove invalid coupon
+            unset($cartMeta['coupon']);
+            Cache::put("cart_meta:{$cartId}", $cartMeta, now()->addDays(7));
+            return $cartMeta;
+        }
+
+        // Recalculate discount
+        $cartTotals = $this->calculateTotals($cart);
+        $cartCheck = $coupon->isApplicableToCart(
+            $cart,
+            $cartTotals['subtotal'],
+            $cartTotals['total_items']
+        );
+
+        if (!$cartCheck['valid']) {
+            // Remove inapplicable coupon
+            unset($cartMeta['coupon']);
+            Cache::put("cart_meta:{$cartId}", $cartMeta, now()->addDays(7));
+            return $cartMeta;
+        }
+
+        // Update discount amount
+        $discountDetails = $coupon->calculateDiscount($cart, $cartTotals['subtotal']);
+        $cartMeta['coupon']['discount_amount'] = $discountDetails['discount_amount'];
+
+        Cache::put("cart_meta:{$cartId}", $cartMeta, now()->addDays(7));
+
+        return $cartMeta;
     }
 }
