@@ -63,3 +63,6 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 
 ## Swager
 php artisan l5-swagger:generate
+
+## Possible URL 
+http://127.0.0.1:8000/api/documentation

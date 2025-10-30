@@ -2,20 +2,29 @@
     "openapi": "3.0.0",
     "info": {
         "title": "SVC Ecommerce API",
-        "description": "API documentation for Coffee Ecommerce Platform",
+        "description": "API documentation for SVC Coffee Ecommerce Platform - Complete e-commerce solution with cart, checkout, and order management",
         "contact": {
-            "email": "support@coffeeecommerce.com"
+            "name": "SVC Development Team",
+            "email": "usman@workforcecommerce.com"
+        },
+        "license": {
+            "name": "Proprietary",
+            "url": "https://workforcecommerce.com/license"
         },
         "version": "1.0.0"
     },
     "servers": [
         {
-            "url": "https://svc-dev-dashboard.wfcservers.site",
-            "description": "Production Server"
-        },
-        {
             "url": "http://localhost:8000",
             "description": "Local Development Server"
+        },
+        {
+            "url": "https://staging.workforcecommerce.com",
+            "description": "Staging Server"
+        },
+        {
+            "url": "https://api.workforcecommerce.com",
+            "description": "Production Server"
         }
     ],
     "paths": {
@@ -997,9 +1006,2714 @@
                     }
                 ]
             }
+        },
+        "/api/cart": {
+            "get": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Get cart contents",
+                "description": "Retrieve cart contents with items, totals, and stock validation",
+                "operationId": "getCart",
+                "parameters": [
+                    {
+                        "name": "cart_id",
+                        "in": "query",
+                        "description": "Cart ID (optional, can be passed in header X-Cart-ID)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "abc123xyz"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cart retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "cart_id": {
+                                                    "type": "string",
+                                                    "example": "abc123xyz"
+                                                },
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "product_id": {
+                                                                "type": "string",
+                                                                "format": "uuid"
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Espresso Machine"
+                                                            },
+                                                            "quantity": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "price": {
+                                                                "type": "number",
+                                                                "format": "float",
+                                                                "example": 299.99
+                                                            },
+                                                            "image": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "totals": {
+                                                    "properties": {
+                                                        "subtotal": {
+                                                            "type": "number",
+                                                            "example": 599.98
+                                                        },
+                                                        "tax_amount": {
+                                                            "type": "number",
+                                                            "example": 59.99
+                                                        },
+                                                        "total_amount": {
+                                                            "type": "number",
+                                                            "example": 659.97
+                                                        },
+                                                        "total_items": {
+                                                            "type": "integer",
+                                                            "example": 2
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/cart/items": {
+            "put": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Update cart item quantity",
+                "description": "Update quantity of an item in cart. Set quantity to 0 to remove the item.",
+                "operationId": "updateCartItem",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "cart_id",
+                                    "product_id",
+                                    "quantity"
+                                ],
+                                "properties": {
+                                    "cart_id": {
+                                        "type": "string",
+                                        "example": "abc123xyz"
+                                    },
+                                    "product_id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "variant_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "quantity": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "example": 3
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cart updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cart updated successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Insufficient stock available"
+                    },
+                    "404": {
+                        "description": "Item not found in cart"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Add item to cart",
+                "description": "Add a product to cart. If cart_id is not provided, a new cart will be created.",
+                "operationId": "addItemToCart",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "product_id",
+                                    "quantity"
+                                ],
+                                "properties": {
+                                    "cart_id": {
+                                        "description": "Cart ID (optional for new cart)",
+                                        "type": "string",
+                                        "example": "abc123xyz"
+                                    },
+                                    "product_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "9d4f5678-1234-5678-9abc-def123456789"
+                                    },
+                                    "quantity": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 2
+                                    },
+                                    "variant_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": null,
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Item added successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Item added to cart"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "cart_id": {
+                                                    "type": "string"
+                                                },
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "totals": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Insufficient stock available"
+                    },
+                    "404": {
+                        "description": "Product not found"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Remove item from cart",
+                "description": "Remove a specific item from cart",
+                "operationId": "removeCartItem",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "cart_id",
+                                    "product_id"
+                                ],
+                                "properties": {
+                                    "cart_id": {
+                                        "type": "string",
+                                        "example": "abc123xyz"
+                                    },
+                                    "product_id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "variant_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Item removed successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Item removed from cart"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Item not found in cart"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/cart/clear": {
+            "delete": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Clear cart",
+                "description": "Clear all items from cart",
+                "operationId": "clearCart",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "cart_id"
+                                ],
+                                "properties": {
+                                    "cart_id": {
+                                        "type": "string",
+                                        "example": "abc123xyz"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cart cleared successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cart cleared successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/cart/coupon": {
+            "post": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Apply coupon code",
+                "description": "Apply a coupon code to cart (Not yet implemented - returns 501)",
+                "operationId": "applyCoupon",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "cart_id",
+                                    "coupon_code"
+                                ],
+                                "properties": {
+                                    "cart_id": {
+                                        "type": "string",
+                                        "example": "abc123xyz"
+                                    },
+                                    "coupon_code": {
+                                        "type": "string",
+                                        "example": "SUMMER2025"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "501": {
+                        "description": "Not implemented",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Coupon system not yet implemented"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/checkout/create-order": {
+            "post": {
+                "tags": [
+                    "Checkout"
+                ],
+                "summary": "Create order from cart",
+                "description": "Create a new order from cart. Supports both guest and registered customer checkout.",
+                "operationId": "createOrder",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "cart_id",
+                                    "shipping_first_name",
+                                    "shipping_last_name",
+                                    "shipping_address_line1",
+                                    "shipping_city",
+                                    "shipping_postal_code",
+                                    "shipping_country",
+                                    "shipping_phone",
+                                    "shipping_method",
+                                    "payment_method"
+                                ],
+                                "properties": {
+                                    "cart_id": {
+                                        "type": "string",
+                                        "example": "abc123xyz"
+                                    },
+                                    "customer_id": {
+                                        "description": "Customer UUID (null for guest checkout)",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": null,
+                                        "nullable": true
+                                    },
+                                    "guest_email": {
+                                        "description": "Required if customer_id is null",
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "john.doe@example.com"
+                                    },
+                                    "guest_name": {
+                                        "description": "Required if customer_id is null",
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "guest_phone": {
+                                        "type": "string",
+                                        "example": "+1234567890",
+                                        "nullable": true
+                                    },
+                                    "shipping_first_name": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "example": "John"
+                                    },
+                                    "shipping_last_name": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "example": "Doe"
+                                    },
+                                    "shipping_address_line1": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "123 Main Street"
+                                    },
+                                    "shipping_address_line2": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Apt 4B",
+                                        "nullable": true
+                                    },
+                                    "shipping_city": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "example": "New York"
+                                    },
+                                    "shipping_state": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "example": "NY",
+                                        "nullable": true
+                                    },
+                                    "shipping_postal_code": {
+                                        "type": "string",
+                                        "maxLength": 20,
+                                        "example": "10001"
+                                    },
+                                    "shipping_country": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "example": "United States"
+                                    },
+                                    "shipping_phone": {
+                                        "type": "string",
+                                        "maxLength": 20,
+                                        "example": "+1234567890"
+                                    },
+                                    "billing_same_as_shipping": {
+                                        "type": "boolean",
+                                        "example": true
+                                    },
+                                    "billing_first_name": {
+                                        "description": "Required if billing_same_as_shipping is false",
+                                        "type": "string",
+                                        "example": "John",
+                                        "nullable": true
+                                    },
+                                    "billing_last_name": {
+                                        "type": "string",
+                                        "example": "Doe",
+                                        "nullable": true
+                                    },
+                                    "billing_address_line1": {
+                                        "type": "string",
+                                        "example": "456 Business Ave",
+                                        "nullable": true
+                                    },
+                                    "billing_address_line2": {
+                                        "type": "string",
+                                        "example": "Suite 100",
+                                        "nullable": true
+                                    },
+                                    "billing_city": {
+                                        "type": "string",
+                                        "example": "Los Angeles",
+                                        "nullable": true
+                                    },
+                                    "billing_state": {
+                                        "type": "string",
+                                        "example": "CA",
+                                        "nullable": true
+                                    },
+                                    "billing_postal_code": {
+                                        "type": "string",
+                                        "example": "90001",
+                                        "nullable": true
+                                    },
+                                    "billing_country": {
+                                        "type": "string",
+                                        "example": "United States",
+                                        "nullable": true
+                                    },
+                                    "shipping_method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "standard",
+                                            "express",
+                                            "overnight",
+                                            "free"
+                                        ],
+                                        "example": "standard"
+                                    },
+                                    "payment_method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "credit_card",
+                                            "paypal",
+                                            "stripe",
+                                            "cash_on_delivery"
+                                        ],
+                                        "example": "credit_card"
+                                    },
+                                    "customer_notes": {
+                                        "type": "string",
+                                        "example": "Please ring doorbell",
+                                        "nullable": true
+                                    },
+                                    "coupon_code": {
+                                        "type": "string",
+                                        "example": "SUMMER2025",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Order created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Order created successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "order_id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "order_number": {
+                                                    "type": "string",
+                                                    "example": "ORD-2025-00001"
+                                                },
+                                                "total_amount": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 659.97
+                                                },
+                                                "currency": {
+                                                    "type": "string",
+                                                    "example": "USD"
+                                                },
+                                                "payment_required": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Cart is empty or insufficient stock",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cart is empty"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    },
+                    "500": {
+                        "description": "Failed to create order"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/orders": {
+            "get": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Get customer orders",
+                "description": "Get list of customer's orders with optional filtering and pagination",
+                "operationId": "getCustomerOrders",
+                "parameters": [
+                    {
+                        "name": "customer_id",
+                        "in": "query",
+                        "description": "Customer UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by order status",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ORDER_PENDING",
+                                "ORDER_CONFIRMED",
+                                "ORDER_PROCESSING",
+                                "ORDER_SHIPPED",
+                                "ORDER_DELIVERED",
+                                "ORDER_CANCELLED"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "date_from",
+                        "in": "query",
+                        "description": "Filter from date (Y-m-d)",
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2025-01-01"
+                        }
+                    },
+                    {
+                        "name": "date_to",
+                        "in": "query",
+                        "description": "Filter to date (Y-m-d)",
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2025-12-31"
+                        }
+                    },
+                    {
+                        "name": "sort_by",
+                        "in": "query",
+                        "description": "Sort field",
+                        "schema": {
+                            "type": "string",
+                            "default": "created_at",
+                            "example": "created_at"
+                        }
+                    },
+                    {
+                        "name": "sort_order",
+                        "in": "query",
+                        "description": "Sort order",
+                        "schema": {
+                            "type": "string",
+                            "default": "desc",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Items per page (max 100)",
+                        "schema": {
+                            "type": "integer",
+                            "default": 20,
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Orders retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "order_number": {
+                                                        "type": "string",
+                                                        "example": "ORD-2025-00001"
+                                                    },
+                                                    "status": {
+                                                        "properties": {
+                                                            "code": {
+                                                                "type": "string",
+                                                                "example": "ORDER_CONFIRMED"
+                                                            },
+                                                            "label": {
+                                                                "type": "string",
+                                                                "example": "Confirmed"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "totals": {
+                                                        "properties": {
+                                                            "total_amount": {
+                                                                "type": "number",
+                                                                "example": 659.97
+                                                            },
+                                                            "currency": {
+                                                                "type": "string",
+                                                                "example": "USD"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "items_count": {
+                                                        "type": "integer",
+                                                        "example": 3
+                                                    },
+                                                    "order_date": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 50
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 20
+                                                },
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "timestamp": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Customer ID is required"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{orderNumber}": {
+            "get": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Get order details",
+                "description": "Get detailed information about a specific order",
+                "operationId": "getOrderDetails",
+                "parameters": [
+                    {
+                        "name": "orderNumber",
+                        "in": "path",
+                        "description": "Order number (e.g., ORD-2025-00001)",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "ORD-2025-00001"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Order retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "order_number": {
+                                                    "type": "string",
+                                                    "example": "ORD-2025-00001"
+                                                },
+                                                "status": {
+                                                    "type": "object"
+                                                },
+                                                "payment_status": {
+                                                    "type": "object"
+                                                },
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "product_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "quantity": {
+                                                                "type": "integer"
+                                                            },
+                                                            "unit_price": {
+                                                                "type": "number"
+                                                            },
+                                                            "total": {
+                                                                "type": "number"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "shipping_address": {
+                                                    "type": "object"
+                                                },
+                                                "billing_address": {
+                                                    "type": "object"
+                                                },
+                                                "totals": {
+                                                    "type": "object"
+                                                },
+                                                "dates": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "timestamp": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{orderNumber}/track": {
+            "get": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Track order status",
+                "description": "Track order status with timeline and shipping information",
+                "operationId": "trackOrder",
+                "parameters": [
+                    {
+                        "name": "orderNumber",
+                        "in": "path",
+                        "description": "Order number",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "ORD-2025-00001"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Order tracking retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "order_number": {
+                                                    "type": "string",
+                                                    "example": "ORD-2025-00001"
+                                                },
+                                                "status": {
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string"
+                                                        },
+                                                        "label": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "timeline": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "status": {
+                                                                "type": "string",
+                                                                "example": "Ordered"
+                                                            },
+                                                            "completed": {
+                                                                "type": "boolean",
+                                                                "example": true
+                                                            },
+                                                            "date": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "shipping": {
+                                                    "properties": {
+                                                        "carrier": {
+                                                            "type": "string",
+                                                            "example": "FedEx"
+                                                        },
+                                                        "tracking_number": {
+                                                            "type": "string",
+                                                            "example": "123456789"
+                                                        },
+                                                        "tracking_url": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "estimated_delivery": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{orderNumber}/cancel": {
+            "post": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Cancel order",
+                "description": "Cancel an order and restore stock",
+                "operationId": "cancelOrder",
+                "parameters": [
+                    {
+                        "name": "orderNumber",
+                        "in": "path",
+                        "description": "Order number",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "ORD-2025-00001"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "reason"
+                                ],
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 500,
+                                        "example": "Changed my mind, want to order different products"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Order cancelled successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Order cancelled successfully"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Order cannot be cancelled at this stage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Order cannot be cancelled at this stage"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{orderNumber}/return": {
+            "post": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Request return/refund",
+                "description": "Request return or refund for order items",
+                "operationId": "requestReturn",
+                "parameters": [
+                    {
+                        "name": "orderNumber",
+                        "in": "path",
+                        "description": "Order number",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "ORD-2025-00001"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "items",
+                                    "return_method"
+                                ],
+                                "properties": {
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "item_id": {
+                                                    "description": "Order item UUID",
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "quantity": {
+                                                    "type": "integer",
+                                                    "minimum": 1,
+                                                    "example": 1
+                                                },
+                                                "reason": {
+                                                    "type": "string",
+                                                    "example": "Product damaged during shipping"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "return_method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "refund",
+                                            "replacement"
+                                        ],
+                                        "example": "refund"
+                                    },
+                                    "additional_notes": {
+                                        "type": "string",
+                                        "maxLength": 1000,
+                                        "example": "Please process refund to original payment method",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Return request submitted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Return request submitted successfully. Our team will review and contact you soon."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Order is not eligible for return/refund",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Order is not eligible for return/refund"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
         }
     },
     "components": {
+        "schemas": {
+            "Pagination": {
+                "title": "Pagination",
+                "description": "Standard pagination object",
+                "properties": {
+                    "total": {
+                        "description": "Total number of items",
+                        "type": "integer",
+                        "example": 100
+                    },
+                    "per_page": {
+                        "description": "Items per page",
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "current_page": {
+                        "description": "Current page number",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "last_page": {
+                        "description": "Last page number",
+                        "type": "integer",
+                        "example": 5
+                    },
+                    "from": {
+                        "description": "First item on current page",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "to": {
+                        "description": "Last item on current page",
+                        "type": "integer",
+                        "example": 20
+                    }
+                },
+                "type": "object"
+            },
+            "Category": {
+                "title": "Category",
+                "description": "Product category object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9d4f5678-1234-5678-9abc-def123456789"
+                    },
+                    "parent_id": {
+                        "description": "Parent category ID for subcategories",
+                        "type": "string",
+                        "format": "uuid",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "title": {
+                        "description": "Category name",
+                        "type": "string",
+                        "example": "Coffee Machines"
+                    },
+                    "slug": {
+                        "description": "URL-friendly slug",
+                        "type": "string",
+                        "example": "coffee-machines"
+                    },
+                    "description": {
+                        "description": "Category description",
+                        "type": "string",
+                        "example": "Professional coffee machines for home and office"
+                    },
+                    "short_description": {
+                        "description": "Short description",
+                        "type": "string",
+                        "example": "Best coffee machines",
+                        "nullable": true
+                    },
+                    "image": {
+                        "description": "Category image URL",
+                        "type": "string",
+                        "example": "https://example.com/storage/categories/coffee-machines.jpg",
+                        "nullable": true
+                    },
+                    "icon": {
+                        "description": "Icon class",
+                        "type": "string",
+                        "example": "bi-cup-hot",
+                        "nullable": true
+                    },
+                    "is_featured": {
+                        "description": "Featured on homepage",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "show_in_menu": {
+                        "description": "Show in navigation menu",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "show_on_home": {
+                        "description": "Show on homepage",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "is_active": {
+                        "description": "Active status",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "sort_order": {
+                        "description": "Display order",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "products_count": {
+                        "description": "Number of products in category",
+                        "type": "integer",
+                        "example": 45
+                    },
+                    "children_count": {
+                        "description": "Number of subcategories",
+                        "type": "integer",
+                        "example": 5
+                    },
+                    "level": {
+                        "description": "Nesting level (0 = root)",
+                        "type": "integer",
+                        "example": 0
+                    },
+                    "seo": {
+                        "$ref": "#/components/schemas/SEO"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "CategoryTree": {
+                "title": "Category Tree",
+                "description": "Hierarchical category structure",
+                "type": "object",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Category"
+                    },
+                    {
+                        "properties": {
+                            "children": {
+                                "description": "Child categories",
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/CategoryTree"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "CategorySummary": {
+                "title": "Category Summary",
+                "description": "Simplified category object for listings",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Coffee Machines"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "coffee-machines"
+                    },
+                    "image": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "products_count": {
+                        "type": "integer",
+                        "example": 45
+                    }
+                },
+                "type": "object"
+            },
+            "Product": {
+                "title": "Product",
+                "description": "Complete product object with all details",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9d4f5678-1234-5678-9abc-def123456789"
+                    },
+                    "category_id": {
+                        "description": "Primary category ID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "description": "Product name",
+                        "type": "string",
+                        "example": "Professional Espresso Machine"
+                    },
+                    "slug": {
+                        "description": "URL-friendly slug",
+                        "type": "string",
+                        "example": "professional-espresso-machine"
+                    },
+                    "sku": {
+                        "description": "Stock Keeping Unit",
+                        "type": "string",
+                        "example": "PRD-ESP-001"
+                    },
+                    "barcode": {
+                        "description": "Product barcode",
+                        "type": "string",
+                        "example": "1234567890123",
+                        "nullable": true
+                    },
+                    "short_description": {
+                        "description": "Brief description",
+                        "type": "string",
+                        "example": "High-quality espresso machine",
+                        "nullable": true
+                    },
+                    "description": {
+                        "description": "Full HTML description",
+                        "type": "string",
+                        "example": "Full product description with features...",
+                        "nullable": true
+                    },
+                    "price": {
+                        "description": "Regular price",
+                        "type": "number",
+                        "format": "float",
+                        "example": 299.99
+                    },
+                    "sale_price": {
+                        "description": "Sale price if on sale",
+                        "type": "number",
+                        "format": "float",
+                        "example": 249.99,
+                        "nullable": true
+                    },
+                    "cost_price": {
+                        "description": "Cost price",
+                        "type": "number",
+                        "format": "float",
+                        "example": 150,
+                        "nullable": true
+                    },
+                    "compare_at_price": {
+                        "description": "Compare at price",
+                        "type": "number",
+                        "format": "float",
+                        "example": 349.99,
+                        "nullable": true
+                    },
+                    "is_on_sale": {
+                        "description": "Currently on sale",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "discount_percentage": {
+                        "description": "Discount percentage",
+                        "type": "number",
+                        "format": "float",
+                        "example": 16.67
+                    },
+                    "product_type": {
+                        "description": "Product type",
+                        "type": "string",
+                        "enum": [
+                            "simple",
+                            "variable",
+                            "grouped",
+                            "external"
+                        ],
+                        "example": "simple"
+                    },
+                    "is_featured": {
+                        "description": "Featured product",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "show_on_home": {
+                        "description": "Show on homepage",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "is_active": {
+                        "description": "Active status",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "track_inventory": {
+                        "description": "Track stock levels",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "stock_quantity": {
+                        "description": "Available stock quantity",
+                        "type": "integer",
+                        "example": 50
+                    },
+                    "low_stock_threshold": {
+                        "description": "Low stock alert threshold",
+                        "type": "integer",
+                        "example": 10,
+                        "nullable": true
+                    },
+                    "stock_status": {
+                        "type": "string",
+                        "enum": [
+                            "in_stock",
+                            "out_of_stock",
+                            "on_backorder"
+                        ],
+                        "example": "in_stock"
+                    },
+                    "is_taxable": {
+                        "description": "Subject to tax",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "tax_percentage": {
+                        "description": "Tax rate percentage",
+                        "type": "number",
+                        "format": "float",
+                        "example": 10,
+                        "nullable": true
+                    },
+                    "weight": {
+                        "description": "Product weight in kg",
+                        "type": "number",
+                        "format": "float",
+                        "example": 5.5,
+                        "nullable": true
+                    },
+                    "length": {
+                        "description": "Length in cm",
+                        "type": "number",
+                        "format": "float",
+                        "example": 30,
+                        "nullable": true
+                    },
+                    "width": {
+                        "description": "Width in cm",
+                        "type": "number",
+                        "format": "float",
+                        "example": 20,
+                        "nullable": true
+                    },
+                    "height": {
+                        "description": "Height in cm",
+                        "type": "number",
+                        "format": "float",
+                        "example": 25,
+                        "nullable": true
+                    },
+                    "shipping_class": {
+                        "description": "Shipping class",
+                        "type": "string",
+                        "example": "standard",
+                        "nullable": true
+                    },
+                    "main_image": {
+                        "description": "Main product image URL",
+                        "type": "string",
+                        "example": "https://example.com/storage/products/espresso-machine.jpg",
+                        "nullable": true
+                    },
+                    "gallery_images": {
+                        "description": "Product gallery images",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "example": "https://example.com/storage/products/gallery-1.jpg"
+                        }
+                    },
+                    "sort_order": {
+                        "description": "Display order",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "view_count": {
+                        "description": "Number of views",
+                        "type": "integer",
+                        "example": 1250
+                    },
+                    "purchase_count": {
+                        "description": "Number of purchases",
+                        "type": "integer",
+                        "example": 85
+                    },
+                    "rating_average": {
+                        "description": "Average rating (0-5)",
+                        "type": "number",
+                        "format": "float",
+                        "example": 4.5,
+                        "nullable": true
+                    },
+                    "rating_count": {
+                        "description": "Number of ratings",
+                        "type": "integer",
+                        "example": 32
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/CategorySummary"
+                    },
+                    "images": {
+                        "description": "Product images",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductImage"
+                        }
+                    },
+                    "variants": {
+                        "description": "Product variants",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductVariant"
+                        }
+                    },
+                    "related_products": {
+                        "description": "Related products",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductSummary"
+                        }
+                    },
+                    "tags": {
+                        "description": "Product tags",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "example": "espresso"
+                        }
+                    },
+                    "seo": {
+                        "$ref": "#/components/schemas/SEO"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "ProductSummary": {
+                "title": "Product Summary",
+                "description": "Simplified product object for listings",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Professional Espresso Machine"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "professional-espresso-machine"
+                    },
+                    "sku": {
+                        "type": "string",
+                        "example": "PRD-ESP-001"
+                    },
+                    "short_description": {
+                        "type": "string",
+                        "example": "High-quality espresso machine",
+                        "nullable": true
+                    },
+                    "price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 299.99
+                    },
+                    "sale_price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 249.99,
+                        "nullable": true
+                    },
+                    "is_on_sale": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "discount_percentage": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 16.67
+                    },
+                    "main_image": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "is_featured": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "stock_status": {
+                        "type": "string",
+                        "example": "in_stock"
+                    },
+                    "stock_quantity": {
+                        "type": "integer",
+                        "example": 50
+                    },
+                    "rating_average": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 4.5,
+                        "nullable": true
+                    },
+                    "rating_count": {
+                        "type": "integer",
+                        "example": 32
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/CategorySummary"
+                    }
+                },
+                "type": "object"
+            },
+            "ProductImage": {
+                "title": "Product Image",
+                "description": "Product image object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "image_path": {
+                        "description": "Storage path",
+                        "type": "string",
+                        "example": "products/espresso-machine-1.jpg"
+                    },
+                    "image_url": {
+                        "description": "Full URL",
+                        "type": "string",
+                        "example": "https://example.com/storage/products/espresso-machine-1.jpg"
+                    },
+                    "thumbnail_url": {
+                        "description": "Thumbnail URL",
+                        "type": "string",
+                        "example": "https://example.com/storage/products/thumbs/espresso-machine-1.jpg"
+                    },
+                    "alt_text": {
+                        "type": "string",
+                        "example": "Professional Espresso Machine - Front View",
+                        "nullable": true
+                    },
+                    "is_main": {
+                        "description": "Is main product image",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "sort_order": {
+                        "description": "Display order",
+                        "type": "integer",
+                        "example": 1
+                    }
+                },
+                "type": "object"
+            },
+            "ProductVariant": {
+                "title": "Product Variant",
+                "description": "Product variant (size, color, etc.)",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "product_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "sku": {
+                        "description": "Variant SKU",
+                        "type": "string",
+                        "example": "PRD-ESP-001-BLK"
+                    },
+                    "name": {
+                        "description": "Variant name",
+                        "type": "string",
+                        "example": "Black"
+                    },
+                    "price": {
+                        "description": "Variant price (if different)",
+                        "type": "number",
+                        "format": "float",
+                        "example": 299.99,
+                        "nullable": true
+                    },
+                    "sale_price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 249.99,
+                        "nullable": true
+                    },
+                    "stock_quantity": {
+                        "description": "Variant stock",
+                        "type": "integer",
+                        "example": 25
+                    },
+                    "image": {
+                        "type": "string",
+                        "example": "https://example.com/storage/variants/black.jpg",
+                        "nullable": true
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "attributes": {
+                        "description": "Variant attributes",
+                        "properties": {
+                            "color": {
+                                "type": "string",
+                                "example": "Black"
+                            },
+                            "size": {
+                                "type": "string",
+                                "example": "Large"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "SEO": {
+                "title": "SEO",
+                "description": "SEO metadata object",
+                "properties": {
+                    "meta_title": {
+                        "description": "SEO meta title",
+                        "type": "string",
+                        "example": "Professional Espresso Machine - Best Coffee Makers",
+                        "nullable": true
+                    },
+                    "meta_description": {
+                        "description": "SEO meta description",
+                        "type": "string",
+                        "example": "Buy the best professional espresso machine for home and office use. High quality, affordable prices.",
+                        "nullable": true
+                    },
+                    "meta_keywords": {
+                        "description": "SEO meta keywords",
+                        "type": "string",
+                        "example": "espresso machine, coffee maker, professional",
+                        "nullable": true
+                    },
+                    "canonical_url": {
+                        "description": "Canonical URL",
+                        "type": "string",
+                        "example": "https://example.com/products/professional-espresso-machine",
+                        "nullable": true
+                    },
+                    "og_title": {
+                        "description": "Open Graph title",
+                        "type": "string",
+                        "example": "Professional Espresso Machine",
+                        "nullable": true
+                    },
+                    "og_description": {
+                        "description": "Open Graph description",
+                        "type": "string",
+                        "example": "Best espresso machine for coffee lovers",
+                        "nullable": true
+                    },
+                    "og_image": {
+                        "description": "Open Graph image",
+                        "type": "string",
+                        "example": "https://example.com/storage/products/og-image.jpg",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "CartItem": {
+                "title": "Cart Item",
+                "description": "Shopping cart item",
+                "properties": {
+                    "product_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9d4f5678-1234-5678-9abc-def123456789"
+                    },
+                    "variant_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Professional Espresso Machine"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "professional-espresso-machine"
+                    },
+                    "sku": {
+                        "type": "string",
+                        "example": "PRD-ESP-001"
+                    },
+                    "image": {
+                        "type": "string",
+                        "example": "https://example.com/storage/products/espresso-machine.jpg"
+                    },
+                    "price": {
+                        "description": "Current price",
+                        "type": "number",
+                        "format": "float",
+                        "example": 299.99
+                    },
+                    "regular_price": {
+                        "description": "Regular price before discount",
+                        "type": "number",
+                        "format": "float",
+                        "example": 349.99
+                    },
+                    "quantity": {
+                        "description": "Item quantity",
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "is_taxable": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "tax_rate": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 10
+                    },
+                    "max_quantity": {
+                        "description": "Maximum available quantity",
+                        "type": "integer",
+                        "example": 50
+                    },
+                    "added_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "CartTotals": {
+                "title": "Cart Totals",
+                "description": "Cart or order totals",
+                "properties": {
+                    "subtotal": {
+                        "description": "Sum of all item prices",
+                        "type": "number",
+                        "format": "float",
+                        "example": 599.98
+                    },
+                    "tax_amount": {
+                        "description": "Total tax amount",
+                        "type": "number",
+                        "format": "float",
+                        "example": 59.99
+                    },
+                    "shipping_amount": {
+                        "description": "Shipping cost",
+                        "type": "number",
+                        "format": "float",
+                        "example": 15
+                    },
+                    "discount_amount": {
+                        "description": "Discount from coupons",
+                        "type": "number",
+                        "format": "float",
+                        "example": 0
+                    },
+                    "total_amount": {
+                        "description": "Final total amount",
+                        "type": "number",
+                        "format": "float",
+                        "example": 674.97
+                    },
+                    "total_items": {
+                        "description": "Total number of items",
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "currency": {
+                        "description": "Currency code",
+                        "type": "string",
+                        "example": "USD"
+                    }
+                },
+                "type": "object"
+            },
+            "Order": {
+                "title": "Order",
+                "description": "Order summary object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "order_number": {
+                        "type": "string",
+                        "example": "ORD-2025-00001"
+                    },
+                    "status": {
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "example": "ORDER_CONFIRMED"
+                            },
+                            "label": {
+                                "type": "string",
+                                "example": "Confirmed"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "payment_status": {
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "example": "PAYMENT_PAID"
+                            },
+                            "label": {
+                                "type": "string",
+                                "example": "Paid"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "totals": {
+                        "$ref": "#/components/schemas/CartTotals"
+                    },
+                    "items_count": {
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "order_date": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "can_cancel": {
+                        "description": "Can order be cancelled",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "can_return": {
+                        "description": "Can order be returned",
+                        "type": "boolean",
+                        "example": false
+                    }
+                },
+                "type": "object"
+            },
+            "OrderDetails": {
+                "title": "Order Details",
+                "description": "Complete order details",
+                "type": "object",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Order"
+                    },
+                    {
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/OrderItem"
+                                }
+                            },
+                            "shipping_address": {
+                                "$ref": "#/components/schemas/Address"
+                            },
+                            "billing_address": {
+                                "$ref": "#/components/schemas/Address"
+                            },
+                            "payment": {
+                                "properties": {
+                                    "method": {
+                                        "type": "string",
+                                        "example": "credit_card"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "example": "PAYMENT_PAID"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "shipping": {
+                                "properties": {
+                                    "method": {
+                                        "type": "string",
+                                        "example": "standard"
+                                    },
+                                    "carrier": {
+                                        "type": "string",
+                                        "example": "FedEx",
+                                        "nullable": true
+                                    },
+                                    "tracking_number": {
+                                        "type": "string",
+                                        "example": "123456789",
+                                        "nullable": true
+                                    },
+                                    "tracking_url": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "dates": {
+                                "properties": {
+                                    "created_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "confirmed_at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "nullable": true
+                                    },
+                                    "shipped_at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "nullable": true
+                                    },
+                                    "delivered_at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "nullable": true
+                                    },
+                                    "cancelled_at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "notes": {
+                                "properties": {
+                                    "customer_notes": {
+                                        "type": "string",
+                                        "example": "Please ring doorbell",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "OrderItem": {
+                "title": "Order Item",
+                "description": "Individual order item",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "product_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "product_name": {
+                        "type": "string",
+                        "example": "Professional Espresso Machine"
+                    },
+                    "product_sku": {
+                        "type": "string",
+                        "example": "PRD-ESP-001"
+                    },
+                    "product_image": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "unit_price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 299.99
+                    },
+                    "subtotal": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 299.99
+                    },
+                    "tax_amount": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 29.99
+                    },
+                    "total": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 329.98
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "ITEM_PENDING"
+                    }
+                },
+                "type": "object"
+            },
+            "Address": {
+                "title": "Address",
+                "description": "Shipping or billing address",
+                "properties": {
+                    "first_name": {
+                        "type": "string",
+                        "example": "John"
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "example": "Doe"
+                    },
+                    "address_line1": {
+                        "type": "string",
+                        "example": "123 Main Street"
+                    },
+                    "address_line2": {
+                        "type": "string",
+                        "example": "Apt 4B",
+                        "nullable": true
+                    },
+                    "city": {
+                        "type": "string",
+                        "example": "New York"
+                    },
+                    "state": {
+                        "type": "string",
+                        "example": "NY",
+                        "nullable": true
+                    },
+                    "postal_code": {
+                        "type": "string",
+                        "example": "10001"
+                    },
+                    "country": {
+                        "type": "string",
+                        "example": "United States"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "+1234567890"
+                    }
+                },
+                "type": "object"
+            },
+            "OrderTracking": {
+                "title": "Order Tracking",
+                "description": "Order tracking information with timeline",
+                "properties": {
+                    "order_number": {
+                        "type": "string",
+                        "example": "ORD-2025-00001"
+                    },
+                    "status": {
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "example": "ORDER_SHIPPED"
+                            },
+                            "label": {
+                                "type": "string",
+                                "example": "Shipped"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "timeline": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "status": {
+                                    "type": "string",
+                                    "example": "Ordered"
+                                },
+                                "completed": {
+                                    "type": "boolean",
+                                    "example": true
+                                },
+                                "date": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "nullable": true
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "shipping": {
+                        "properties": {
+                            "carrier": {
+                                "type": "string",
+                                "example": "FedEx",
+                                "nullable": true
+                            },
+                            "tracking_number": {
+                                "type": "string",
+                                "example": "123456789",
+                                "nullable": true
+                            },
+                            "tracking_url": {
+                                "type": "string",
+                                "example": "https://fedex.com/track/123456789",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "estimated_delivery": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "responses": {
+            "Success": {
+                "description": "Successful operation",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {
+                                "success": {
+                                    "type": "boolean",
+                                    "example": true
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "example": "Operation completed successfully"
+                                },
+                                "data": {
+                                    "type": "object"
+                                },
+                                "timestamp": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "BadRequest": {
+                "description": "Bad request - Invalid parameters",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {
+                                "success": {
+                                    "type": "boolean",
+                                    "example": false
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "example": "Invalid request parameters"
+                                },
+                                "error": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "Unauthorized": {
+                "description": "Unauthorized - Missing or invalid API key",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {
+                                "success": {
+                                    "type": "boolean",
+                                    "example": false
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "example": "Unauthorized - Missing API key"
+                                },
+                                "error": {
+                                    "type": "string",
+                                    "example": "API key is required"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "Forbidden": {
+                "description": "Forbidden - Invalid API key",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {
+                                "success": {
+                                    "type": "boolean",
+                                    "example": false
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "example": "Forbidden - Invalid API key"
+                                },
+                                "error": {
+                                    "type": "string",
+                                    "example": "Invalid API key provided"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "NotFound": {
+                "description": "Resource not found",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {
+                                "success": {
+                                    "type": "boolean",
+                                    "example": false
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "example": "Resource not found"
+                                },
+                                "error": {
+                                    "type": "string",
+                                    "example": "The requested resource does not exist"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "UnprocessableEntity": {
+                "description": "Validation error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {
+                                "success": {
+                                    "type": "boolean",
+                                    "example": false
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "example": "Validation failed"
+                                },
+                                "errors": {
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "example": "The field is required"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "InternalServerError": {
+                "description": "Internal server error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {
+                                "success": {
+                                    "type": "boolean",
+                                    "example": false
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "example": "Internal server error"
+                                },
+                                "error": {
+                                    "type": "string",
+                                    "example": "An unexpected error occurred"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "NotImplemented": {
+                "description": "Feature not yet implemented",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {
+                                "success": {
+                                    "type": "boolean",
+                                    "example": false
+                                },
+                                "message": {
+                                    "type": "string",
+                                    "example": "Feature not yet implemented"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            }
+        },
         "securitySchemes": {
             "apiKey": {
                 "type": "apiKey",
@@ -1012,19 +3726,31 @@
     "tags": [
         {
             "name": "Public",
-            "description": "Public endpoints (no authentication)"
+            "description": "Public endpoints (no authentication required)"
         },
         {
             "name": "Categories",
-            "description": "Category management"
+            "description": "Category management - Browse and filter product categories"
         },
         {
             "name": "Category Products",
-            "description": "Category product operations"
+            "description": "Products by category - Get products filtered by specific categories"
         },
         {
             "name": "Products",
-            "description": "Product management"
+            "description": "Product management - Browse, search, and view product details"
+        },
+        {
+            "name": "Cart",
+            "description": "Shopping cart management - Add, update, remove items from cart"
+        },
+        {
+            "name": "Checkout",
+            "description": "Checkout process - Create orders from cart with guest or registered customer"
+        },
+        {
+            "name": "Orders",
+            "description": "Order management - View, track, cancel orders and request returns"
         }
     ],
     "security": [
