@@ -213,7 +213,7 @@ class CategoriesController extends Controller
     public function edit($id)
     {
         $category = ProductsCategories::findOrFail($id);
-        $statusList = SystemStatus::where('type', 'category')->get();
+        $statusList = SystemStatus::where('module', 'categories')->get();
         $parentCategories = ProductsCategories::where('id', '!=', $id)->get();
         $parentCategories = ProductsCategories::getFlatList();
 

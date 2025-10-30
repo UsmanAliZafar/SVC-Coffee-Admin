@@ -832,9 +832,9 @@
                                 @endphp
                                 <p class="mb-1"><strong>Type:</strong> {{ $product->getTaxTypeLabel() }}</p>
                                 <p class="mb-1"><strong>Rate:</strong> {{ $product->tax_percentage }}%</p>
-                                <p class="mb-1"><strong>Price (excl. tax):</strong> {{ currency_symbol($product->curency) }} {{ number_format($taxInfo['price_excluding_tax'], 2) }}</p>
-                                <p class="mb-1"><strong>Tax Amount:</strong> {{ currency_symbol($product->curency) }} {{ number_format($taxInfo['tax_amount'], 2) }}</p>
-                                <p class="mb-0"><strong>Price (incl. tax):</strong> {{ currency_symbol($product->curency) }} {{ number_format($taxInfo['price_including_tax'], 2) }}</p>
+                                <p class="mb-1"><strong>Price (excl. tax):</strong> {{ get_currency_symbol($product->curency) }} {{ number_format($taxInfo['price_excluding_tax'], 2) }}</p>
+                                <p class="mb-1"><strong>Tax Amount:</strong> {{ get_currency_symbol($product->curency) }} {{ number_format($taxInfo['tax_amount'], 2) }}</p>
+                                <p class="mb-0"><strong>Price (incl. tax):</strong> {{ get_currency_symbol($product->curency) }} {{ number_format($taxInfo['price_including_tax'], 2) }}</p>
                             </div>
                         </div>
                         @endif
@@ -2033,7 +2033,7 @@ function updateTaxPreview() {
     const taxPercentage = parseFloat($('#taxPercentage').val()) || 0;
     const taxType = $('#taxType').val();
     const currency = $('select[name="curency"]').val() || 'USD';
-    const symbol = currency_symbol(currency);
+    const symbol = get_currency_symbol(currency);
 
     if (price <= 0 || taxPercentage <= 0) {
         $('#taxPreview').hide();
@@ -2065,7 +2065,7 @@ function updateTaxPreview() {
 }
 
 // Helper function for currency symbol (if not already defined)
-function currency_symbol(code) {
+function get_currency_symbol(code) {
     const symbols = {
         'USD': '$', 'EUR': '€', 'GBP': '£', 'PKR': '₨', 'SAR': '﷼',
         'AED': 'د.إ', 'CAD': 'C$', 'AUD': 'A$', 'JPY': '¥', 'CNY': '¥', 'INR': '₹'
