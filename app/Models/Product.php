@@ -708,6 +708,7 @@ class Product extends Model
             'PRODUCT_DRAFT' => '<span class="badge bg-warning">Draft</span>',
             'PRODUCT_INACTIVE' => '<span class="badge bg-secondary">Inactive</span>',
             'PRODUCT_PENDING' => '<span class="badge bg-info">Pending</span>',
+            'PRODUCT_OUT_OF_STOCK' => '<span class="badge bg-danger">OUT STOCK</span>',
             default => '<span class="badge bg-light text-dark">Unknown</span>',
         };
     }
