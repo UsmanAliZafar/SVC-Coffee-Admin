@@ -317,12 +317,6 @@
                         <li class="submenu-divider"></li>
 
                         {{-- Customer Segments --}}
-                        <li>
-                            <a href="{{ route('admin.customers.new') }}"
-                            class="{{ request()->routeIs('admin.customers.new') ? 'active' : '' }}">
-                                <i class="bi bi-person-check text-success"></i> New Customers
-                            </a>
-                        </li>
 
                         <li>
                             <a href="{{ route('admin.customers.returning') }}"

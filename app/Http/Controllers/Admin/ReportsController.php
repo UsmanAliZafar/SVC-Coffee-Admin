@@ -194,21 +194,99 @@ class ReportsController extends Controller
      */
     public function revenueByCategory(Request $request)
     {
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->startOfMonth();
 
-        $start = Carbon::parse($startDate);
-        $end = Carbon::parse($endDate);
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
 
-        $data = [
-            'start_date' => $start,
-            'end_date' => $end,
-            'category_revenue' => $this->getCategoryRevenue($start, $end),
-            'category_trends' => $this->getCategoryRevenueTrends($start, $end),
-            'subcategory_breakdown' => $this->getSubcategoryRevenue($start, $end),
+        // Get category revenue data
+        $category_revenue = Order::select(
+                'products_categories.id',
+                'products_categories.title',
+                DB::raw('SUM(orders.total_amount) as revenue'),
+                DB::raw('SUM(order_items.quantity) as units_sold'),
+                DB::raw('COUNT(DISTINCT orders.id) as order_count')
+            )
+            ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->join('products_categories', 'products.category_id', '=', 'products_categories.id')
+            ->whereBetween('orders.created_at', [$start_date, $end_date])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+            ->whereNotNull('products.category_id')
+            ->groupBy('products_categories.id', 'products_categories.title')
+            ->orderBy('revenue', 'desc')
+            ->get()
+            ->map(function($item) {
+                return [
+                    'id' => $item->id,
+                    'title' => $item->title,
+                    'revenue' => (float) $item->revenue,
+                    'units_sold' => (int) $item->units_sold,
+                    'order_count' => (int) $item->order_count,
+                ];
+            })
+            ->toArray();
+
+        // Calculate totals
+        $total_revenue = collect($category_revenue)->sum('revenue');
+        $total_units_sold = collect($category_revenue)->sum('units_sold');
+
+        // Get category trends
+        $category_trends = [];
+        if (count($category_revenue) > 0) {
+            foreach ($category_revenue as $category) {
+                $trends = Order::select(
+                        DB::raw('DATE(orders.created_at) as date'),
+                        DB::raw('SUM(orders.total_amount) as daily_revenue')
+                    )
+                    ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'order_items.product_id', '=', 'products.id')
+                    ->where('products.category_id', $category['id'])
+                    ->whereBetween('orders.created_at', [$start_date, $end_date])
+                    ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+                    ->groupBy('date')
+                    ->orderBy('date', 'asc')
+                    ->get()
+                    ->map(function($item) {
+                        return [
+                            'date' => $item->date,
+                            'daily_revenue' => (float) $item->daily_revenue,
+                        ];
+                    })
+                    ->toArray();
+
+                $category_trends[$category['title']] = $trends;
+            }
+        }
+
+        // Subcategory breakdown (optional - only if you have parent categories)
+        $subcategory_breakdown = [];
+
+        return view('admin.reports.revenue.by-category', compact(
+            'start_date',
+            'end_date',
+            'category_revenue',
+            'total_revenue',
+            'total_units_sold',
+            'category_trends',
+            'subcategory_breakdown'
+        ));
+    }
+
+    /**
+     * HELPER METHOD - Add this to get category colors consistently
+     */
+    private function getCategoryColor($index)
+    {
+        $colors = [
+            '#5B914C', '#0dcaf0', '#0d6efd', '#ffc107', '#dc3545',
+            '#6c757d', '#20c997', '#fd7e14', '#6f42c1', '#d63384'
         ];
 
-        return view('admin.reports.revenue.by-category', $data);
+        return $colors[$index % count($colors)];
     }
 
     /**
@@ -216,46 +294,82 @@ class ReportsController extends Controller
      */
     public function revenueByProduct(Request $request)
     {
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
-        $categoryId = $request->input('category_id');
+        // Get date range from request or default to this month
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->startOfMonth();
 
-        $start = Carbon::parse($startDate);
-        $end = Carbon::parse($endDate);
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
 
-        $query = OrderItem::select(
-                    'order_items.product_id',
-                    'products.name as product_name',
-                    'products.sku',
-                    'products.price',
-                    DB::raw('SUM(order_items.quantity) as total_quantity'),
-                    DB::raw('SUM(order_items.total) as total_revenue'),
-                    DB::raw('AVG(order_items.unit_price) as avg_price'),
-                    DB::raw('COUNT(DISTINCT order_items.order_id) as order_count')
-                )
-                ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->join('products', 'order_items.product_id', '=', 'products.id')
-                ->whereBetween('orders.created_at', [$start, $end])
-                ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
-                ->groupBy('order_items.product_id', 'products.name', 'products.sku', 'products.price');
+        // Get all categories for filter dropdown
+        $categories = ProductsCategories::active()
+            ->ordered()
+            ->get();
 
-        if ($categoryId) {
-            $query->where('products.category_id', $categoryId);
+        // Build the query
+        $query = Product::select(
+                'products.id',
+                'products.name',
+                'products.sku',
+                'products.main_image',
+                'products.category_id',
+                DB::raw('SUM(order_items.quantity * order_items.unit_price) as revenue'),
+                DB::raw('SUM(order_items.quantity) as units_sold'),
+                DB::raw('COUNT(DISTINCT orders.id) as order_count')
+            )
+            ->join('order_items', 'products.id', '=', 'order_items.product_id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereBetween('orders.created_at', [$start_date, $end_date])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+            ->groupBy('products.id', 'products.name', 'products.sku', 'products.main_image', 'products.category_id');
+
+        // Apply category filter if selected
+        if ($request->filled('category_id')) {
+            $query->where('products.category_id', $request->category_id);
         }
 
-        $productRevenue = $query->orderBy('total_revenue', 'desc')->paginate(50);
+        // Apply search filter if provided
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('products.name', 'like', "%{$searchTerm}%")
+                ->orWhere('products.sku', 'like', "%{$searchTerm}%");
+            });
+        }
 
-        $data = [
-            'start_date' => $start,
-            'end_date' => $end,
-            'category_id' => $categoryId,
-            'categories' => ProductsCategories::active()->ordered()->get(),
-            'product_revenue' => $productRevenue,
-            'total_revenue' => $productRevenue->sum('total_revenue'),
-            'total_quantity' => $productRevenue->sum('total_quantity'),
-        ];
+        // Get products ordered by revenue
+        $products = $query->orderBy('revenue', 'desc')
+            ->with('category')
+            ->get()
+            ->map(function($product) {
+                return (object) [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'sku' => $product->sku,
+                    'main_image' => $product->main_image,
+                    'category' => $product->category,
+                    'revenue' => (float) $product->revenue,
+                    'units_sold' => (int) $product->units_sold,
+                    'order_count' => (int) $product->order_count,
+                ];
+            });
 
-        return view('admin.reports.revenue.by-product', $data);
+        // Calculate totals
+        $total_revenue = $products->sum('revenue');
+        $total_units_sold = $products->sum('units_sold');
+        $total_products = $products->count();
+
+        return view('admin.reports.revenue.by-product', compact(
+            'start_date',
+            'end_date',
+            'products',
+            'categories',
+            'total_revenue',
+            'total_units_sold',
+            'total_products'
+        ));
     }
 
     // ==================== PRODUCT REPORTS ====================
@@ -1302,28 +1416,29 @@ class ReportsController extends Controller
     /**
      * Get revenue trend
      */
-    private function getRevenueTrend($start, $end, $period): array
+   private function getRevenueTrend($start, $end, $period): array
     {
-        $groupBy = match($period) {
-            'day' => DB::raw('HOUR(created_at)'),
-            'week', 'month' => DB::raw('DATE(created_at)'),
-            'year' => DB::raw('MONTH(created_at)'),
-            default => DB::raw('DATE(created_at)'),
+        // Define the groupBy expression based on period
+        $groupByExpression = match($period) {
+            'day' => 'HOUR(created_at)',
+            'week', 'month' => 'DATE(created_at)',
+            'year' => 'MONTH(created_at)',
+            default => 'DATE(created_at)',
         };
 
+        // Build the query with proper DB::raw usage
         return Order::select(
-                    $groupBy . ' as period',
+                    DB::raw("{$groupByExpression} as period"),
                     DB::raw('SUM(total_amount) as revenue'),
                     DB::raw('COUNT(*) as order_count')
                 )
                 ->whereBetween('created_at', [$start, $end])
                 ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
-                ->groupBy('period')
-                ->orderBy('period', 'asc')
+                ->groupBy(DB::raw($groupByExpression))
+                ->orderBy(DB::raw($groupByExpression), 'asc')
                 ->get()
                 ->toArray();
     }
-
     /**
      * Get revenue by order status
      */
