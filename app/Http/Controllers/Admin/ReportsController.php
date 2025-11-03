@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Customer;
 use App\Models\ProductWarehouseStock;
 use App\Models\InventoryMovement;
+use App\Models\Warehouse;
 use App\Models\Transaction;
 use App\Models\ProductsCategories;
 use Illuminate\Http\Request;
@@ -379,27 +380,73 @@ class ReportsController extends Controller
      */
     public function productsTopSelling(Request $request)
     {
+        // Get period and date from request
         $period = $request->input('period', 'month');
-        $date = $request->input('date', Carbon::now()->format('Y-m-d'));
+        $date = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::now();
         $limit = $request->input('limit', 50);
 
-        $dateRange = $this->getDateRangeForPeriod($period, $date);
+        // Get date range based on period
+        $date_range = $this->getDateRangeForPeriod($period, $date->format('Y-m-d'));
 
-        $topProducts = $this->getTopProductsByDateRange(
-            $dateRange['start'],
-            $dateRange['end'],
-            $limit
-        );
+        // Get top selling products
+        $top_products = Product::select(
+                'products.id',
+                'products.name',
+                'products.sku',
+                'products.main_image',
+                'products.price',
+                'products_categories.title as category_name',
+                DB::raw('SUM(order_items.quantity) as total_sold'),
+                DB::raw('SUM(order_items.total) as total_revenue'),
+                DB::raw('AVG(order_items.unit_price) as avg_price'),
+                DB::raw('COUNT(DISTINCT order_items.order_id) as order_count')
+            )
+            ->leftJoin('products_categories', 'products.category_id', '=', 'products_categories.id')
+            ->join('order_items', 'products.id', '=', 'order_items.product_id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereBetween('orders.created_at', [$date_range['start'], $date_range['end']])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+            ->groupBy(
+                'products.id',
+                'products.name',
+                'products.sku',
+                'products.main_image',
+                'products.price',
+                'products_categories.title'
+            )
+            ->orderBy('total_sold', 'desc')
+            ->limit($limit)
+            ->get()
+            ->map(function($product) {
+                return (object) [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'sku' => $product->sku,
+                    'main_image' => $product->main_image,
+                    'price' => (float) $product->price,
+                    'category_name' => $product->category_name,
+                    'total_sold' => (int) $product->total_sold,
+                    'total_revenue' => (float) $product->total_revenue,
+                    'avg_price' => (float) $product->avg_price,
+                    'order_count' => (int) $product->order_count,
+                ];
+            });
 
-        $data = [
-            'period' => $period,
-            'date_range' => $dateRange,
-            'top_products' => $topProducts,
-            'total_units_sold' => $topProducts->sum('total_sold'),
-            'total_revenue' => $topProducts->sum('total_revenue'),
-        ];
+        // Calculate totals
+        $total_units_sold = $top_products->sum('total_sold');
+        $total_revenue = $top_products->sum('total_revenue');
+        $order_count = $top_products->sum('order_count');
 
-        return view('admin.reports.products.top-selling', $data);
+        return view('admin.reports.products.top-selling', compact(
+            'period',
+            'date',
+            'date_range',
+            'limit',
+            'top_products',
+            'total_units_sold',
+            'total_revenue',
+            'order_count'
+        ));
     }
 
     /**
@@ -407,41 +454,77 @@ class ReportsController extends Controller
      */
     public function productsByCategory(Request $request)
     {
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
+        // Get date range from request or default to this month
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->startOfMonth();
 
-        $start = Carbon::parse($startDate);
-        $end = Carbon::parse($endDate);
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
 
-        $categoryPerformance = ProductsCategories::select(
+        // Get category performance data with product counts
+        $category_performance = ProductsCategories::select(
                 'products_categories.id',
                 'products_categories.title',
                 DB::raw('COUNT(DISTINCT products.id) as total_products'),
                 DB::raw('COALESCE(SUM(order_items.quantity), 0) as units_sold'),
                 DB::raw('COALESCE(SUM(order_items.total), 0) as revenue'),
-                DB::raw('COUNT(DISTINCT order_items.order_id) as order_count')
+                DB::raw('COUNT(DISTINCT orders.id) as order_count')
             )
             ->leftJoin('products', 'products_categories.id', '=', 'products.category_id')
             ->leftJoin('order_items', 'products.id', '=', 'order_items.product_id')
-            ->leftJoin('orders', function($join) use ($start, $end) {
-                $join->on('order_items.order_id', '=', 'orders.id')
-                     ->whereBetween('orders.created_at', [$start, $end])
-                     ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING']);
-            })
-            ->where('products_categories.status_key_code', 'CATEGORY_ACTIVE')
+            ->leftJoin('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereBetween('orders.created_at', [$start_date, $end_date])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
             ->groupBy('products_categories.id', 'products_categories.title')
+            ->having('revenue', '>', 0)
             ->orderBy('revenue', 'desc')
-            ->get();
+            ->get()
+            ->map(function($category) use ($start_date, $end_date) {
+                // Get top 5 products for this category
+                $top_products = Product::select(
+                        'products.id',
+                        'products.name',
+                        'products.sku',
+                        'products.main_image',
+                        DB::raw('SUM(order_items.quantity) as units_sold'),
+                        DB::raw('SUM(order_items.total) as revenue')
+                    )
+                    ->join('order_items', 'products.id', '=', 'order_items.product_id')
+                    ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                    ->where('products.category_id', $category->id)
+                    ->whereBetween('orders.created_at', [$start_date, $end_date])
+                    ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+                    ->groupBy('products.id', 'products.name', 'products.sku', 'products.main_image')
+                    ->orderBy('units_sold', 'desc')
+                    ->limit(5)
+                    ->get();
 
-        $data = [
-            'start_date' => $start,
-            'end_date' => $end,
-            'category_performance' => $categoryPerformance,
-            'total_revenue' => $categoryPerformance->sum('revenue'),
-            'total_units_sold' => $categoryPerformance->sum('units_sold'),
-        ];
+                return [
+                    'id' => $category->id,
+                    'title' => $category->title,
+                    'total_products' => (int) $category->total_products,
+                    'units_sold' => (int) $category->units_sold,
+                    'revenue' => (float) $category->revenue,
+                    'order_count' => (int) $category->order_count,
+                    'top_products' => $top_products
+                ];
+            });
 
-        return view('admin.reports.products.by-category', $data);
+        // Calculate totals
+        $total_products_sold = $category_performance->sum('total_products');
+        $total_units_sold = $category_performance->sum('units_sold');
+        $total_revenue = $category_performance->sum('revenue');
+
+        return view('admin.reports.products.by-category', compact(
+            'start_date',
+            'end_date',
+            'category_performance',
+            'total_products_sold',
+            'total_units_sold',
+            'total_revenue'
+        ));
     }
 
     /**
@@ -449,67 +532,110 @@ class ReportsController extends Controller
      */
     public function productsPerformance(Request $request)
     {
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
-        $categoryId = $request->input('category_id');
+        // Get date range from request or default to this month
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->startOfMonth();
 
-        $start = Carbon::parse($startDate);
-        $end = Carbon::parse($endDate);
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
 
+        // Get performance filter
+        $performance_filter = $request->input('performance_filter', 'all');
+
+        // Build base query for products with sales data
         $query = Product::select(
                 'products.id',
                 'products.name',
                 'products.sku',
+                'products.main_image',
                 'products.price',
                 'products.stock_quantity',
                 'products.low_stock_threshold',
                 'products_categories.title as category_name',
                 DB::raw('COALESCE(SUM(order_items.quantity), 0) as units_sold'),
                 DB::raw('COALESCE(SUM(order_items.total), 0) as revenue'),
-                DB::raw('COALESCE(AVG(order_items.unit_price), 0) as avg_selling_price'),
-                DB::raw('COUNT(DISTINCT order_items.order_id) as order_count'),
-                DB::raw('COALESCE(SUM(order_items.total) / NULLIF(SUM(order_items.quantity), 0), 0) as revenue_per_unit')
+                DB::raw('COUNT(DISTINCT orders.id) as order_count')
             )
             ->leftJoin('products_categories', 'products.category_id', '=', 'products_categories.id')
             ->leftJoin('order_items', 'products.id', '=', 'order_items.product_id')
-            ->leftJoin('orders', function($join) use ($start, $end) {
-                $join->on('order_items.order_id', '=', 'orders.id')
-                     ->whereBetween('orders.created_at', [$start, $end])
-                     ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING']);
-            });
-
-        if ($categoryId) {
-            $query->where('products.category_id', $categoryId);
-        }
-
-        $products = $query->groupBy(
+            ->leftJoin('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereBetween('orders.created_at', [$start_date, $end_date])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+            ->groupBy(
                 'products.id',
                 'products.name',
                 'products.sku',
+                'products.main_image',
                 'products.price',
                 'products.stock_quantity',
                 'products.low_stock_threshold',
                 'products_categories.title'
-            )
-            ->orderBy('revenue', 'desc')
-            ->paginate(50);
+            );
 
-        $data = [
-            'start_date' => $start,
-            'end_date' => $end,
-            'category_id' => $categoryId,
-            'categories' => ProductsCategories::active()->ordered()->get(),
-            'products' => $products,
-            'summary' => [
-                'total_products' => Product::count(),
-                'products_sold' => $products->filter(fn($p) => $p->units_sold > 0)->count(),
-                'products_not_sold' => $products->filter(fn($p) => $p->units_sold == 0)->count(),
-                'total_revenue' => $products->sum('revenue'),
-                'total_units_sold' => $products->sum('units_sold'),
-            ],
-        ];
+        // Apply low stock filter if selected
+        if ($performance_filter == 'low_stock') {
+            $query->whereRaw('products.stock_quantity <= products.low_stock_threshold');
+        }
 
-        return view('admin.reports.products.performance', $data);
+        // Get all products
+        $all_products = $query->get();
+
+        // Calculate performance scores and filter
+        $products = $all_products->filter(function($product) use ($performance_filter, $all_products) {
+            if ($all_products->count() == 0) return false;
+
+            // Calculate performance score
+            $max_revenue = $all_products->max('revenue');
+            $revenue_score = $max_revenue > 0 ? ($product->revenue / $max_revenue) * 50 : 0;
+
+            $max_units = $all_products->max('units_sold');
+            $units_score = $max_units > 0 ? ($product->units_sold / $max_units) * 30 : 0;
+
+            $order_score = min(($product->order_count / 10) * 20, 20);
+
+            $performance_score = round($revenue_score + $units_score + $order_score);
+
+            // Determine performance level
+            if ($performance_score >= 80) {
+                $level = 'excellent';
+            } elseif ($performance_score >= 60) {
+                $level = 'good';
+            } elseif ($performance_score >= 40) {
+                $level = 'average';
+            } else {
+                $level = 'poor';
+            }
+
+            // Apply filter
+            if ($performance_filter == 'all' || $performance_filter == 'low_stock') {
+                return true;
+            }
+
+            return $level == $performance_filter;
+        })
+        ->sortByDesc('revenue')
+        ->values();
+
+        // Calculate summary statistics
+        $total_products = Product::count();
+        $active_products = Product::count(); // Count all products since we don't have is_active
+        $low_stock_count = Product::whereRaw('stock_quantity <= low_stock_threshold')->count();
+
+        $total_revenue = $products->sum('revenue');
+        $total_units_sold = $products->sum('units_sold');
+
+        return view('admin.reports.products.performance', compact(
+            'start_date',
+            'end_date',
+            'products',
+            'total_products',
+            'active_products',
+            'low_stock_count',
+            'total_revenue',
+            'total_units_sold'
+        ));
     }
 
     // ==================== INVENTORY REPORTS ====================
@@ -517,73 +643,159 @@ class ReportsController extends Controller
     /**
      * Inventory Overview
      */
-    public function inventoryIndex()
+    public function inventoryIndex(Request $request)
     {
-        $data = [
-            'total_products' => Product::count(),
-            'products_in_stock' => Product::where('stock_quantity', '>', 0)->where('track_inventory', true)->count(),
-            'products_low_stock' => Product::whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                                          ->where('stock_quantity', '>', 0)
-                                          ->where('track_inventory', true)
-                                          ->count(),
-            'products_out_of_stock' => Product::where('stock_quantity', '<=', 0)->where('track_inventory', true)->count(),
-            'total_stock_value' => $this->calculateTotalStockValue(),
-            'warehouse_summary' => $this->getWarehouseStockSummary(),
-            'category_stock' => $this->getCategoryStockLevels(),
-        ];
+        // Get filter parameters
+        $status = $request->input('status', 'all');
+        $category_id = $request->input('category_id');
+        $search = $request->input('search');
 
-        return view('admin.reports.inventory.index', $data);
+        // Build query
+        $query = Product::with('category')
+            ->select('products.*');
+
+        // Apply status filter
+        if ($status == 'out_of_stock') {
+            $query->where('stock_quantity', '<=', 0);
+        } elseif ($status == 'low_stock') {
+            $query->whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold');
+        } elseif ($status == 'in_stock') {
+            $query->whereRaw('stock_quantity > low_stock_threshold');
+        }
+
+        // Apply category filter
+        if ($category_id) {
+            $query->where('category_id', $category_id);
+        }
+
+        // Apply search filter
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        // Get products
+        $products = $query->orderBy('stock_quantity', 'asc')->get();
+
+        // Get all categories for filter
+        $categories = ProductsCategories::orderBy('title')->get();
+
+        // Calculate summary statistics
+        $total_products = Product::count();
+        $total_stock_value = Product::sum('stock_quantity');
+        $low_stock_count = Product::whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold')->count();
+        $out_of_stock_count = Product::where('stock_quantity', '<=', 0)->count();
+
+        // Get critical alerts (out of stock)
+        $critical_alerts = Product::where('stock_quantity', '<=', 0)
+            ->orderBy('name')
+            ->get();
+
+        // Get low stock alerts
+        $low_stock_alerts = Product::whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold')
+            ->orderBy('stock_quantity', 'asc')
+            ->get();
+
+        return view('admin.reports.inventory.index', compact(
+            'products',
+            'categories',
+            'total_products',
+            'total_stock_value',
+            'low_stock_count',
+            'out_of_stock_count',
+            'critical_alerts',
+            'low_stock_alerts'
+        ));
     }
-
     /**
      * Stock Levels Report
      */
     public function inventoryStockLevels(Request $request)
     {
-        $warehouseId = $request->input('warehouse_id');
-        $categoryId = $request->input('category_id');
-        $status = $request->input('status'); // in_stock, low_stock, out_of_stock
+        // Get filter parameters
+        $status = $request->input('status', 'all');
+        $category_id = $request->input('category_id');
+        $search = $request->input('search');
+        $sort = $request->input('sort', 'stock_asc');
 
-        $query = Product::with(['category', 'warehouseStock'])
-            ->where('track_inventory', true);
+        // Build query
+        $query = Product::with('category');
 
-        if ($warehouseId) {
-            $query->whereHas('warehouseStock', function($q) use ($warehouseId) {
-                $q->where('warehouse_id', $warehouseId);
+        // Apply status filter
+        if ($status == 'critical') {
+            $query->where('stock_quantity', '<=', 0);
+        } elseif ($status == 'low') {
+            $query->whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold');
+        } elseif ($status == 'good') {
+            $query->whereRaw('stock_quantity > low_stock_threshold');
+        } elseif ($status == 'reorder') {
+            $query->whereRaw('stock_quantity <= low_stock_threshold');
+        }
+
+        // Apply category filter
+        if ($category_id) {
+            $query->where('category_id', $category_id);
+        }
+
+        // Apply search filter
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%");
             });
         }
 
-        if ($categoryId) {
-            $query->where('category_id', $categoryId);
+        // Apply sorting
+        switch ($sort) {
+            case 'stock_asc':
+                $query->orderBy('stock_quantity', 'asc');
+                break;
+            case 'stock_desc':
+                $query->orderBy('stock_quantity', 'desc');
+                break;
+            case 'name_asc':
+                $query->orderBy('name', 'asc');
+                break;
+            case 'value_desc':
+                $query->orderByRaw('stock_quantity * price DESC');
+                break;
+            default:
+                $query->orderBy('stock_quantity', 'asc');
         }
 
-        if ($status) {
-            switch ($status) {
-                case 'low_stock':
-                    $query->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                          ->where('stock_quantity', '>', 0);
-                    break;
-                case 'out_of_stock':
-                    $query->where('stock_quantity', '<=', 0);
-                    break;
-                case 'in_stock':
-                    $query->where('stock_quantity', '>', DB::raw('low_stock_threshold'));
-                    break;
-            }
-        }
+        // Get products
+        $products = $query->get();
 
-        $products = $query->orderBy('stock_quantity', 'asc')->paginate(50);
+        // Get all categories for filter
+        $categories = ProductsCategories::orderBy('title')->get();
 
-        $data = [
-            'products' => $products,
-            'warehouse_id' => $warehouseId,
-            'category_id' => $categoryId,
-            'status' => $status,
-            'categories' => ProductsCategories::active()->ordered()->get(),
-            'warehouses' => \App\Models\Warehouse::active()->get(),
-        ];
+        // Calculate summary statistics
+        $total_products = Product::count();
+        $total_stock = Product::sum('stock_quantity');
+        $total_value = Product::selectRaw('SUM(stock_quantity * price) as total')->value('total') ?? 0;
+        $average_value = $total_products > 0 ? $total_value / $total_products : 0;
 
-        return view('admin.reports.inventory.stock-levels', $data);
+        // Count by status
+        $in_stock_count = Product::whereRaw('stock_quantity > low_stock_threshold')->count();
+        $low_stock_count = Product::whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold')->count();
+        $out_of_stock_count = Product::where('stock_quantity', '<=', 0)->count();
+        $reorder_needed = Product::whereRaw('stock_quantity <= low_stock_threshold')->count();
+
+        return view('admin.reports.inventory.stock-levels', compact(
+            'products',
+            'categories',
+            'status',
+            'total_products',
+            'total_stock',
+            'total_value',
+            'average_value',
+            'in_stock_count',
+            'low_stock_count',
+            'out_of_stock_count',
+            'reorder_needed'
+        ));
     }
 
     /**
@@ -591,56 +803,125 @@ class ReportsController extends Controller
      */
     public function inventoryMovement(Request $request)
     {
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
-        $productId = $request->input('product_id');
-        $warehouseId = $request->input('warehouse_id');
-        $movementType = $request->input('type');
+        // Get date range from request or default to last 30 days
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->subDays(30)->startOfDay();
 
-        $start = Carbon::parse($startDate);
-        $end = Carbon::parse($endDate);
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
 
-        $query = InventoryMovement::with(['product', 'warehouse'])
-            ->whereBetween('created_at', [$start, $end]);
+        // Get filter parameters
+        $type = $request->input('type', 'all');
+        $category = $request->input('category'); // order, quality, loss, supplier, production, warehouse, adjustment
+        $product_search = $request->input('product');
+        $warehouse_id = $request->input('warehouse_id');
 
-        if ($productId) {
-            $query->where('product_id', $productId);
+        // Build query for inventory movements
+        $query = InventoryMovement::with(['product', 'creator', 'warehouse', 'fromWarehouse', 'toWarehouse'])
+            ->whereBetween('created_at', [$start_date, $end_date]);
+
+        // Apply type filter
+        if ($type != 'all') {
+            $query->where('type', $type);
         }
 
-        if ($warehouseId) {
-            $query->where('warehouse_id', $warehouseId);
+        // Apply category filter (using your model's scope)
+        if ($category) {
+            $query->byCategory($category);
         }
 
-        if ($movementType) {
-            $query->where('type', $movementType);
+        // Apply warehouse filter
+        if ($warehouse_id) {
+            $query->where(function($q) use ($warehouse_id) {
+                $q->where('warehouse_id', $warehouse_id)
+                ->orWhere('from_warehouse_id', $warehouse_id)
+                ->orWhere('to_warehouse_id', $warehouse_id);
+            });
         }
 
-        $movements = $query->orderBy('created_at', 'desc')->paginate(100);
+        // Apply product search
+        if ($product_search) {
+            $query->whereHas('product', function($q) use ($product_search) {
+                $q->where('name', 'like', "%{$product_search}%")
+                ->orWhere('sku', 'like', "%{$product_search}%");
+            });
+        }
 
-        // Movement summary
-        $summary = InventoryMovement::select(
-                'type',
-                DB::raw('COUNT(*) as count'),
-                DB::raw('SUM(CASE WHEN quantity > 0 THEN quantity ELSE 0 END) as total_added'),
-                DB::raw('SUM(CASE WHEN quantity < 0 THEN ABS(quantity) ELSE 0 END) as total_removed')
-            )
-            ->whereBetween('created_at', [$start, $end])
-            ->groupBy('type')
+        // Get movements
+        $movements = $query->orderBy('created_at', 'desc')
+            ->limit(100)
             ->get();
 
-        $data = [
-            'start_date' => $start,
-            'end_date' => $end,
-            'movements' => $movements,
-            'summary' => $summary,
-            'product_id' => $productId,
-            'warehouse_id' => $warehouseId,
-            'movement_type' => $movementType,
-            'warehouses' => \App\Models\Warehouse::active()->get(),
-            'movement_types' => $this->getMovementTypes(),
+        // Calculate summary statistics
+        $total_movements = $movements->count();
+
+        // Count movements by increase/decrease
+        $stock_increases = $movements->filter(fn($m) => $m->isIncrease())->count();
+        $stock_decreases = $movements->filter(fn($m) => $m->isDecrease())->count();
+
+        // Calculate quantities
+        $stock_in_quantity = $movements->filter(fn($m) => $m->isIncrease())->sum('quantity');
+        $stock_out_quantity = abs($movements->filter(fn($m) => $m->isDecrease())->sum('quantity'));
+        $net_change = $stock_in_quantity - $stock_out_quantity;
+
+        // Count by specific types
+        $adjustments_count = $movements->whereIn('type', ['adjustment', 'cycle_count', 'physical_count'])->count();
+        $total_in = $stock_increases;
+        $total_out = $stock_decreases;
+
+        // Generate movement trends (daily aggregation)
+        $movement_trends = [];
+        $current_date = $start_date->copy();
+
+        while ($current_date <= $end_date) {
+            $day_movements = $movements->filter(function($m) use ($current_date) {
+                return $m->created_at->isSameDay($current_date);
+            });
+
+            $day_in = $day_movements->filter(fn($m) => $m->isIncrease())->sum('quantity');
+            $day_out = abs($day_movements->filter(fn($m) => $m->isDecrease())->sum('quantity'));
+
+            $movement_trends[] = [
+                'date' => $current_date->format('M d'),
+                'stock_in' => $day_in,
+                'stock_out' => $day_out,
+                'net_change' => $day_in - $day_out
+            ];
+
+            $current_date->addDay();
+        }
+
+        // Get all warehouses for filter
+        $warehouses = Warehouse::orderBy('name')->get();
+
+        // Get movement type categories for filter
+        $movement_categories = [
+            'order' => 'Order Related',
+            'quality' => 'Quality Control',
+            'loss' => 'Loss & Found',
+            'supplier' => 'Supplier Operations',
+            'production' => 'Production',
+            'warehouse' => 'Warehouse Operations',
+            'adjustment' => 'Adjustments & Counts'
         ];
 
-        return view('admin.reports.inventory.movement', $data);
+        return view('admin.reports.inventory.movement', compact(
+            'start_date',
+            'end_date',
+            'movements',
+            'total_movements',
+            'total_in',
+            'total_out',
+            'net_change',
+            'stock_in_quantity',
+            'stock_out_quantity',
+            'adjustments_count',
+            'movement_trends',
+            'warehouses',
+            'movement_categories'
+        ));
     }
 
     /**
