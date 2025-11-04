@@ -82,7 +82,7 @@ class WarehouseController extends Controller
                 return '<div>
                     <strong>' . number_format($totalStock) . '</strong> units<br>
                     <small class="text-muted">' . $stockCount . ' products</small><br>
-                    <small class="text-success">$' . number_format($totalValue, 2) . '</small>
+                    <small class="text-success">' . store_currency_symbol() . number_format($totalValue, 2) . '</small>
                 </div>';
             })
             ->addColumn('alerts', function($warehouse) {
@@ -288,11 +288,20 @@ class WarehouseController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->whereHas('product', function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%");
-            });
+            // DataTables may send search as an array: ['value' => '...']
+            $search = $request->input('search.value', $request->input('search'));
+
+            // Normalize arrays to string (avoid "Array to string conversion")
+            if (is_array($search)) {
+                $search = trim(implode(' ', $search));
+            }
+
+            if ($search !== null && $search !== '') {
+                $query->whereHas('product', function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
         }
 
         return DataTables::of($query)
@@ -321,7 +330,7 @@ class WarehouseController extends Controller
             })
             ->addColumn('value', function($stock) {
                 $value = $stock->quantity * $stock->product->price;
-                return '<span class="text-success">$' . number_format($value, 2) . '</span>';
+                return '<span class="text-success">'. store_currency_symbol() . number_format($value, 2) . '</span>';
             })
             ->addColumn('actions', function($stock) use ($warehouse) {
                 $actions = '<div class="btn-group" role="group">';

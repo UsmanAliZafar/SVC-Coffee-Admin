@@ -309,7 +309,7 @@
         </div>
         <div class="col-md-3 mb-3">
             <div class="stat-box">
-                <div class="stat-value text-success">${{ number_format($warehouse->getTotalStockValue(), 2) }}</div>
+                <div class="stat-value text-success">{{ store_currency_symbol() }}{{ number_format($warehouse->getTotalStockValue(), 2) }}</div>
                 <div class="stat-label">Total Stock Value</div>
             </div>
         </div>
@@ -637,31 +637,42 @@
 let stockTable;
 
 $(document).ready(function() {
-    // Initialize stock DataTable
-    stockTable = $('#stockTable').DataTable({
-        processing: true,
-        serverSide: true,
-        ajax: '{{ route("admin.warehouses.stock.data", $warehouse->id) }}',
-        columns: [
-            { data: 'product_info', name: 'product_info', orderable: false },
-            { data: 'quantity', name: 'quantity' },
-            { data: 'available', name: 'available', orderable: false },
-            { data: 'reserved', name: 'reserved', orderable: false },
-            { data: 'location', name: 'location', orderable: false },
-            { data: 'value', name: 'value', orderable: false },
-            { data: 'actions', name: 'actions', orderable: false, searchable: false }
-        ],
-        order: [[1, 'desc']],
-        pageLength: 10,
-        language: {
-            processing: '<i class="bi bi-hourglass-split"></i> Loading...',
-            emptyTable: 'No stock found in this warehouse'
-        }
-    });
+    // Initialize stock DataTable - but only when the tab is shown for the first time
+    let stockTableInitialized = false;
 
     // Load stock table when tab is shown
     $('button[data-bs-target="#stock"]').on('shown.bs.tab', function() {
-        stockTable.ajax.reload();
+        if (!stockTableInitialized) {
+            // Initialize DataTable
+            stockTable = $('#stockTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: '{{ route("admin.warehouses.stock.data", $warehouse->id) }}',
+                columns: [
+                    { data: 'product_info', name: 'product_info', orderable: false },
+                    { data: 'quantity', name: 'quantity' },
+                    { data: 'available', name: 'available', orderable: false },
+                    { data: 'reserved', name: 'reserved', orderable: false },
+                    { data: 'location', name: 'location', orderable: false },
+                    { data: 'value', name: 'value', orderable: false },
+                    { data: 'actions', name: 'actions', orderable: false, searchable: false }
+                ],
+                order: [[1, 'desc']],
+                pageLength: 10,
+                language: {
+                    processing: '<i class="bi bi-hourglass-split"></i> Loading...',
+                    emptyTable: 'No stock found in this warehouse'
+                },
+                responsive: true,
+                autoWidth: false // This is important
+            });
+
+            stockTableInitialized = true;
+        } else {
+            // Just reload data if already initialized
+            stockTable.ajax.reload();
+            stockTable.columns.adjust().draw(); // Recalculate column widths
+        }
     });
 });
 
