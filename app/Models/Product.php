@@ -1379,6 +1379,12 @@ class Product extends Model
         }
     }
 
+    public function urlRedirects(): HasMany
+    {
+        return $this->hasMany(UrlRedirect::class, 'entity_id')
+                    ->where('entity_type', 'product');
+    }
+
     /**
      * Reserve stock for an order
      */

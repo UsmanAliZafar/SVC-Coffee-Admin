@@ -161,10 +161,51 @@ class ProductsController extends Controller
     public function getBySlug(string $slug): JsonResponse
     {
         try {
-            $product = Product::query()
+            // Normalize the requested URL (to match how it's stored in UrlRedirect)
+            $requestedUrl = '/products/' . trim($slug, '/');
+            $normalizedUrl = \App\Models\UrlRedirect::normalizeUrl($requestedUrl);
+
+            // Check if there’s a redirect for this old URL
+            $redirect = \App\Models\UrlRedirect::findByOldUrl($normalizedUrl);
+
+            if ($redirect) {
+                // Increment hit count
+                $redirect->incrementHits();
+
+                // If the redirect points to a valid product
+                if ($redirect->entity_type === 'product' && $redirect->entity_id) {
+                    $product = \App\Models\Product::query()
+                        ->active()
+                        ->where('id', $redirect->entity_id)
+                        ->with(['category', 'images', 'vendor', 'tags', 'variants', 'urlRedirects'])
+                        ->first();
+
+                    if ($product) {
+                        // Return redirect response (you can use 301 or 302)
+                        return response()->json([
+                            'success' => true,
+                            'redirect' => true,
+                            'redirect_type' => $redirect->redirect_type,
+                            'new_url' => ltrim(str_replace('/products/', '', $redirect->new_url), '/'),
+                            'message' => 'Redirected from old slug to new slug',
+                            'timestamp' => now()->toIso8601String(),
+                        ], $redirect->isPermanent() ? 301 : 302);
+                    }
+                }
+
+                // If redirect exists but product not found
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Redirect target not found',
+                    'timestamp' => now()->toIso8601String(),
+                ], 404);
+            }
+
+            // No redirect found — try to find product by current slug
+            $product = \App\Models\Product::query()
                 ->active()
                 ->where('slug', $slug)
-                ->with(['category', 'images', 'vendor', 'tags', 'variants'])
+                ->with(['category', 'images', 'vendor', 'tags', 'variants', 'urlRedirects'])
                 ->firstOrFail();
 
             return response()->json([
@@ -190,6 +231,7 @@ class ProductsController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Get product by SKU
@@ -437,6 +479,14 @@ class ProductsController extends Controller
             'id' => $product->id,
             'name' => $product->name,
             'slug' => $product->slug,
+            'url_redirects' => $product->urlRedirects->map(function($redirect) {
+                return [
+                    'id' => $redirect->id,
+                    'old_url' => ltrim(str_replace('/products/', '', $redirect->old_url), '/'),
+                    'new_url' => ltrim(str_replace('/products/', '', $redirect->new_url), '/'),
+                    'redirect_type' => $redirect->redirect_type,
+                ];
+            }),
             'sku' => $product->sku,
             'barcode' => $product->barcode,
             'short_description' => $product->short_description,

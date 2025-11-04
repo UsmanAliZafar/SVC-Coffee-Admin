@@ -242,4 +242,9 @@ class UrlRedirect extends Model
             'notes' => 'Auto-generated redirect due to slug change',
         ]);
     }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'entity_id')->where('entity_type', 'product');
+    }
 }
