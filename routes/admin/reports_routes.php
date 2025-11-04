@@ -54,9 +54,23 @@ Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/lifetime-value', [ReportsController::class, 'customersLifetimeValue'])->name('lifetime-value');
         });
 
-        // Export Reports
-        Route::get('/export/pdf/{reportType}', [ReportsController::class, 'exportPdf'])->name('export.pdf');
-        Route::get('/export/excel/{reportType}', [ReportsController::class, 'exportExcel'])->name('export.excel');
-        Route::get('/export/csv/{reportType}', [ReportsController::class, 'exportCsv'])->name('export.csv');
+        // ==================== EXPORT ROUTES ====================
+        Route::prefix('export')->name('export.')->group(function () {
+
+            // PDF Exports
+            Route::get('/{reportType}/pdf', [ReportsController::class, 'exportPdf'])
+                ->name('pdf')
+                ->where('reportType', '[a-z\-]+');
+
+            // Excel Exports
+            Route::get('/{reportType}/excel', [ReportsController::class, 'exportExcel'])
+                ->name('excel')
+                ->where('reportType', '[a-z\-]+');
+
+            // CSV Exports
+            Route::get('/{reportType}/csv', [ReportsController::class, 'exportCsv'])
+                ->name('csv')
+                ->where('reportType', '[a-z\-]+');
+        });
     });
 });

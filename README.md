@@ -66,3 +66,44 @@ php artisan l5-swagger:generate
 
 ## Possible URL 
 http://127.0.0.1:8000/api/documentation
+
+## Report 
+/**
+ * USAGE EXAMPLES:
+ * 
+ * From Blade Views:
+ * ------------------
+ * 
+ * PDF Export:
+ * <a href="{{ route('admin.reports.export.pdf', ['reportType' => 'revenue-by-category'] + request()->all()) }}" 
+ *    class="dropdown-item">
+ *     <i class="bi bi-file-pdf"></i> Export to PDF
+ * </a>
+ * 
+ * Excel Export:
+ * <a href="{{ route('admin.reports.export.excel', ['reportType' => 'products-top-selling'] + request()->all()) }}" 
+ *    class="dropdown-item">
+ *     <i class="bi bi-file-excel"></i> Export to Excel
+ * </a>
+ * 
+ * CSV Export:
+ * <a href="{{ route('admin.reports.export.csv', ['reportType' => 'inventory-stock-levels'] + request()->all()) }}" 
+ *    class="dropdown-item">
+ *     <i class="bi bi-file-csv"></i> Export to CSV
+ * </a>
+ * 
+ * 
+ * VALID REPORT TYPES:
+ * -------------------
+ * - revenue-by-category
+ * - revenue-by-product
+ * - products-top-selling
+ * - products-by-category
+ * - products-performance
+ * - inventory-stock-levels
+ * - inventory-movements
+ * - inventory-valuation
+ * - customers-index
+ * - customers-new-vs-returning
+ * - customers-lifetime-value
+ */

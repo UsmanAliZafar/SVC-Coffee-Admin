@@ -3,6 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use Carbon\CarbonPeriod;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Response;
+//
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -12,10 +20,7 @@ use App\Models\InventoryMovement;
 use App\Models\Warehouse;
 use App\Models\Transaction;
 use App\Models\ProductsCategories;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use Carbon\CarbonPeriod;
+
 
 class ReportsController extends Controller
 {
@@ -929,61 +934,99 @@ class ReportsController extends Controller
      */
     public function inventoryValuation(Request $request)
     {
-        $warehouseId = $request->input('warehouse_id');
-        $categoryId = $request->input('category_id');
+        // Get filter parameters
+        $category_id = $request->input('category_id');
+        $search = $request->input('search');
+        $sort = $request->input('sort', 'value_desc');
 
-        $query = Product::select(
-                'products.id',
-                'products.name',
-                'products.sku',
-                'products.price',
-                'products.cost_price',
-                'products.stock_quantity',
-                'products_categories.title as category_name',
-                DB::raw('products.stock_quantity * products.price as retail_value'),
-                DB::raw('products.stock_quantity * COALESCE(products.cost_price, 0) as cost_value'),
-                DB::raw('(products.stock_quantity * products.price) - (products.stock_quantity * COALESCE(products.cost_price, 0)) as potential_profit')
-            )
-            ->leftJoin('products_categories', 'products.category_id', '=', 'products_categories.id')
-            ->where('products.track_inventory', true)
-            ->where('products.stock_quantity', '>', 0);
+        // Build query
+        $query = Product::with('category')
+            ->where('stock_quantity', '>', 0); // Only products with stock
 
-        if ($categoryId) {
-            $query->where('products.category_id', $categoryId);
+        // Apply category filter
+        if ($category_id) {
+            $query->where('category_id', $category_id);
         }
 
-        $products = $query->orderBy('retail_value', 'desc')->get();
+        // Apply search filter
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
 
-        $totalRetailValue = $products->sum('retail_value');
-        $totalCostValue = $products->sum('cost_value');
-        $totalPotentialProfit = $products->sum('potential_profit');
+        // Apply sorting
+        switch ($sort) {
+            case 'value_desc':
+                $query->orderByRaw('stock_quantity * price DESC');
+                break;
+            case 'value_asc':
+                $query->orderByRaw('stock_quantity * price ASC');
+                break;
+            case 'name_asc':
+                $query->orderBy('name', 'asc');
+                break;
+            case 'stock_desc':
+                $query->orderBy('stock_quantity', 'desc');
+                break;
+            default:
+                $query->orderByRaw('stock_quantity * price DESC');
+        }
 
-        // Group by category
-        $categoryValuation = $products->groupBy('category_name')->map(function($items, $category) {
-            return [
-                'category' => $category,
-                'product_count' => $items->count(),
-                'total_units' => $items->sum('stock_quantity'),
-                'retail_value' => $items->sum('retail_value'),
-                'cost_value' => $items->sum('cost_value'),
-                'potential_profit' => $items->sum('potential_profit'),
-            ];
-        })->values();
+        // Get products
+        $products = $query->get();
 
-        $data = [
-            'products' => $products,
-            'category_valuation' => $categoryValuation,
-            'total_retail_value' => $totalRetailValue,
-            'total_cost_value' => $totalCostValue,
-            'total_potential_profit' => $totalPotentialProfit,
-            'total_units' => $products->sum('stock_quantity'),
-            'category_id' => $categoryId,
-            'warehouse_id' => $warehouseId,
-            'categories' => ProductsCategories::active()->ordered()->get(),
-            'warehouses' => \App\Models\Warehouse::active()->get(),
-        ];
+        // Calculate total valuation
+        $total_valuation = $products->sum(function($product) {
+            return $product->stock_quantity * $product->price;
+        });
 
-        return view('admin.reports.inventory.valuation', $data);
+        // Calculate summary statistics
+        $total_products = $products->count();
+        $total_units = $products->sum('stock_quantity');
+        $average_unit_value = $total_units > 0 ? $total_valuation / $total_units : 0;
+
+        // Get all categories for filter
+        $categories = ProductsCategories::orderBy('title')->get();
+        $categories_count = $categories->count();
+
+        // Calculate valuation by category
+        $category_valuations = [];
+
+        foreach ($categories as $category) {
+            $category_products = $products->where('category_id', $category->id);
+
+            if ($category_products->count() > 0) {
+                $category_value = $category_products->sum(function($product) {
+                    return $product->stock_quantity * $product->price;
+                });
+
+                $category_valuations[] = [
+                    'category_id' => $category->id,
+                    'category_name' => $category->title,
+                    'product_count' => $category_products->count(),
+                    'total_units' => $category_products->sum('stock_quantity'),
+                    'total_value' => $category_value
+                ];
+            }
+        }
+
+        // Sort category valuations by value descending
+        usort($category_valuations, function($a, $b) {
+            return $b['total_value'] <=> $a['total_value'];
+        });
+
+        return view('admin.reports.inventory.valuation', compact(
+            'products',
+            'categories',
+            'total_valuation',
+            'total_products',
+            'total_units',
+            'average_unit_value',
+            'categories_count',
+            'category_valuations'
+        ));
     }
 
     // ==================== CUSTOMER REPORTS ====================
@@ -993,23 +1036,128 @@ class ReportsController extends Controller
      */
     public function customersIndex(Request $request)
     {
-        $period = $request->input('period', 'month');
-        $date = $request->input('date', Carbon::now()->format('Y-m-d'));
+        // Get filter parameters
+        $segment = $request->input('segment', 'all');
+        $search = $request->input('search');
+        $sort = $request->input('sort', 'ltv_desc');
 
-        $dateRange = $this->getDateRangeForPeriod($period, $date);
+        // Build base query
+        $query = Customer::query();
 
-        $data = [
-            'period' => $period,
-            'date_range' => $dateRange,
-            'total_customers' => Customer::count(),
-            'new_customers' => $this->getNewCustomers($dateRange['start'], $dateRange['end']),
-            'active_customers' => $this->getActiveCustomers($dateRange['start'], $dateRange['end']),
-            'customer_retention' => $this->getCustomerRetentionRate($dateRange['start'], $dateRange['end']),
-            'top_customers' => $this->getTopCustomers($dateRange['start'], $dateRange['end']),
-            'customer_distribution' => $this->getCustomerDistribution(),
+        // Apply segment filter
+        if ($segment == 'vip') {
+            $query->highValue(1000);
+        } elseif ($segment == 'new') {
+            $query->where('created_at', '>=', now()->subDays(30));
+        } elseif ($segment == 'repeat') {
+            $query->where('total_orders', '>', 1);
+        } elseif ($segment == 'inactive') {
+            $query->inactiveForDays(90);
+        }
+
+        // Apply search filter
+        if ($search) {
+            $query->search($search);
+        }
+
+        // Apply sorting
+        switch ($sort) {
+            case 'ltv_desc':
+                $query->orderBySpent('desc');
+                break;
+            case 'orders_desc':
+                $query->orderByOrders('desc');
+                break;
+            case 'recent':
+                $query->orderByRegistration('desc');
+                break;
+            case 'name_asc':
+                $query->orderBy('first_name', 'asc');
+                break;
+            default:
+                $query->orderBySpent('desc');
+        }
+
+        // Get customers with their statistics
+        $customers = $query->get();
+
+        // Calculate summary statistics
+        $total_customers = Customer::count();
+        $new_customers = Customer::thisMonth()->count();
+
+        $all_customers = Customer::all();
+        $total_revenue = $all_customers->sum('total_spent');
+        $average_ltv = $total_customers > 0 ? $total_revenue / $total_customers : 0;
+
+        $repeat_customers = Customer::where('total_orders', '>', 1)->count();
+        $repeat_rate = $total_customers > 0 ? ($repeat_customers / $total_customers) * 100 : 0;
+
+        // Customer Segmentation
+        $segments = [
+            [
+                'name' => 'VIP Customers',
+                'count' => Customer::where('total_spent', '>=', 1000)->count(),
+                'description' => 'Spent $1000+'
+            ],
+            [
+                'name' => 'Repeat Buyers',
+                'count' => Customer::where('total_orders', '>', 1)->count(),
+                'description' => '2+ orders'
+            ],
+            [
+                'name' => 'New Customers',
+                'count' => Customer::where('created_at', '>=', now()->subDays(30))->count(),
+                'description' => 'Joined last 30 days'
+            ],
+            [
+                'name' => 'Inactive',
+                'count' => Customer::where('last_order_at', '<', now()->subDays(90))
+                                ->where('total_orders', '>', 0)
+                                ->count(),
+                'description' => 'No orders 90+ days'
+            ]
         ];
 
-        return view('admin.reports.customers.index', $data);
+        // Customer Growth (last 6 months)
+        $customer_growth = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $count = Customer::whereYear('created_at', $month->year)
+                            ->whereMonth('created_at', $month->month)
+                            ->count();
+
+            $customer_growth[] = [
+                'month' => $month->format('M Y'),
+                'count' => $count
+            ];
+        }
+
+        // LTV Distribution
+        $ltv_distribution = [
+            [
+                'segment' => 'High ($1000+)',
+                'count' => Customer::where('total_spent', '>=', 1000)->count()
+            ],
+            [
+                'segment' => 'Medium ($500-$999)',
+                'count' => Customer::whereBetween('total_spent', [500, 999.99])->count()
+            ],
+            [
+                'segment' => 'Low (<$500)',
+                'count' => Customer::where('total_spent', '<', 500)->count()
+            ]
+        ];
+
+        return view('admin.reports.customers.index', compact(
+            'customers',
+            'total_customers',
+            'new_customers',
+            'average_ltv',
+            'repeat_rate',
+            'segments',
+            'customer_growth',
+            'ltv_distribution'
+        ));
     }
 
     /**
@@ -1017,46 +1165,184 @@ class ReportsController extends Controller
      */
     public function customersNewVsReturning(Request $request)
     {
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
+        // Determine date range based on period
+        $period = $request->input('period', '30days');
 
-        $start = Carbon::parse($startDate);
-        $end = Carbon::parse($endDate);
+        if ($period == 'custom') {
+            $start_date = $request->start_date
+                ? Carbon::parse($request->start_date)->startOfDay()
+                : now()->subDays(30)->startOfDay();
+            $end_date = $request->end_date
+                ? Carbon::parse($request->end_date)->endOfDay()
+                : now()->endOfDay();
+        } else {
+            switch ($period) {
+                case '7days':
+                    $start_date = now()->subDays(7)->startOfDay();
+                    $end_date = now()->endOfDay();
+                    break;
+                case '90days':
+                    $start_date = now()->subDays(90)->startOfDay();
+                    $end_date = now()->endOfDay();
+                    break;
+                case 'this_month':
+                    $start_date = now()->startOfMonth();
+                    $end_date = now()->endOfMonth();
+                    break;
+                case 'last_month':
+                    $start_date = now()->subMonth()->startOfMonth();
+                    $end_date = now()->subMonth()->endOfMonth();
+                    break;
+                case 'this_year':
+                    $start_date = now()->startOfYear();
+                    $end_date = now()->endOfYear();
+                    break;
+                default: // 30days
+                    $start_date = now()->subDays(30)->startOfDay();
+                    $end_date = now()->endOfDay();
+            }
+        }
 
-        // Get orders with customer info
-        $ordersData = Order::select(
-                'customer_id',
-                'guest_email',
-                DB::raw('COUNT(*) as order_count'),
-                DB::raw('SUM(total_amount) as total_spent'),
-                DB::raw('MIN(created_at) as first_order_date')
-            )
-            ->whereBetween('created_at', [$start, $end])
-            ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
-            ->groupBy('customer_id', 'guest_email')
+        // Get orders in date range with customer relationship
+        $orders = Order::with('customer')
+            ->whereBetween('created_at', [$start_date, $end_date])
+            ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING', 'ORDER_COMPLETED'])
             ->get();
 
-        $newCustomers = $ordersData->filter(function($order) use ($start) {
-            return Carbon::parse($order->first_order_date)->between($start, Carbon::now());
-        });
+        // Classify orders as new or returning
+        $new_orders = collect();
+        $returning_orders = collect();
 
-        $returningCustomers = $ordersData->filter(function($order) use ($start) {
-            return Carbon::parse($order->first_order_date)->lt($start);
-        });
+        foreach ($orders as $order) {
+            if ($order->customer) {
+                // Check if this was customer's first order
+                $customer_orders_before = Order::where('customer_id', $order->customer_id)
+                    ->where('created_at', '<', $order->created_at)
+                    ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING', 'ORDER_COMPLETED'])
+                    ->count();
 
-        $data = [
-            'start_date' => $start,
-            'end_date' => $end,
-            'new_customers_count' => $newCustomers->count(),
-            'returning_customers_count' => $returningCustomers->count(),
-            'new_customers_revenue' => $newCustomers->sum('total_spent'),
-            'returning_customers_revenue' => $returningCustomers->sum('total_spent'),
-            'new_customers_avg_order' => $newCustomers->avg('total_spent'),
-            'returning_customers_avg_order' => $returningCustomers->avg('total_spent'),
-            'daily_breakdown' => $this->getNewVsReturningDaily($start, $end),
-        ];
+                if ($customer_orders_before == 0) {
+                    $new_orders->push($order);
+                } else {
+                    $returning_orders->push($order);
+                }
+            }
+        }
 
-        return view('admin.reports.customers.new-vs-returning', $data);
+        // Calculate metrics for new customers
+        $new_customers_count = $new_orders->pluck('customer_id')->unique()->count();
+        $new_orders_count = $new_orders->count();
+        $new_revenue = $new_orders->sum('total_amount');
+        $new_aov = $new_orders_count > 0 ? $new_revenue / $new_orders_count : 0;
+
+        // Calculate metrics for returning customers
+        $returning_customers_count = $returning_orders->pluck('customer_id')->unique()->count();
+        $returning_orders_count = $returning_orders->count();
+        $returning_revenue = $returning_orders->sum('total_amount');
+        $returning_aov = $returning_orders_count > 0 ? $returning_revenue / $returning_orders_count : 0;
+
+        // Calculate percentages
+        $total_customers = $new_customers_count + $returning_customers_count;
+        $new_percentage = $total_customers > 0 ? ($new_customers_count / $total_customers) * 100 : 0;
+        $returning_percentage = $total_customers > 0 ? ($returning_customers_count / $total_customers) * 100 : 0;
+
+        // Generate trend data (daily)
+        $trend_data = [];
+        $current_date = $start_date->copy();
+
+        while ($current_date <= $end_date) {
+            $day_orders = $orders->filter(function($order) use ($current_date) {
+                return $order->created_at->isSameDay($current_date);
+            });
+
+            $day_new = collect();
+            $day_returning = collect();
+
+            foreach ($day_orders as $order) {
+                if ($order->customer) {
+                    $customer_orders_before = Order::where('customer_id', $order->customer_id)
+                        ->where('created_at', '<', $order->created_at)
+                        ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING', 'ORDER_COMPLETED'])
+                        ->count();
+
+                    if ($customer_orders_before == 0) {
+                        $day_new->push($order);
+                    } else {
+                        $day_returning->push($order);
+                    }
+                }
+            }
+
+            $trend_data[] = [
+                'date' => $current_date->format('M d'),
+                'new_customers' => $day_new->pluck('customer_id')->unique()->count(),
+                'returning_customers' => $day_returning->pluck('customer_id')->unique()->count(),
+                'new_revenue' => $day_new->sum('total_amount'),
+                'returning_revenue' => $day_returning->sum('total_amount')
+            ];
+
+            $current_date->addDay();
+        }
+
+        // Generate monthly breakdown
+        $monthly_breakdown = [];
+        $months_count = $start_date->diffInMonths($end_date) + 1;
+
+        for ($i = 0; $i < $months_count; $i++) {
+            $month_start = $start_date->copy()->addMonths($i)->startOfMonth();
+            $month_end = $start_date->copy()->addMonths($i)->endOfMonth();
+
+            if ($month_end->gt($end_date)) {
+                $month_end = $end_date->copy();
+            }
+
+            $month_orders = $orders->filter(function($order) use ($month_start, $month_end) {
+                return $order->created_at->between($month_start, $month_end);
+            });
+
+            $month_new = collect();
+            $month_returning = collect();
+
+            foreach ($month_orders as $order) {
+                if ($order->customer) {
+                    $customer_orders_before = Order::where('customer_id', $order->customer_id)
+                        ->where('created_at', '<', $order->created_at)
+                        ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING', 'ORDER_COMPLETED'])
+                        ->count();
+
+                    if ($customer_orders_before == 0) {
+                        $month_new->push($order);
+                    } else {
+                        $month_returning->push($order);
+                    }
+                }
+            }
+
+            $monthly_breakdown[] = [
+                'month' => $month_start->format('M Y'),
+                'new_customers' => $month_new->pluck('customer_id')->unique()->count(),
+                'returning_customers' => $month_returning->pluck('customer_id')->unique()->count(),
+                'new_revenue' => $month_new->sum('total_amount'),
+                'returning_revenue' => $month_returning->sum('total_amount')
+            ];
+        }
+
+        return view('admin.reports.customers.new-vs-returning', compact(
+            'start_date',
+            'end_date',
+            'new_customers_count',
+            'new_orders_count',
+            'new_revenue',
+            'new_aov',
+            'new_percentage',
+            'returning_customers_count',
+            'returning_orders_count',
+            'returning_revenue',
+            'returning_aov',
+            'returning_percentage',
+            'trend_data',
+            'monthly_breakdown'
+        ));
     }
 
     /**
@@ -1064,41 +1350,146 @@ class ReportsController extends Controller
      */
     public function customersLifetimeValue(Request $request)
     {
-        $minOrders = $request->input('min_orders', 1);
-        $limit = $request->input('limit', 100);
+        // Get filter parameters
+        $segment = $request->input('segment', 'all');
+        $search = $request->input('search');
+        $sort = $request->input('sort', 'ltv_desc');
 
-        $customers = Customer::select(
-                'customers.id',
-                'customers.name',
-                'customers.email',
-                'customers.created_at',
-                DB::raw('COUNT(orders.id) as total_orders'),
-                DB::raw('SUM(orders.total_amount) as lifetime_value'),
-                DB::raw('AVG(orders.total_amount) as avg_order_value'),
-                DB::raw('MAX(orders.created_at) as last_order_date'),
-                DB::raw('DATEDIFF(MAX(orders.created_at), MIN(orders.created_at)) as customer_lifespan_days')
-            )
-            ->leftJoin('orders', 'customers.id', '=', 'orders.customer_id')
-            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
-            ->groupBy('customers.id', 'customers.name', 'customers.email', 'customers.created_at')
-            ->having('total_orders', '>=', $minOrders)
-            ->orderBy('lifetime_value', 'desc')
-            ->limit($limit)
-            ->get();
+        // Build query
+        $query = Customer::query();
 
-        $data = [
-            'customers' => $customers,
-            'min_orders' => $minOrders,
-            'summary' => [
-                'total_customers' => $customers->count(),
-                'total_ltv' => $customers->sum('lifetime_value'),
-                'avg_ltv' => $customers->avg('lifetime_value'),
-                'avg_orders' => $customers->avg('total_orders'),
-                'avg_order_value' => $customers->avg('avg_order_value'),
+        // Apply segment filter
+        if ($segment == 'platinum') {
+            $query->where('total_spent', '>=', 5000);
+        } elseif ($segment == 'gold') {
+            $query->whereBetween('total_spent', [2000, 4999.99]);
+        } elseif ($segment == 'silver') {
+            $query->whereBetween('total_spent', [500, 1999.99]);
+        } elseif ($segment == 'bronze') {
+            $query->where('total_spent', '<', 500);
+        }
+
+        // Apply search filter
+        if ($search) {
+            $query->search($search);
+        }
+
+        // Apply sorting
+        switch ($sort) {
+            case 'ltv_desc':
+                $query->orderBySpent('desc');
+                break;
+            case 'ltv_asc':
+                $query->orderBySpent('asc');
+                break;
+            case 'orders_desc':
+                $query->orderByOrders('desc');
+                break;
+            case 'recent':
+                $query->orderByRegistration('desc');
+                break;
+            default:
+                $query->orderBySpent('desc');
+        }
+
+        // Get customers
+        $customers = $query->get();
+
+        // Get top customers for special display
+        $top_customers = Customer::orderBySpent('desc')->take(10)->get();
+
+        // Calculate summary statistics
+        $total_customers = Customer::count();
+        $all_customers = Customer::all();
+        $total_ltv = $all_customers->sum('total_spent');
+        $average_ltv = $total_customers > 0 ? $total_ltv / $total_customers : 0;
+        $highest_ltv = $all_customers->max('total_spent') ?? 0;
+
+        // Calculate LTV segments
+        $segments = [
+            [
+                'name' => 'Platinum',
+                'class' => 'platinum',
+                'icon' => 'bi-gem',
+                'description' => '$5,000+ Lifetime Value',
+                'count' => Customer::where('total_spent', '>=', 5000)->count(),
+                'total_value' => Customer::where('total_spent', '>=', 5000)->sum('total_spent'),
+                'avg_ltv' => 0,
+                'avg_orders' => 0
             ],
+            [
+                'name' => 'Gold',
+                'class' => 'gold',
+                'icon' => 'bi-award',
+                'description' => '$2,000 - $4,999',
+                'count' => Customer::whereBetween('total_spent', [2000, 4999.99])->count(),
+                'total_value' => Customer::whereBetween('total_spent', [2000, 4999.99])->sum('total_spent'),
+                'avg_ltv' => 0,
+                'avg_orders' => 0
+            ],
+            [
+                'name' => 'Silver',
+                'class' => 'silver',
+                'icon' => 'bi-trophy',
+                'description' => '$500 - $1,999',
+                'count' => Customer::whereBetween('total_spent', [500, 1999.99])->count(),
+                'total_value' => Customer::whereBetween('total_spent', [500, 1999.99])->sum('total_spent'),
+                'avg_ltv' => 0,
+                'avg_orders' => 0
+            ],
+            [
+                'name' => 'Bronze',
+                'class' => 'bronze',
+                'icon' => 'bi-star',
+                'description' => 'Under $500',
+                'count' => Customer::where('total_spent', '<', 500)->count(),
+                'total_value' => Customer::where('total_spent', '<', 500)->sum('total_spent'),
+                'avg_ltv' => 0,
+                'avg_orders' => 0
+            ]
         ];
 
-        return view('admin.reports.customers.lifetime-value', $data);
+        // Calculate averages for each segment
+        foreach ($segments as &$seg) {
+            if ($seg['count'] > 0) {
+                $seg['avg_ltv'] = $seg['total_value'] / $seg['count'];
+
+                // Get average orders for this segment
+                if ($seg['name'] == 'Platinum') {
+                    $segment_customers = Customer::where('total_spent', '>=', 5000)->get();
+                } elseif ($seg['name'] == 'Gold') {
+                    $segment_customers = Customer::whereBetween('total_spent', [2000, 4999.99])->get();
+                } elseif ($seg['name'] == 'Silver') {
+                    $segment_customers = Customer::whereBetween('total_spent', [500, 1999.99])->get();
+                } else {
+                    $segment_customers = Customer::where('total_spent', '<', 500)->get();
+                }
+
+                $seg['avg_orders'] = $segment_customers->avg('total_orders') ?? 0;
+            }
+        }
+
+        // Calculate predicted LTV (simple growth projection)
+        // Using last 6 months growth rate
+        $six_months_ago = now()->subMonths(6);
+        $recent_customers = Customer::where('created_at', '>=', $six_months_ago)->get();
+        $recent_avg_ltv = $recent_customers->count() > 0 ? $recent_customers->avg('total_spent') : $average_ltv;
+
+        // Calculate growth rate
+        $ltv_growth_rate = $average_ltv > 0 ? (($recent_avg_ltv - $average_ltv) / $average_ltv) * 100 : 0;
+        $predicted_ltv = $average_ltv * (1 + ($ltv_growth_rate / 100));
+
+        return view('admin.reports.customers.lifetime-value', compact(
+            'customers',
+            'top_customers',
+            'total_customers',
+            'total_ltv',
+            'average_ltv',
+            'highest_ltv',
+            'segments',
+            'predicted_ltv',
+            'ltv_growth_rate'
+        ));
     }
 
     // ==================== HELPER METHODS ====================
@@ -2064,8 +2455,30 @@ class ReportsController extends Controller
      */
     public function exportPdf($reportType, Request $request)
     {
-        // Implementation for PDF export
-        // Use libraries like DomPDF or TCPDF
+        try {
+            // Get report data based on type
+            $data = $this->getReportData($reportType, $request);
+
+            // Get appropriate view for PDF
+            $view = $this->getReportView($reportType);
+
+            // Generate PDF
+            $pdf = Pdf::loadView("admin.reports.exports.{$view}", $data)
+                ->setPaper('a4', 'landscape')
+                ->setOption('margin-top', 10)
+                ->setOption('margin-bottom', 10)
+                ->setOption('margin-left', 10)
+                ->setOption('margin-right', 10);
+
+            // Generate filename
+            $filename = $this->generateFilename($reportType, 'pdf');
+
+            // Download PDF
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to generate PDF: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -2073,8 +2486,19 @@ class ReportsController extends Controller
      */
     public function exportExcel($reportType, Request $request)
     {
-        // Implementation for Excel export
-        // Use Laravel Excel package
+        try {
+            // Generate filename
+            $filename = $this->generateFilename($reportType, 'xlsx');
+
+            // Get appropriate export class
+            $exportClass = $this->getExportClass($reportType, $request);
+
+            // Download Excel file
+            return Excel::download($exportClass, $filename);
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to generate Excel: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -2082,6 +2506,878 @@ class ReportsController extends Controller
      */
     public function exportCsv($reportType, Request $request)
     {
-        // Implementation for CSV export
+        try {
+            // Get report data
+            $data = $this->getReportDataForCsv($reportType, $request);
+
+            // Generate filename
+            $filename = $this->generateFilename($reportType, 'csv');
+
+            // Create CSV content
+            $csv = $this->generateCsvContent($reportType, $data);
+
+            // Return CSV download
+            return Response::make($csv, 200, [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => "attachment; filename={$filename}",
+            ]);
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to generate CSV: ' . $e->getMessage());
+        }
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Get report data based on type
+     */
+    private function getReportData($reportType, $request)
+    {
+        switch ($reportType) {
+            case 'revenue-by-category':
+                return $this->getRevenueByCategoryData($request);
+
+            case 'revenue-by-product':
+                return $this->getRevenueByProductData($request);
+
+            case 'products-top-selling':
+                return $this->getProductsTopSellingData($request);
+
+            case 'products-by-category':
+                return $this->getProductsByCategoryData($request);
+
+            case 'products-performance':
+                return $this->getProductsPerformanceData($request);
+
+            case 'inventory-stock-levels':
+                return $this->getInventoryStockLevelsData($request);
+
+            case 'inventory-movements':
+                return $this->getInventoryMovementsData($request);
+
+            case 'inventory-valuation':
+                return $this->getInventoryValuationData($request);
+
+            case 'customers-index':
+                return $this->getCustomersIndexData($request);
+
+            case 'customers-new-vs-returning':
+                return $this->getCustomersNewVsReturningData($request);
+
+            case 'customers-lifetime-value':
+                return $this->getCustomersLifetimeValueData($request);
+
+            default:
+                throw new \Exception('Invalid report type');
+        }
+    }
+
+    /**
+     * Get report view name
+     */
+    private function getReportView($reportType)
+    {
+        $viewMap = [
+            'revenue-by-category' => 'revenue-by-category-pdf',
+            'revenue-by-product' => 'revenue-by-product-pdf',
+            'products-top-selling' => 'products-top-selling-pdf',
+            'products-by-category' => 'products-by-category-pdf',
+            'products-performance' => 'products-performance-pdf',
+            'inventory-stock-levels' => 'inventory-stock-levels-pdf',
+            'inventory-movements' => 'inventory-movements-pdf',
+            'inventory-valuation' => 'inventory-valuation-pdf',
+            'customers-index' => 'customers-index-pdf',
+            'customers-new-vs-returning' => 'customers-new-vs-returning-pdf',
+            'customers-lifetime-value' => 'customers-lifetime-value-pdf',
+        ];
+
+        return $viewMap[$reportType] ?? 'default-pdf';
+    }
+
+    /**
+     * Generate filename for export
+     */
+    private function generateFilename($reportType, $extension)
+    {
+        $reportName = str_replace('-', '_', $reportType);
+        $timestamp = now()->format('Y-m-d_His');
+        return "{$reportName}_{$timestamp}.{$extension}";
+    }
+
+    /**
+     * Get export class for Excel
+     */
+    private function getExportClass($reportType, $request)
+    {
+        switch ($reportType) {
+            case 'revenue-by-category':
+                return new \App\Exports\RevenueByCategoryExport($request);
+
+            case 'revenue-by-product':
+                return new \App\Exports\RevenueByProductExport($request);
+
+            case 'products-top-selling':
+                return new \App\Exports\ProductsTopSellingExport($request);
+
+            case 'products-by-category':
+                return new \App\Exports\ProductsByCategoryExport($request);
+
+            case 'products-performance':
+                return new \App\Exports\ProductsPerformanceExport($request);
+
+            case 'inventory-stock-levels':
+                return new \App\Exports\InventoryStockLevelsExport($request);
+
+            case 'inventory-movements':
+                return new \App\Exports\InventoryMovementsExport($request);
+
+            case 'inventory-valuation':
+                return new \App\Exports\InventoryValuationExport($request);
+
+            case 'customers-index':
+                return new \App\Exports\CustomersIndexExport($request);
+
+            case 'customers-new-vs-returning':
+                return new \App\Exports\CustomersNewVsReturningExport($request);
+
+            case 'customers-lifetime-value':
+                return new \App\Exports\CustomersLifetimeValueExport($request);
+
+            default:
+                throw new \Exception('Invalid report type');
+        }
+    }
+
+    /**
+     * Get report data for CSV
+     */
+    private function getReportDataForCsv($reportType, $request)
+    {
+        // Reuse the same data retrieval methods
+        return $this->getReportData($reportType, $request);
+    }
+
+    /**
+     * Generate CSV content
+     */
+    private function generateCsvContent($reportType, $data)
+    {
+        $output = fopen('php://temp', 'r+');
+
+        switch ($reportType) {
+            case 'revenue-by-category':
+                $this->generateRevenueByCategoryCsv($output, $data);
+                break;
+
+            case 'revenue-by-product':
+                $this->generateRevenueByProductCsv($output, $data);
+                break;
+
+            case 'products-top-selling':
+                $this->generateProductsTopSellingCsv($output, $data);
+                break;
+
+            case 'products-by-category':
+                $this->generateProductsByCategoryCsv($output, $data);
+                break;
+
+            case 'products-performance':
+                $this->generateProductsPerformanceCsv($output, $data);
+                break;
+
+            case 'inventory-stock-levels':
+                $this->generateInventoryStockLevelsCsv($output, $data);
+                break;
+
+            case 'inventory-movements':
+                $this->generateInventoryMovementsCsv($output, $data);
+                break;
+
+            case 'inventory-valuation':
+                $this->generateInventoryValuationCsv($output, $data);
+                break;
+
+            case 'customers-index':
+                $this->generateCustomersIndexCsv($output, $data);
+                break;
+
+            case 'customers-new-vs-returning':
+                $this->generateCustomersNewVsReturningCsv($output, $data);
+                break;
+
+            case 'customers-lifetime-value':
+                $this->generateCustomersLifetimeValueCsv($output, $data);
+                break;
+        }
+
+        rewind($output);
+        $csv = stream_get_contents($output);
+        fclose($output);
+
+        return $csv;
+    }
+
+    // ==================== DATA RETRIEVAL METHODS ====================
+
+    /**
+     * Get Revenue by Category data
+     */
+    private function getRevenueByCategoryData($request)
+    {
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->subDays(30)->startOfDay();
+
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
+
+        $categories = ProductsCategories::with(['products' => function($query) use ($start_date, $end_date) {
+            $query->whereHas('orderItems.order', function($q) use ($start_date, $end_date) {
+                $q->whereBetween('created_at', [$start_date, $end_date])
+                ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING']);
+            });
+        }])->get();
+
+        $category_data = [];
+        $total_revenue = 0;
+
+        foreach ($categories as $category) {
+            $revenue = OrderItem::whereHas('order', function($query) use ($start_date, $end_date) {
+                $query->whereBetween('created_at', [$start_date, $end_date])
+                    ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING']);
+            })
+            ->whereHas('product', function($query) use ($category) {
+                $query->where('category_id', $category->id);
+            })
+            ->sum(DB::raw('quantity * price'));
+
+            if ($revenue > 0) {
+                $category_data[] = [
+                    'category' => $category,
+                    'revenue' => $revenue,
+                    'product_count' => $category->products->count()
+                ];
+                $total_revenue += $revenue;
+            }
+        }
+
+        return [
+            'categories' => collect($category_data)->sortByDesc('revenue'),
+            'total_revenue' => $total_revenue,
+            'start_date' => $start_date,
+            'end_date' => $end_date
+        ];
+    }
+
+    /**
+     * Get Revenue by Product data
+     */
+    private function getRevenueByProductData($request)
+    {
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->subDays(30)->startOfDay();
+
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
+
+        $products = Product::select(
+                'products.*',
+                DB::raw('SUM(order_items.quantity) as total_quantity'),
+                DB::raw('SUM(order_items.quantity * order_items.price) as total_revenue')
+            )
+            ->join('order_items', 'products.id', '=', 'order_items.product_id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereBetween('orders.created_at', [$start_date, $end_date])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+            ->groupBy('products.id')
+            ->orderByDesc('total_revenue')
+            ->get();
+
+        return [
+            'products' => $products,
+            'total_revenue' => $products->sum('total_revenue'),
+            'start_date' => $start_date,
+            'end_date' => $end_date
+        ];
+    }
+
+    /**
+     * Get Products Top Selling data
+     */
+    private function getProductsTopSellingData($request)
+    {
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->subDays(30)->startOfDay();
+
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
+
+        $products = Product::select(
+                'products.*',
+                DB::raw('SUM(order_items.quantity) as units_sold'),
+                DB::raw('SUM(order_items.quantity * order_items.price) as revenue'),
+                DB::raw('COUNT(DISTINCT orders.id) as order_count')
+            )
+            ->join('order_items', 'products.id', '=', 'order_items.product_id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereBetween('orders.created_at', [$start_date, $end_date])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+            ->groupBy('products.id')
+            ->orderByDesc('units_sold')
+            ->limit(50)
+            ->get();
+
+        return [
+            'products' => $products,
+            'start_date' => $start_date,
+            'end_date' => $end_date
+        ];
+    }
+
+    /**
+     * Get Products by Category data
+     */
+    private function getProductsByCategoryData($request)
+    {
+        $categories = ProductsCategories::with(['products' => function($query) {
+            $query->orderBy('name');
+        }])->orderBy('title')->get();
+
+        return [
+            'categories' => $categories,
+            'total_products' => Product::count()
+        ];
+    }
+
+    /**
+     * Get Products Performance data
+     */
+    private function getProductsPerformanceData($request)
+    {
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->subDays(30)->startOfDay();
+
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
+
+        $products = Product::select(
+                'products.*',
+                DB::raw('SUM(order_items.quantity) as units_sold'),
+                DB::raw('SUM(order_items.quantity * order_items.price) as revenue'),
+                DB::raw('COUNT(DISTINCT orders.id) as order_count'),
+                DB::raw('AVG(order_items.price) as avg_price')
+            )
+            ->leftJoin('order_items', 'products.id', '=', 'order_items.product_id')
+            ->leftJoin('orders', function($join) use ($start_date, $end_date) {
+                $join->on('order_items.order_id', '=', 'orders.id')
+                    ->whereBetween('orders.created_at', [$start_date, $end_date])
+                    ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING']);
+            })
+            ->groupBy('products.id')
+            ->get();
+
+        return [
+            'products' => $products,
+            'start_date' => $start_date,
+            'end_date' => $end_date
+        ];
+    }
+
+    /**
+     * Get Inventory Stock Levels data
+     */
+    private function getInventoryStockLevelsData($request)
+    {
+        $products = Product::with('category')->where('stock_quantity', '>', 0)->get();
+
+        return [
+            'products' => $products,
+            'total_valuation' => $products->sum(function($p) {
+                return $p->stock_quantity * $p->price;
+            })
+        ];
+    }
+
+    /**
+     * Get Inventory Movements data
+     */
+    private function getInventoryMovementsData($request)
+    {
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->subDays(30)->startOfDay();
+
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
+
+        $movements = InventoryMovement::with(['product', 'creator', 'warehouse'])
+            ->whereBetween('created_at', [$start_date, $end_date])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return [
+            'movements' => $movements,
+            'start_date' => $start_date,
+            'end_date' => $end_date
+        ];
+    }
+
+    /**
+     * Get Inventory Valuation data
+     */
+    private function getInventoryValuationData($request)
+    {
+        $products = Product::with('category')
+            ->where('stock_quantity', '>', 0)
+            ->get();
+
+        $total_valuation = $products->sum(function($product) {
+            return $product->stock_quantity * $product->price;
+        });
+
+        return [
+            'products' => $products,
+            'total_valuation' => $total_valuation
+        ];
+    }
+
+    /**
+     * Get Customers Index data
+     */
+    private function getCustomersIndexData($request)
+    {
+        $customers = Customer::orderBySpent('desc')->get();
+
+        return [
+            'customers' => $customers,
+            'total_customers' => $customers->count(),
+            'average_ltv' => $customers->avg('total_spent')
+        ];
+    }
+
+    /**
+     * Get Customers New vs Returning data
+     */
+    private function getCustomersNewVsReturningData($request)
+    {
+        $start_date = $request->start_date
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->subDays(30)->startOfDay();
+
+        $end_date = $request->end_date
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
+
+        $orders = Order::with('customer')
+            ->whereBetween('created_at', [$start_date, $end_date])
+            ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+            ->get();
+
+        return [
+            'orders' => $orders,
+            'start_date' => $start_date,
+            'end_date' => $end_date
+        ];
+    }
+
+    /**
+     * Get Customers Lifetime Value data
+     */
+    private function getCustomersLifetimeValueData($request)
+    {
+        $customers = Customer::orderBySpent('desc')->get();
+
+        return [
+            'customers' => $customers,
+            'average_ltv' => $customers->avg('total_spent'),
+            'total_ltv' => $customers->sum('total_spent')
+        ];
+    }
+
+    // ==================== CSV GENERATION METHODS ====================
+
+    /**
+     * Generate Revenue by Category CSV
+     */
+    private function generateRevenueByCategoryCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Revenue by Category Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, ['Period: ' . $data['start_date']->format('Y-m-d') . ' to ' . $data['end_date']->format('Y-m-d')]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Category', 'Revenue', 'Product Count', 'Percentage']);
+
+        // Data rows
+        foreach ($data['categories'] as $item) {
+            $percentage = $data['total_revenue'] > 0
+                ? ($item['revenue'] / $data['total_revenue']) * 100
+                : 0;
+
+            fputcsv($output, [
+                $item['category']->title,
+                number_format($item['revenue'], 2),
+                $item['product_count'],
+                number_format($percentage, 2) . '%'
+            ]);
+        }
+
+        // Total
+        fputcsv($output, []);
+        fputcsv($output, ['TOTAL', number_format($data['total_revenue'], 2), '', '100%']);
+    }
+
+    /**
+     * Generate Revenue by Product CSV
+     */
+    private function generateRevenueByProductCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Revenue by Product Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Product', 'SKU', 'Units Sold', 'Revenue', 'Avg Price']);
+
+        // Data rows
+        foreach ($data['products'] as $product) {
+            $avg_price = $product->total_quantity > 0
+                ? $product->total_revenue / $product->total_quantity
+                : 0;
+
+            fputcsv($output, [
+                $product->name,
+                $product->sku,
+                number_format($product->total_quantity),
+                number_format($product->total_revenue, 2),
+                number_format($avg_price, 2)
+            ]);
+        }
+    }
+
+    /**
+     * Generate Products Top Selling CSV
+     */
+    private function generateProductsTopSellingCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Top Selling Products Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Rank', 'Product', 'SKU', 'Units Sold', 'Revenue', 'Orders']);
+
+        // Data rows
+        foreach ($data['products'] as $index => $product) {
+            fputcsv($output, [
+                $index + 1,
+                $product->name,
+                $product->sku,
+                number_format($product->units_sold),
+                number_format($product->revenue, 2),
+                number_format($product->order_count)
+            ]);
+        }
+    }
+
+    /**
+     * Generate Products by Category CSV
+     */
+    private function generateProductsByCategoryCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Products by Category Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Data rows
+        foreach ($data['categories'] as $category) {
+            fputcsv($output, ['Category: ' . $category->title]);
+            fputcsv($output, ['Product', 'SKU', 'Price', 'Stock']);
+
+            foreach ($category->products as $product) {
+                fputcsv($output, [
+                    $product->name,
+                    $product->sku,
+                    number_format($product->price, 2),
+                    number_format($product->stock_quantity)
+                ]);
+            }
+
+            fputcsv($output, []);
+        }
+    }
+
+    /**
+     * Generate Products Performance CSV
+     */
+    private function generateProductsPerformanceCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Product Performance Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Product', 'SKU', 'Units Sold', 'Revenue', 'Orders', 'Performance Score']);
+
+        // Data rows
+        foreach ($data['products'] as $product) {
+            // Calculate performance score (0-100)
+            $max_revenue = $data['products']->max('revenue');
+            $max_units = $data['products']->max('units_sold');
+
+            $revenue_score = $max_revenue > 0 ? ($product->revenue / $max_revenue) * 50 : 0;
+            $units_score = $max_units > 0 ? ($product->units_sold / $max_units) * 50 : 0;
+            $performance_score = $revenue_score + $units_score;
+
+            fputcsv($output, [
+                $product->name,
+                $product->sku,
+                number_format($product->units_sold ?? 0),
+                number_format($product->revenue ?? 0, 2),
+                number_format($product->order_count ?? 0),
+                number_format($performance_score, 1)
+            ]);
+        }
+    }
+
+    /**
+     * Generate Inventory Stock Levels CSV
+     */
+    private function generateInventoryStockLevelsCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Inventory Stock Levels Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Product', 'SKU', 'Category', 'Stock Quantity', 'Unit Price', 'Total Value', 'Status']);
+
+        // Data rows
+        foreach ($data['products'] as $product) {
+            $total_value = $product->stock_quantity * $product->price;
+
+            if ($product->stock_quantity <= 0) {
+                $status = 'Out of Stock';
+            } elseif ($product->stock_quantity <= $product->low_stock_threshold) {
+                $status = 'Low Stock';
+            } else {
+                $status = 'In Stock';
+            }
+
+            fputcsv($output, [
+                $product->name,
+                $product->sku,
+                $product->category->title ?? 'N/A',
+                number_format($product->stock_quantity),
+                number_format($product->price, 2),
+                number_format($total_value, 2),
+                $status
+            ]);
+        }
+    }
+
+    /**
+     * Generate Inventory Movements CSV
+     */
+    private function generateInventoryMovementsCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Inventory Movements Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, ['Period: ' . $data['start_date']->format('Y-m-d') . ' to ' . $data['end_date']->format('Y-m-d')]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Date', 'Product', 'Type', 'Quantity', 'Before', 'After', 'Reference', 'Notes']);
+
+        // Data rows
+        foreach ($data['movements'] as $movement) {
+            fputcsv($output, [
+                $movement->created_at->format('Y-m-d H:i:s'),
+                $movement->product->name ?? 'N/A',
+                $movement->getTypeLabel(),
+                $movement->getFormattedQuantity(),
+                number_format($movement->previous_quantity),
+                number_format($movement->new_quantity),
+                $movement->reference_type ? $movement->reference_type . ' #' . $movement->reference_id : 'N/A',
+                $movement->notes ?? ''
+            ]);
+        }
+    }
+
+    /**
+     * Generate Inventory Valuation CSV
+     */
+    private function generateInventoryValuationCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Inventory Valuation Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, ['Total Inventory Value: ' . store_currency_symbol() . number_format($data['total_valuation'], 2)]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Product', 'SKU', 'Category', 'Stock Qty', 'Unit Cost', 'Total Value', '% of Total']);
+
+        // Data rows
+        foreach ($data['products'] as $product) {
+            $product_value = $product->stock_quantity * $product->price;
+            $percentage = $data['total_valuation'] > 0 ? ($product_value / $data['total_valuation']) * 100 : 0;
+
+            fputcsv($output, [
+                $product->name,
+                $product->sku,
+                $product->category->title ?? 'N/A',
+                number_format($product->stock_quantity),
+                number_format($product->price, 2),
+                number_format($product_value, 2),
+                number_format($percentage, 2) . '%'
+            ]);
+        }
+
+        // Total
+        fputcsv($output, []);
+        fputcsv($output, ['TOTAL', '', '', '', '', number_format($data['total_valuation'], 2), '100%']);
+    }
+
+    /**
+     * Generate Customers Index CSV
+     */
+    private function generateCustomersIndexCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Customer Analytics Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, ['Total Customers: ' . number_format($data['total_customers'])]);
+        fputcsv($output, ['Average LTV: ' . store_currency_symbol() . number_format($data['average_ltv'], 2)]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Customer', 'Email', 'Orders', 'Total Spent', 'Avg Order', 'First Order', 'Last Order', 'Segment']);
+
+        // Data rows
+        foreach ($data['customers'] as $customer) {
+            $avg_order = $customer->total_orders > 0 ? $customer->total_spent / $customer->total_orders : 0;
+            $segment = $customer->getSegment();
+
+            fputcsv($output, [
+                $customer->getFullName(),
+                $customer->email,
+                number_format($customer->total_orders),
+                number_format($customer->total_spent, 2),
+                number_format($avg_order, 2),
+                $customer->first_order_at ? $customer->first_order_at->format('Y-m-d') : 'N/A',
+                $customer->last_order_at ? $customer->last_order_at->format('Y-m-d') : 'Never',
+                $segment
+            ]);
+        }
+    }
+
+    /**
+     * Generate Customers New vs Returning CSV
+     */
+    private function generateCustomersNewVsReturningCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['New vs Returning Customers Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, ['Period: ' . $data['start_date']->format('Y-m-d') . ' to ' . $data['end_date']->format('Y-m-d')]);
+        fputcsv($output, []);
+
+        // Process orders
+        $new_count = 0;
+        $returning_count = 0;
+        $new_revenue = 0;
+        $returning_revenue = 0;
+
+        foreach ($data['orders'] as $order) {
+            if ($order->customer) {
+                $customer_orders_before = Order::where('customer_id', $order->customer_id)
+                    ->where('created_at', '<', $order->created_at)
+                    ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+                    ->count();
+
+                if ($customer_orders_before == 0) {
+                    $new_count++;
+                    $new_revenue += $order->total_amount;
+                } else {
+                    $returning_count++;
+                    $returning_revenue += $order->total_amount;
+                }
+            }
+        }
+
+        // Summary
+        fputcsv($output, ['Customer Type', 'Count', 'Revenue', 'Avg Order Value']);
+        fputcsv($output, [
+            'New Customers',
+            number_format($new_count),
+            number_format($new_revenue, 2),
+            $new_count > 0 ? number_format($new_revenue / $new_count, 2) : '0.00'
+        ]);
+        fputcsv($output, [
+            'Returning Customers',
+            number_format($returning_count),
+            number_format($returning_revenue, 2),
+            $returning_count > 0 ? number_format($returning_revenue / $returning_count, 2) : '0.00'
+        ]);
+    }
+
+    /**
+     * Generate Customers Lifetime Value CSV
+     */
+    private function generateCustomersLifetimeValueCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Customer Lifetime Value Report']);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, ['Average LTV: ' . store_currency_symbol() . number_format($data['average_ltv'], 2)]);
+        fputcsv($output, ['Total LTV: ' . store_currency_symbol() . number_format($data['total_ltv'], 2)]);
+        fputcsv($output, []);
+
+        // Column headers
+        fputcsv($output, ['Rank', 'Customer', 'Email', 'Lifetime Value', 'Orders', 'Avg Order', 'Segment']);
+
+        // Data rows
+        foreach ($data['customers'] as $index => $customer) {
+            $avg_order = $customer->total_orders > 0 ? $customer->total_spent / $customer->total_orders : 0;
+
+            // Determine segment
+            if ($customer->total_spent >= 5000) {
+                $segment = 'Platinum';
+            } elseif ($customer->total_spent >= 2000) {
+                $segment = 'Gold';
+            } elseif ($customer->total_spent >= 500) {
+                $segment = 'Silver';
+            } else {
+                $segment = 'Bronze';
+            }
+
+            fputcsv($output, [
+                $index + 1,
+                $customer->getFullName(),
+                $customer->email,
+                number_format($customer->total_spent, 2),
+                number_format($customer->total_orders),
+                number_format($avg_order, 2),
+                $segment
+            ]);
+        }
     }
 }

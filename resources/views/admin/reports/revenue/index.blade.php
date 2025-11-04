@@ -234,9 +234,9 @@
                 <i class="bi bi-download"></i> Export
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-pdf"></i> Export to PDF</a></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-excel"></i> Export to Excel</a></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-csv"></i> Export to CSV</a></li>
+                <li><a class="dropdown-item" href="{{ route('admin.reports.export.pdf', ['reportType' => 'revenue-by-category'] + request()->all()) }}"><i class="bi bi-file-pdf"></i> Export to PDF</a></li>
+                <li><a class="dropdown-item" href="{{ route('admin.reports.export.excel', ['reportType' => 'revenue-by-category'] + request()->all()) }}"><i class="bi bi-file-excel"></i> Export to Excel</a></li>
+                <li><a class="dropdown-item" href="{{ route('admin.reports.export.csv', ['reportType' => 'revenue-by-category'] + request()->all()) }}"><i class="bi bi-file-csv"></i> Export to CSV</a></li>
             </ul>
         </div>
     </div>
