@@ -125,7 +125,7 @@ class ProductsController extends Controller
         try {
             $product = Product::query()
                 ->active()
-                ->with(['category', 'images', 'vendor', 'tags', 'variants', 'relatedProducts'])
+                ->with(['category', 'images', 'vendor', 'tags', 'variants'])
                 ->findOrFail($id);
 
             return response()->json([
@@ -164,7 +164,7 @@ class ProductsController extends Controller
             $product = Product::query()
                 ->active()
                 ->where('slug', $slug)
-                ->with(['category', 'images', 'vendor', 'tags', 'variants', 'relatedProducts'])
+                ->with(['category', 'images', 'vendor', 'tags', 'variants'])
                 ->firstOrFail();
 
             return response()->json([

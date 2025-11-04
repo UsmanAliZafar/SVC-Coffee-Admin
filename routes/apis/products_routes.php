@@ -28,6 +28,9 @@ Route::prefix('products')->name('products.')->group(function () {
     // Get product by SKU
     Route::get('/sku/{sku}', [ProductsController::class, 'getBySku'])->name('by_sku');
 
+    // Get product by slug
+    Route::get('/slug/{slug}', [ProductsController::class, 'getBySlug'])->name('by_sku');
+
     // Create product
     Route::post('/', [ProductsController::class, 'store'])->name('store');
 
