@@ -437,11 +437,14 @@ function generateWarehouseCard(warehouse) {
         alertBadges += `<span class="badge bg-danger">${outOfStock} Out</span> `;
     }
     if (lowStock > 0) {
-        alertBadges += `<span class="badge bg-warning text-dark">${lowStock} Low</span>`;
+        alertBadges += `<span class="badge bg-warning text-dark">${lowStock} Low</span> `;
     }
     if (!alertBadges) {
-        alertBadges = '<span class="badge bg-success">All Good</span>';
+        alertBadges = '<span class="badge bg-success">All Good</span> ';
     }
+
+    // Add priority badge inline with alert badges
+    alertBadges += `<span class="badge bg-info">Priority: ${warehouse.priority}</span>`;
 
     const location = warehouse.full_address || '<span class="text-muted">No location</span>';
     const totalStock = formatNumber(warehouse.total_stock || 0);
@@ -481,7 +484,6 @@ function generateWarehouseCard(warehouse) {
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="warehouse-card ${defaultClass}" onclick="viewWarehouse('${warehouse.id}')">
                 ${warehouse.is_default ? '<span class="badge bg-primary position-absolute" style="top: 10px; left: 10px;">Default</span>' : ''}
-                <div class="priority-badge">Priority: ${warehouse.priority}</div>
 
                 <div class="warehouse-header">
                     <div>
