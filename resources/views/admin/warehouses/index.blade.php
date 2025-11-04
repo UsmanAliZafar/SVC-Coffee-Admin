@@ -4,6 +4,22 @@
 
 @push('styles')
 <style>
+    #tableView {
+        min-height: 200px;
+    }
+
+    #warehousesTable {
+        width: 100% !important;
+    }
+
+    .table-responsive {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .dataTables_wrapper {
+        width: 100%;
+    }
     .warehouse-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         border: 2px solid #e0e0e0;
@@ -321,6 +337,7 @@
 <script>
 let warehousesTable;
 let currentView = 'card';
+let tableInitialized = false; // Add this flag
 
 $(document).ready(function() {
     // Load quick statistics
@@ -329,8 +346,8 @@ $(document).ready(function() {
     // Load card view by default
     loadCardView();
 
-    // Initialize table (but keep it hidden)
-    initializeTable();
+    // DO NOT initialize table here anymore
+    // initializeTable(); // REMOVE THIS LINE
 
     // View mode toggle
     $('.view-mode-btn').on('click', function() {
@@ -340,6 +357,26 @@ $(document).ready(function() {
 });
 
 // Load quick statistics
+function loadQuickStats() {
+    $.ajax({
+        url: '{{ route("admin.warehouses.data") }}',
+        type: 'GET',
+        data: { get_stats: true },
+        success: function(response) {
+            console.log('Stats response:', response);
+            if (response.stats) {
+                $('#totalWarehouses').text(response.stats.total || 0);
+                $('#activeWarehouses').text(response.stats.active || 0);
+                $('#totalStockUnits').text(formatNumber(response.stats.total_stock || 0));
+                $('#totalStockValue').text(store_currency_symbol() + formatNumber(response.stats.total_value || 0, 2));
+            }
+        },
+        error: function(xhr) {
+            console.error('Failed to load statistics:', xhr);
+            console.error('Response:', xhr.responseText);
+        }
+    });
+}
 
 // Load card view
 function loadCardView() {
@@ -411,7 +448,6 @@ function generateWarehouseCard(warehouse) {
     const totalValue = formatNumber(warehouse.total_value || 0, 2);
     const productCount = warehouse.stock_count || 0;
 
-    // Build action buttons based on permissions (passed from server)
     let actionButtons = `
         <a href="/admin/warehouses/${warehouse.id}"
            class="btn btn-sm btn-info" title="View Details">
@@ -470,7 +506,7 @@ function generateWarehouseCard(warehouse) {
                         <div class="stat-label">Products</div>
                     </div>
                     <div class="stat-item" style="grid-column: 1 / -1;">
-                        <span class="stat-value text-success">${totalValue}</span>
+                        <span class="stat-value text-success">${store_currency_symbol()}${totalValue}</span>
                         <div class="stat-label">Total Value</div>
                     </div>
                 </div>
@@ -491,6 +527,12 @@ function generateWarehouseCard(warehouse) {
 
 // Initialize DataTable
 function initializeTable() {
+    if (tableInitialized) {
+        warehousesTable.ajax.reload();
+        warehousesTable.columns.adjust().draw();
+        return;
+    }
+
     warehousesTable = $('#warehousesTable').DataTable({
         processing: true,
         serverSide: true,
@@ -512,14 +554,22 @@ function initializeTable() {
         ],
         order: [[6, 'desc']],
         pageLength: 25,
+        responsive: true,
+        autoWidth: false, // Important!
         language: {
             processing: '<i class="bi bi-hourglass-split"></i> Loading...',
             emptyTable: 'No warehouses found'
+        },
+        drawCallback: function() {
+            // Adjust columns after drawing
+            warehousesTable.columns.adjust();
         }
     });
+
+    tableInitialized = true;
 }
 
-// Switch view
+// Switch view - UPDATED
 function switchView(view) {
     currentView = view;
 
@@ -533,7 +583,11 @@ function switchView(view) {
     } else {
         $('#cardView').hide();
         $('#tableView').show();
-        warehousesTable.ajax.reload();
+
+        // Initialize table only when switching to table view
+        setTimeout(function() {
+            initializeTable();
+        }, 100); // Small delay to ensure the div is visible
     }
 }
 
@@ -549,7 +603,7 @@ function getFilters() {
 function applyFilters() {
     if (currentView === 'card') {
         loadCardView();
-    } else {
+    } else if (tableInitialized) {
         warehousesTable.ajax.reload();
     }
 }
@@ -566,7 +620,7 @@ function refreshData() {
     loadQuickStats();
     if (currentView === 'card') {
         loadCardView();
-    } else {
+    } else if (tableInitialized) {
         warehousesTable.ajax.reload();
     }
 }
@@ -574,6 +628,11 @@ function refreshData() {
 // View warehouse details
 function viewWarehouse(id) {
     window.location.href = '{{ route("admin.warehouses.show", ":id") }}'.replace(':id', id);
+}
+
+// Helper function for currency symbol
+function store_currency_symbol() {
+    return '{{ store_currency_symbol() }}';
 }
 
 // Toggle warehouse status
@@ -718,28 +777,6 @@ function formatNumber(num, decimals = 0) {
     return Number(num).toLocaleString('en-US', {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
-    });
-}
-
-// Load quick statistics
-function loadQuickStats() {
-    $.ajax({
-        url: '{{ route("admin.warehouses.data") }}',
-        type: 'GET',
-        data: { get_stats: true },
-        success: function(response) {
-            console.log('Stats response:', response); // Debug log
-            if (response.stats) {
-                $('#totalWarehouses').text(response.stats.total || 0);
-                $('#activeWarehouses').text(response.stats.active || 0);
-                $('#totalStockUnits').text(formatNumber(response.stats.total_stock || 0));
-                $('#totalStockValue').text(store_currency_symbol() + formatNumber(response.stats.total_value || 0, 2));
-            }
-        },
-        error: function(xhr) {
-            console.error('Failed to load statistics:', xhr);
-            console.error('Response:', xhr.responseText);
-        }
     });
 }
 </script>
