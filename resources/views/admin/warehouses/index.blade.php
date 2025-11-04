@@ -241,7 +241,7 @@
             <div class="quick-stat-label">Total Stock Units</div>
         </div>
         <div class="quick-stat-card">
-            <div class="quick-stat-value text-info" id="totalStockValue">$0</div>
+            <div class="quick-stat-value text-info" id="totalStockValue">{{ store_currency_symbol() }}0</div>
             <div class="quick-stat-label">Total Stock Value</div>
         </div>
     </div>
@@ -340,23 +340,6 @@ $(document).ready(function() {
 });
 
 // Load quick statistics
-function loadQuickStats() {
-    $.ajax({
-        url: '{{ route("admin.warehouses.data") }}',
-        data: { get_stats: true },
-        success: function(response) {
-            if (response.stats) {
-                $('#totalWarehouses').text(response.stats.total || 0);
-                $('#activeWarehouses').text(response.stats.active || 0);
-                $('#totalStockUnits').text(formatNumber(response.stats.total_stock || 0));
-                $('#totalStockValue').text('$' + formatNumber(response.stats.total_value || 0, 2));
-            }
-        },
-        error: function(xhr) {
-            console.error('Failed to load statistics:', xhr);
-        }
-    });
-}
 
 // Load card view
 function loadCardView() {
@@ -735,6 +718,28 @@ function formatNumber(num, decimals = 0) {
     return Number(num).toLocaleString('en-US', {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
+    });
+}
+
+// Load quick statistics
+function loadQuickStats() {
+    $.ajax({
+        url: '{{ route("admin.warehouses.data") }}',
+        type: 'GET',
+        data: { get_stats: true },
+        success: function(response) {
+            console.log('Stats response:', response); // Debug log
+            if (response.stats) {
+                $('#totalWarehouses').text(response.stats.total || 0);
+                $('#activeWarehouses').text(response.stats.active || 0);
+                $('#totalStockUnits').text(formatNumber(response.stats.total_stock || 0));
+                $('#totalStockValue').text(store_currency_symbol() + formatNumber(response.stats.total_value || 0, 2));
+            }
+        },
+        error: function(xhr) {
+            console.error('Failed to load statistics:', xhr);
+            console.error('Response:', xhr.responseText);
+        }
     });
 }
 </script>
