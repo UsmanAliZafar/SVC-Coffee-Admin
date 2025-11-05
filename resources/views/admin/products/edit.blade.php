@@ -1536,27 +1536,42 @@ $(document).ready(function() {
                 Swal.close();
 
                 if (xhr.status === 422) {
-                    let errors = xhr.responseJSON.errors;
+                    // Validation errors
+                    const errors = xhr.responseJSON.errors;
 
-                    $('.is-invalid').removeClass('is-invalid');
-                    $('.invalid-feedback').empty();
+                    $.each(errors, function(key, messages) {
+                        const input = $(`[name="${key}"]`);
+                        const feedback = input.closest('.mb-3').find('.invalid-feedback');
 
-                    $.each(errors, function(field, messages) {
-                        let input = $(`[name="${field}"]`);
                         input.addClass('is-invalid');
-                        input.siblings('.invalid-feedback').text(messages[0]);
+
+                        if (feedback.length) {
+                            feedback.text(messages[0]).show();
+                        } else {
+                            // Create feedback element if it doesn't exist
+                            input.after(`<div class="invalid-feedback d-block">${messages[0]}</div>`);
+                        }
                     });
+
+                    // Scroll to first error
+                    const firstError = $('.is-invalid').first();
+                    if (firstError.length) {
+                        $('html, body').animate({
+                            scrollTop: firstError.offset().top - 100
+                        }, 500);
+                    }
 
                     Swal.fire({
                         icon: 'error',
                         title: 'Validation Error',
-                        text: 'Please check the form for errors'
+                        html: 'Please check the form:<br>' +
+                            Object.values(errors).flat().map(err => `• ${err}`).join('<br>')
                     });
                 } else {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Failed to update product'
+                        text: xhr.responseJSON?.message || 'Failed to create category'
                     });
                 }
             }

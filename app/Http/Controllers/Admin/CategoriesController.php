@@ -156,13 +156,28 @@ class CategoriesController extends Controller
             'icon' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:1024',
             'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:1024',
             'order' => 'nullable|integer|min:0',
-            'is_featured' => 'boolean',
-            'show_in_menu' => 'boolean',
-            'show_on_home' => 'boolean',
-            'status_key_code' => 'required|string',
+            'is_featured' => 'nullable|boolean',
+            'show_in_menu' => 'nullable|boolean',
+            'show_on_home' => 'nullable|boolean',
+            'status_key_code' => 'required|string|exists:system_statuses,key_code',
             'meta_title' => 'nullable|string|max:255',
-            'meta_description' => 'nullable|string',
+            'meta_description' => 'nullable|string|max:500',
             'meta_keywords' => 'nullable|string|max:500',
+        ], [
+            // Custom error messages
+            'title.required' => 'Category title is required',
+            'title.max' => 'Category title cannot exceed 255 characters',
+            'slug.unique' => 'This slug is already taken',
+            'parent_id.exists' => 'Selected parent category does not exist',
+            'image.image' => 'Main image must be a valid image file',
+            'image.mimes' => 'Main image must be jpeg, png, jpg, or webp',
+            'image.max' => 'Main image size cannot exceed 2MB',
+            'banner_image.image' => 'Banner image must be a valid image file',
+            'banner_image.max' => 'Banner image size cannot exceed 2MB',
+            'icon.max' => 'Icon size cannot exceed 1MB',
+            'thumbnail.max' => 'Thumbnail size cannot exceed 1MB',
+            'status_key_code.required' => 'Status is required',
+            'status_key_code.exists' => 'Selected status is invalid',
         ]);
 
         DB::beginTransaction();
@@ -234,7 +249,7 @@ class CategoriesController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:products_categories,slug,' . $id,
+            'slug' => 'nullable|string|max:255|unique:products_categories,slug',
             'description' => 'nullable|string',
             'short_description' => 'nullable|string',
             'parent_id' => 'nullable|uuid|exists:products_categories,id',
@@ -243,14 +258,30 @@ class CategoriesController extends Controller
             'icon' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:1024',
             'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:1024',
             'order' => 'nullable|integer|min:0',
-            'is_featured' => 'boolean',
-            'show_in_menu' => 'boolean',
-            'show_on_home' => 'boolean',
-            'status_key_code' => 'required|string',
+            'is_featured' => 'nullable|boolean',
+            'show_in_menu' => 'nullable|boolean',
+            'show_on_home' => 'nullable|boolean',
+            'status_key_code' => 'required|string|exists:system_statuses,key_code',
             'meta_title' => 'nullable|string|max:255',
-            'meta_description' => 'nullable|string',
+            'meta_description' => 'nullable|string|max:500',
             'meta_keywords' => 'nullable|string|max:500',
+        ], [
+            // Custom error messages
+            'title.required' => 'Category title is required',
+            'title.max' => 'Category title cannot exceed 255 characters',
+            'slug.unique' => 'This slug is already taken',
+            'parent_id.exists' => 'Selected parent category does not exist',
+            'image.image' => 'Main image must be a valid image file',
+            'image.mimes' => 'Main image must be jpeg, png, jpg, or webp',
+            'image.max' => 'Main image size cannot exceed 2MB',
+            'banner_image.image' => 'Banner image must be a valid image file',
+            'banner_image.max' => 'Banner image size cannot exceed 2MB',
+            'icon.max' => 'Icon size cannot exceed 1MB',
+            'thumbnail.max' => 'Thumbnail size cannot exceed 1MB',
+            'status_key_code.required' => 'Status is required',
+            'status_key_code.exists' => 'Selected status is invalid',
         ]);
+
 
         DB::beginTransaction();
         try {

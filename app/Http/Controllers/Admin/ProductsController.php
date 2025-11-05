@@ -416,11 +416,88 @@ class ProductsController extends Controller
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'session_id' => 'nullable|string',
-            'is_taxable' => 'nullable',
+            'is_taxable' => 'nullable|boolean',
             'tax_type' => 'nullable|in:inclusive,exclusive',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
             'features' => 'nullable|json',
+        ], [
+            // Name validation messages
+            'name.required' => 'Product name is required',
+            'name.string' => 'Product name must be a valid text',
+            'name.max' => 'Product name cannot exceed 255 characters',
+
+            // Slug validation messages
+            'slug.string' => 'Slug must be a valid text',
+            'slug.max' => 'Slug cannot exceed 255 characters',
+            'slug.unique' => 'This slug is already taken by another product',
+
+            // SKU validation messages
+            'sku.required' => 'SKU is required',
+            'sku.string' => 'SKU must be a valid text',
+            'sku.max' => 'SKU cannot exceed 255 characters',
+            'sku.unique' => 'This SKU is already in use',
+
+            // Barcode validation messages
+            'barcode.string' => 'Barcode must be a valid text',
+            'barcode.max' => 'Barcode cannot exceed 255 characters',
+            'barcode.unique' => 'This barcode is already in use',
+
+            // Category validation messages
+            'category_id.exists' => 'Selected category does not exist',
+
+            // Vendor validation messages
+            'vendor_id.exists' => 'Selected vendor does not exist',
+
+            // Product type validation messages
+            'product_type.string' => 'Product type must be a valid text',
+            'product_type.max' => 'Product type cannot exceed 100 characters',
+
+            // Price validation messages
+            'price.required' => 'Product price is required',
+            'price.numeric' => 'Price must be a valid number',
+            'price.min' => 'Price cannot be negative',
+
+            // Sale price validation messages
+            'sale_price.numeric' => 'Sale price must be a valid number',
+            'sale_price.min' => 'Sale price cannot be negative',
+            'sale_price.lt' => 'Sale price must be less than regular price',
+
+            // Cost price validation messages
+            'cost_price.numeric' => 'Cost price must be a valid number',
+            'cost_price.min' => 'Cost price cannot be negative',
+
+            // Description validation messages
+            'short_description.string' => 'Short description must be valid text',
+            'description.string' => 'Description must be valid text',
+
+            // Status validation messages
+            'status_key_code.required' => 'Product status is required',
+            'status_key_code.string' => 'Status must be a valid text',
+
+            // Image validation messages
+            'main_image.image' => 'Main image must be a valid image file',
+            'main_image.mimes' => 'Main image must be jpeg, png, jpg, gif, or webp format',
+            'main_image.max' => 'Main image size cannot exceed 2MB',
+
+            // Stock threshold validation messages
+            'low_stock_threshold.integer' => 'Low stock threshold must be a whole number',
+            'low_stock_threshold.min' => 'Low stock threshold cannot be negative',
+
+            // Session validation messages
+            'session_id.string' => 'Session ID must be valid text',
+
+            // Tax validation messages
+            'is_taxable.boolean' => 'Taxable field must be true or false',
+            'tax_type.in' => 'Tax type must be either inclusive or exclusive',
+            'tax_percentage.numeric' => 'Tax percentage must be a valid number',
+            'tax_percentage.min' => 'Tax percentage cannot be negative',
+            'tax_percentage.max' => 'Tax percentage cannot exceed 100',
+            'tax_class.string' => 'Tax class must be valid text',
+            'tax_class.max' => 'Tax class cannot exceed 100 characters',
+
+            // Features validation messages
+            'features.json' => 'Features must be in valid JSON format',
         ]);
 
         if ($validator->fails()) {
@@ -646,9 +723,9 @@ class ProductsController extends Controller
         // Validation
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:products,slug,' . $id,
-            'sku' => 'required|string|max:255|unique:products,sku,' . $id,
-            'barcode' => 'nullable|string|max:255|unique:products,barcode,' . $id,
+            'slug' => 'nullable|string|max:255|unique:products,slug',
+            'sku' => 'required|string|max:255|unique:products,sku',
+            'barcode' => 'nullable|string|max:255|unique:products,barcode',
             'category_id' => 'nullable|exists:products_categories,id',
             'vendor_id' => 'nullable|exists:vendors,id',
             'product_type' => 'nullable|string|max:100',
@@ -659,11 +736,90 @@ class ProductsController extends Controller
             'description' => 'nullable|string',
             'status_key_code' => 'required|string',
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'is_taxable' => 'nullable',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+            'session_id' => 'nullable|string',
+            'is_taxable' => 'nullable|boolean',
             'tax_type' => 'nullable|in:inclusive,exclusive',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
             'features' => 'nullable|json',
+        ], [
+            // Name validation messages
+            'name.required' => 'Product name is required',
+            'name.string' => 'Product name must be a valid text',
+            'name.max' => 'Product name cannot exceed 255 characters',
+
+            // Slug validation messages
+            'slug.string' => 'Slug must be a valid text',
+            'slug.max' => 'Slug cannot exceed 255 characters',
+            'slug.unique' => 'This slug is already taken by another product',
+
+            // SKU validation messages
+            'sku.required' => 'SKU is required',
+            'sku.string' => 'SKU must be a valid text',
+            'sku.max' => 'SKU cannot exceed 255 characters',
+            'sku.unique' => 'This SKU is already in use',
+
+            // Barcode validation messages
+            'barcode.string' => 'Barcode must be a valid text',
+            'barcode.max' => 'Barcode cannot exceed 255 characters',
+            'barcode.unique' => 'This barcode is already in use',
+
+            // Category validation messages
+            'category_id.exists' => 'Selected category does not exist',
+
+            // Vendor validation messages
+            'vendor_id.exists' => 'Selected vendor does not exist',
+
+            // Product type validation messages
+            'product_type.string' => 'Product type must be a valid text',
+            'product_type.max' => 'Product type cannot exceed 100 characters',
+
+            // Price validation messages
+            'price.required' => 'Product price is required',
+            'price.numeric' => 'Price must be a valid number',
+            'price.min' => 'Price cannot be negative',
+
+            // Sale price validation messages
+            'sale_price.numeric' => 'Sale price must be a valid number',
+            'sale_price.min' => 'Sale price cannot be negative',
+            'sale_price.lt' => 'Sale price must be less than regular price',
+
+            // Cost price validation messages
+            'cost_price.numeric' => 'Cost price must be a valid number',
+            'cost_price.min' => 'Cost price cannot be negative',
+
+            // Description validation messages
+            'short_description.string' => 'Short description must be valid text',
+            'description.string' => 'Description must be valid text',
+
+            // Status validation messages
+            'status_key_code.required' => 'Product status is required',
+            'status_key_code.string' => 'Status must be a valid text',
+
+            // Image validation messages
+            'main_image.image' => 'Main image must be a valid image file',
+            'main_image.mimes' => 'Main image must be jpeg, png, jpg, gif, or webp format',
+            'main_image.max' => 'Main image size cannot exceed 2MB',
+
+            // Stock threshold validation messages
+            'low_stock_threshold.integer' => 'Low stock threshold must be a whole number',
+            'low_stock_threshold.min' => 'Low stock threshold cannot be negative',
+
+            // Session validation messages
+            'session_id.string' => 'Session ID must be valid text',
+
+            // Tax validation messages
+            'is_taxable.boolean' => 'Taxable field must be true or false',
+            'tax_type.in' => 'Tax type must be either inclusive or exclusive',
+            'tax_percentage.numeric' => 'Tax percentage must be a valid number',
+            'tax_percentage.min' => 'Tax percentage cannot be negative',
+            'tax_percentage.max' => 'Tax percentage cannot exceed 100',
+            'tax_class.string' => 'Tax class must be valid text',
+            'tax_class.max' => 'Tax class cannot exceed 100 characters',
+
+            // Features validation messages
+            'features.json' => 'Features must be in valid JSON format',
         ]);
 
         if ($validator->fails()) {
