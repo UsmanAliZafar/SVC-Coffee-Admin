@@ -75,7 +75,12 @@ class CategoriesController extends Controller
                 $indent = str_repeat('&nbsp;&nbsp;&nbsp;', $depth);
                 $icon = $category->hasChildren() ? '<i class="bi bi-folder-fill text-warning"></i>' : '<i class="bi bi-tag-fill text-primary"></i>';
 
-                return $indent . $icon . ' <a href="' . route('admin.categories.show', $category->id) . '" class="fw-semibold">' . $category->title . '</a>';
+                $title = htmlspecialchars($category->title, ENT_QUOTES);
+                $created = $category->created_at
+                    ? '<div class="text-muted small mt-1"><i class="bi bi-calendar3"></i> Created On: ' . $category->created_at->format('Y-m-d H:i:s A') . '</div>'
+                    : '';
+
+                return $indent . $icon . ' <a href="' . route('admin.categories.show', $category->id) . '" class="fw-semibold">' . $title . '</a>' . $created;
             })
             ->addColumn('parent_name', function ($category) {
                 return $category->parent ? $category->parent->title : '<span class="badge bg-secondary">Root</span>';
