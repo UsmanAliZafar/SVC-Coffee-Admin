@@ -79,7 +79,7 @@ class ProductsController extends Controller
             'images' => function($q) {
                 $q->where('is_primary', true);
             }
-        ]);
+        ])->orderBy('created_at', 'desc');
 
         // Apply filters
         if ($request->filled('status')) {
@@ -169,24 +169,54 @@ class ProductsController extends Controller
                 $editUrl = route('admin.products.edit', $product->id);
                 $viewUrl = route('admin.products.show', $product->id);
 
-                $html = '<div>';
-                $html .= '<strong><a href="' . $editUrl . '" class="text-decoration-none">' . $product->name . '</a></strong><br>';
-                $html .= '<small class="text-muted">SKU: ' . $product->sku . '</small>';
-                if ($product->barcode) {
-                    $html .= '<br><small class="text-muted">Barcode: ' . $product->barcode . '</small>';
+                $html = '<div class="product-info">';
+
+                // Product name with edit link
+                $html .= '<div class="product-title">';
+                $html .= '<strong><a href="' . $editUrl . '" class="text-decoration-none product-link">'
+                     . htmlspecialchars($product->name) . '</a></strong>';
+                if ($product->is_featured) {
+                    $html .= ' <i class="bi bi-star-fill text-warning" title="Featured Product"></i>';
                 }
+                $html .= '</div>';
+
+                // Product details
+                $html .= '<div class="product-details">';
+                $html .= '<span class="text-muted me-2">SKU: ' . htmlspecialchars($product->sku) . '</span>';
+
+                if ($product->barcode) {
+                    $html .= '<span class="text-muted">| Barcode: ' . htmlspecialchars($product->barcode) . '</span>';
+                }
+                $html .= '</div>';
+
+                // Creation date with icon
+                $html .= '<div class="product-meta">';
+                $html .= '<small class="text-muted"><i class="bi bi-calendar3"></i> Created on: '
+                     . $product->created_at->format('M d, Y h:i:s A') . '</small>';
+                $html .= '</div>';
+
                 $html .= '</div>';
 
                 return $html;
             })
             ->addColumn('category_name', function($product) {
-                return $product->category ? $product->category->title : '<span class="text-muted">N/A</span>';
+                if (!$product->category) {
+                    return '<span class="text-muted"><i class="bi bi-dash-circle"></i> Uncategorized</span>';
+                }
+
+                return '<span class="category-badge">'
+                     . '<i class="bi bi-folder"></i> '
+                     . htmlspecialchars($product->category->title)
+                     . '</span>';
             })
             ->addColumn('price_display', function($product) {
-                $html = '<div>';
+                $html = '<div class="price-container">';
 
                 if ($product->isOnSale()) {
-                    $html .= '<span class="text-decoration-line-through text-muted">' . $product->getFormattedPrice() . '</span><br>';
+                    $html .= '<div class="original-price">';
+                    $html .= '<span class="text-decoration-line-through text-muted">'
+                         . $product->getFormattedPrice() . '</span>';
+                    $html .= '</div>';
                     $html .= '<strong class="text-success">' . $product->getFormattedSalePrice() . '</strong>';
                     $html .= ' <span class="badge bg-danger">-' . $product->getDiscountPercentage() . '%</span>';
                 } else {
