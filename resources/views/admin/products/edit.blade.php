@@ -1523,6 +1523,8 @@ $(document).ready(function() {
                         title: 'Success!',
                         text: response.message,
                         confirmButtonColor: '#5B914C'
+                    }).then(() => {
+                        window.location.href = '/admin/products/{{ $product->id }}';
                     });
                 } else {
                     Swal.fire({
