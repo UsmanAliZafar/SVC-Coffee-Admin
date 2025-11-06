@@ -416,7 +416,7 @@ class ProductsController extends Controller
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'session_id' => 'nullable|string',
-            'is_taxable' => 'sometimes|boolean',
+            // 'is_taxable' => 'nullable|boolean',
             'tax_type' => 'nullable|in:inclusive,exclusive',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
@@ -488,7 +488,7 @@ class ProductsController extends Controller
             'session_id.string' => 'Session ID must be valid text',
 
             // Tax validation messages
-            'is_taxable.boolean' => 'Taxable field must be true or false',
+            // 'is_taxable.boolean' => 'Taxable field must be true or false',
             'tax_type.in' => 'Tax type must be either inclusive or exclusive',
             'tax_percentage.numeric' => 'Tax percentage must be a valid number',
             'tax_percentage.min' => 'Tax percentage cannot be negative',
@@ -724,8 +724,8 @@ class ProductsController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             // 'slug' => 'nullable|string|max:255|unique:products,slug',
-            'sku' => 'required|string|max:255|unique:products,sku',
-            'barcode' => 'nullable|string|max:255|unique:products,barcode',
+            // 'sku' => 'required|string|max:255|unique:products,sku',
+            // 'barcode' => 'nullable|string|max:255|unique:products,barcode',
             'category_id' => 'nullable|exists:products_categories,id',
             'vendor_id' => 'nullable|exists:vendors,id',
             'product_type' => 'nullable|string|max:100',
@@ -738,7 +738,7 @@ class ProductsController extends Controller
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'session_id' => 'nullable|string',
-            'is_taxable' => 'sometimes|boolean',
+            // 'is_taxable' => 'sometimes|boolean',
             'tax_type' => 'nullable|in:inclusive,exclusive',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
@@ -805,7 +805,7 @@ class ProductsController extends Controller
             'session_id.string' => 'Session ID must be valid text',
 
             // Tax validation messages
-            'is_taxable.boolean' => 'Taxable field must be true or false',
+            // 'is_taxable.boolean' => 'Taxable field must be true or false',
             'tax_type.in' => 'Tax type must be either inclusive or exclusive',
             'tax_percentage.numeric' => 'Tax percentage must be a valid number',
             'tax_percentage.min' => 'Tax percentage cannot be negative',
