@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
+use App\Services\NotificationService;
 // MODELS
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -21,6 +22,13 @@ use App\Models\Transaction;
 
 class OrdersController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct()
+    {
+        $this->notificationService = app(NotificationService::class);
+    }
+
     /**
      * Display listing page
      */
@@ -293,6 +301,27 @@ class OrdersController extends Controller
             unset($orderData['items']);
 
             $order = Order::create($orderData);
+
+            // ✅ TRIGGER: New Order Notification
+            $this->notificationService->notify('order_created', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'total_amount' => $order->getFormattedTotal(),
+                'customer_name' => $order->getCustomerName(),
+                'customer_email' => $order->getCustomerEmail(),
+            ]);
+
+            // Check if high-value order
+            if ($order->total_amount >= config('notifications.thresholds.high_value_order', 500)) {
+                $this->notificationService->notify('customer_high_value_order', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->getCustomerName(),
+                    'total_amount' => $order->getFormattedTotal(),
+                    'customer_id' => $order->customer_id,
+                ]);
+            }
+            // Log order creation
 
             \Log::info('Order created', ['order_id' => $order->id, 'order_number' => $order->order_number]);
 
@@ -810,10 +839,23 @@ class OrdersController extends Controller
                     }
                 }
                 $order->confirm();
+                // ✅ TRIGGER: Order Confirmed Notification
+                $this->notificationService->notify('order_confirmed', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'total_amount' => $order->getFormattedTotal(),
+                ]);
             }
 
             if ($newStatus === 'ORDER_PROCESSING' && $oldStatus !== 'ORDER_PROCESSING') {
                 $order->markAsProcessing();
+                // ✅ TRIGGER: Order Processing Notification
+                $this->notificationService->notify('order_shipped', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'carrier' => $order->shipping_carrier,
+                ]);
             }
 
             if ($newStatus === 'ORDER_PACKED' && $oldStatus !== 'ORDER_PACKED') {
@@ -833,10 +875,22 @@ class OrdersController extends Controller
                     $validated['tracking_number'] ?? null,
                     $validated['carrier'] ?? null
                 );
+                // ✅ TRIGGER: Order Shipped Notification
+                $this->notificationService->notify('order_shipped', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'carrier' => $order->shipping_carrier,
+                ]);
             }
 
             if ($newStatus === 'ORDER_DELIVERED' && $oldStatus !== 'ORDER_DELIVERED') {
                 $order->markAsDelivered();
+                // ✅ TRIGGER: Order Delivered Notification
+                $this->notificationService->notify('order_delivered', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                ]);
             }
 
             if ($newStatus === 'ORDER_CANCELLED') {
@@ -863,6 +917,12 @@ class OrdersController extends Controller
                 }
 
                 $order->cancel($validated['notes'] ?? 'Cancelled by admin');
+
+                // ✅ TRIGGER: Order Cancelled Notification
+                $this->notificationService->notify('order_cancelled', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                ]);
             }
 
             // Add status change note
@@ -976,6 +1036,13 @@ class OrdersController extends Controller
                     'status_key_code' => 'ORDER_REFUNDED',
                 ]);
 
+                // ✅ TRIGGER: Order Refunded
+                $this->notificationService->notify('order_refunded', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'amount' => $order->currency . ' ' . number_format($refundAmount, 2),
+                ]);
+
             } else {
                 // Partial refund
                 $refundAmount = 0;
@@ -995,6 +1062,13 @@ class OrdersController extends Controller
                     'refunded_amount' => $order->refunded_amount + $refundAmount,
                     'refunded_at' => now(),
                     'payment_status_key_code' => 'PAYMENT_PARTIALLY_REFUNDED',
+                ]);
+
+                // ✅ TRIGGER: Order Partially Refunded
+                $this->notificationService->notify('order_partially_refunded', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'amount' => $order->currency . ' ' . number_format($refundAmount, 2),
                 ]);
             }
 
