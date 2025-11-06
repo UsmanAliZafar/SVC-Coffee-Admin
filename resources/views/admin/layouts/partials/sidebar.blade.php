@@ -499,36 +499,75 @@
             <li class="section-divider">
                 <span class="section-title">System</span>
             </li>
+
+            {{-- Notifications Management --}}
+            @if(auth('admin')->user()->hasPermission('notifications.read'))
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.notifications.*') ? 'open' : '' }}">
+                    <a class="nav-link {{ request()->routeIs('admin.notifications.*') ? 'active' : '' }}"
+                    href="{{ route('admin.notifications.index') }}"
+                    data-tooltip="Content">
+                        <i class="bi bi-file-text"></i>
+                        <span class="nav-text">Notifications
+                            @if((unread_notifications_count() ?? 0) > 0)
+                                <span class="badge bg-danger ms-auto">{{ unread_notifications_count() }}</span>
+                            @endif
+                        </span>
+                        <i class="bi bi-chevron-down dropdown-arrow"></i>
+                    </a>
+                    <ul class="submenu">
+                        @if(auth('admin')->user()->hasPermission('notifications.read'))
+                            <li class="nav-item {{ request()->routeIs('admin.notifications.*') ? 'active' : '' }}">
+                                <a class="nav-link" href="{{ route('admin.notifications.index') }}">
+                                    <i class="bi bi-bell"></i>
+                                    <span class="nav-text">Notifications</span>
+                                    @if((unread_notifications_count() ?? 0) > 0)
+                                        <span class="badge bg-danger ms-auto">{{ unread_notifications_count() }}</span>
+                                    @endif
+                                </a>
+                            </li>
+                        @endif
+                        @if(auth('admin')->user()->hasPermission('notifications.update'))
+                        <li>
+                            <a href="{{ route('admin.notifications.settings') }}">
+                                <i class="bi bi-plus-square"></i> Notifications Settings
+                            </a>
+                        </li>
+                        @endif
+                    </ul>
+                </li>
+            @endif
+            {{-- Notifications Management --}}
+
             {{-- Content Management --}}
             @if(auth('admin')->user()->hasPermission('content.read'))
-            <li class="nav-item has-dropdown {{ request()->routeIs('admin.pages.*') ? 'open' : '' }}">
-                <a class="nav-link {{ request()->routeIs('admin.pages.*') ? 'active' : '' }}"
-                href="{{ route('admin.pages.index') }}"
-                data-tooltip="Content">
-                    <i class="bi bi-file-text"></i>
-                    <span class="nav-text">Content</span>
-                    <i class="bi bi-chevron-down dropdown-arrow"></i>
-                </a>
-                <ul class="submenu">
-                    @if(auth('admin')->user()->hasPermission('content.read'))
-                    <li>
-                        <a href="{{ route('admin.pages.index') }}">
-                            <i class="bi bi-file-earmark"></i> Pages
-                        </a>
-                    </li>
-                    @if(auth('admin')->user()->hasPermission('content.create'))
-                    <li>
-                        <a href="{{ route('admin.pages.create') }}">
-                            <i class="bi bi-plus-square"></i> Add New Page
-                        </a>
-                    </li>
-                    @endif
-                    {{-- Uncomment when ready --}}
-                    {{-- <li><a href=""><i class="bi bi-image"></i> Banners</a></li> --}}
-                    {{-- <li><a href=""><i class="bi bi-envelope-paper"></i> Email Templates</a></li> --}}
-                    @endif
-                </ul>
-            </li>
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.pages.*') ? 'open' : '' }}">
+                    <a class="nav-link {{ request()->routeIs('admin.pages.*') ? 'active' : '' }}"
+                    href="{{ route('admin.pages.index') }}"
+                    data-tooltip="Content">
+                        <i class="bi bi-file-text"></i>
+                        <span class="nav-text">Content</span>
+                        <i class="bi bi-chevron-down dropdown-arrow"></i>
+                    </a>
+                    <ul class="submenu">
+                        @if(auth('admin')->user()->hasPermission('content.read'))
+                        <li>
+                            <a href="{{ route('admin.pages.index') }}">
+                                <i class="bi bi-file-earmark"></i> Pages
+                            </a>
+                        </li>
+                        @if(auth('admin')->user()->hasPermission('content.create'))
+                        <li>
+                            <a href="{{ route('admin.pages.create') }}">
+                                <i class="bi bi-plus-square"></i> Add New Page
+                            </a>
+                        </li>
+                        @endif
+                        {{-- Uncomment when ready --}}
+                        {{-- <li><a href=""><i class="bi bi-image"></i> Banners</a></li> --}}
+                        {{-- <li><a href=""><i class="bi bi-envelope-paper"></i> Email Templates</a></li> --}}
+                        @endif
+                    </ul>
+                </li>
             @endif
             {{-- Content Management --}}
 
@@ -561,13 +600,13 @@
             @endif
 
             @if(auth('admin')->user()->hasPermission('settings.read'))
-            <li class="nav-item">
-                <a class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}"
-                   href="{{ route('admin.settings.index') }}" data-tooltip="Settings">
-                    <i class="bi bi-sliders"></i>
-                    <span class="nav-text">Settings</span>
-                </a>
-            </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}"
+                    href="{{ route('admin.settings.index') }}" data-tooltip="Settings">
+                        <i class="bi bi-sliders"></i>
+                        <span class="nav-text">Settings</span>
+                    </a>
+                </li>
             @endif
         </ul>
     </div>

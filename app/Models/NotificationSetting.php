@@ -341,7 +341,7 @@ class NotificationSetting extends Model
         $allTypes = array_keys(config('notifications.types', []));
         $existingSettings = static::where('admin_user_id', $adminUserId)->get()->keyBy('notification_type');
 
-        $settings = collect();
+        $settings = new \Illuminate\Database\Eloquent\Collection();
 
         foreach ($allTypes as $type) {
             if (isset($existingSettings[$type])) {

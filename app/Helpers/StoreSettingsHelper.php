@@ -846,3 +846,42 @@ if (!function_exists('format_order_total')) {
         return format_store_price($total);
     }
 }
+
+// Notification heple counter
+if (!function_exists('unread_notifications_count')) {
+    /**
+     * Get the count of unread notifications for the admin
+     *
+     * @return int
+     */
+    function unread_notifications_count(): int
+    {
+        if (!auth('admin')->check()) {
+            return 0;
+        }
+
+        $adminId = auth('admin')->id();
+        return \App\Models\Notification::where('admin_user_id', $adminId)
+            ->where('is_read', false)
+            ->notExpired()
+            ->count();
+    }
+}
+
+if (!function_exists('recent_notifications')) {
+    /**
+     * Get recent unread notifications for dropdown
+     *
+     * @param int $limit
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    function recent_notifications(int $limit = 5)
+    {
+        if (!auth('admin')->check()) {
+            return collect([]);
+        }
+
+        $adminId = auth('admin')->id();
+        return \App\Models\Notification::getRecentUnreadForAdmin($adminId, $limit);
+    }
+}

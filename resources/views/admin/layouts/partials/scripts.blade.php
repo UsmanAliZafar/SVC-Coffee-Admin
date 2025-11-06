@@ -258,3 +258,20 @@ if (!document.querySelector('#admin-dropdown-styles')) {
     document.head.appendChild(styleElement);
 }
 </script>
+<script>
+    $(document).ready(function() {
+        // Mark notification as read when clicked
+        $('.notification-dropdown .dropdown-item[data-notification-id]').on('click', function(e) {
+            const notificationId = $(this).data('notification-id');
+
+            $.ajax({
+                url: `/admin/notifications/${notificationId}/mark-as-read`,
+                type: 'POST',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function(response) {
+                    // Notification marked as read
+                }
+            });
+        });
+    });
+</script>

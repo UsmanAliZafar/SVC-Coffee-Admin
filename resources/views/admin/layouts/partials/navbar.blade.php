@@ -13,46 +13,63 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
                 <!-- Notifications -->
-                <li class="nav-item dropdown me-3">
+                <li class="nav-item dropdown me-3 mt-3">
                     <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown">
                         <i class="bi bi-bell fs-5"></i>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                            3
-                        </span>
+                        @if(unread_notifications_count() > 0)
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge">
+                                {{ unread_notifications_count() }}
+                            </span>
+                        @endif
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end" style="min-width: 300px;">
-                        <li><h6 class="dropdown-header"><i class="bi bi-bell"></i> Notifications</h6></li>
-                        <li><a class="dropdown-item py-2" href="#">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-exclamation-triangle text-warning me-3"></i>
-                                <div>
-                                    <div class="fw-semibold">Low stock alert</div>
-                                    <small class="text-muted">Coffee beans running low</small>
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown" style="min-width: 350px; max-height: 500px; overflow-y: auto;">
+                        <li>
+                            <h6 class="dropdown-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-bell"></i> Notifications</span>
+                                @if(unread_notifications_count() > 0)
+                                    <span class="badge bg-primary">{{ unread_notifications_count() }}</span>
+                                @endif
+                            </h6>
+                        </li>
+
+                        @forelse(recent_notifications(5) as $notification)
+                            <li>
+                                <a class="dropdown-item py-2 {{ $notification->isUnread() ? 'bg-light' : '' }}"
+                                href="{{ $notification->action_url ?? route('admin.notifications.index') }}"
+                                data-notification-id="{{ $notification->id }}">
+                                    <div class="d-flex align-items-start">
+                                        <i class="{{ $notification->icon }} text-{{ $notification->color }} me-3 mt-1"></i>
+                                        <div class="flex-grow-1">
+                                            <div class="fw-semibold">{{ $notification->title }}</div>
+                                            <small class="text-muted d-block">
+                                                {{ Str::limit($notification->message, 50) }}
+                                            </small>
+                                            <small class="text-muted">
+                                                <i class="bi bi-clock"></i> {{ $notification->getTimeAgo() }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                        @empty
+                            <li>
+                                <div class="dropdown-item text-center py-4 text-muted">
+                                    <i class="bi bi-bell-slash fs-3 d-block mb-2"></i>
+                                    No new notifications
                                 </div>
-                            </div>
-                        </a></li>
-                        <li><a class="dropdown-item py-2" href="#">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-cart text-success me-3"></i>
-                                <div>
-                                    <div class="fw-semibold">New order received</div>
-                                    <small class="text-muted">Order #1234 - $125.50</small>
-                                </div>
-                            </div>
-                        </a></li>
-                        <li><a class="dropdown-item py-2" href="#">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-person text-info me-3"></i>
-                                <div>
-                                    <div class="fw-semibold">New customer registered</div>
-                                    <small class="text-muted">Welcome new customer!</small>
-                                </div>
-                            </div>
-                        </a></li>
+                            </li>
+                        @endforelse
+
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-center text-brand fw-semibold" href="#">View all notifications</a></li>
+                        <li>
+                            <a class="dropdown-item text-center text-primary fw-semibold"
+                            href="{{ route('admin.notifications.index') }}">
+                                <i class="bi bi-arrow-right-circle"></i> View all notifications
+                            </a>
+                        </li>
                     </ul>
                 </li>
+                <!-- End Notifications -->
 
                 <!-- User Menu -->
                 <li class="nav-item dropdown">
