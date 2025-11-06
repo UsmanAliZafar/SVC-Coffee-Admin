@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             SystemStatusSeeder::class,
             DefaultWarehouseSeeder::class,
             CouponSeeder::class,
+            PageSeeder::class,
         ]);
     }
 }

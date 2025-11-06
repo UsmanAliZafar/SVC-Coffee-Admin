@@ -475,23 +475,23 @@
             </li>
            {{-- Reports & Analytics --}}
             @if(auth('admin')->user()->hasPermission('reports.read'))
-            <li class="nav-item has-dropdown {{ request()->routeIs('admin.reports.*') ? 'open' : '' }}">
-                <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}"
-                href="{{ route('admin.reports.index') }}" data-tooltip="Reports">
-                    <i class="bi bi-graph-up"></i>
-                    <span class="nav-text">Reports</span>
-                    <i class="bi bi-chevron-down dropdown-arrow"></i>
-                </a>
-                <ul class="submenu">
-                    @if(auth('admin')->user()->hasPermission('reports.read'))
-                    <li><a href="{{ route('admin.reports.sales.monthly') }}"><i class="bi bi-cash-stack"></i> Sales Report</a></li>
-                    <li><a href="{{ route('admin.reports.revenue.index') }}"><i class="bi bi-currency-dollar"></i> Revenue</a></li>
-                    <li><a href="{{ route('admin.reports.products.top-selling') }}"><i class="bi bi-box-seam"></i> Products</a></li>
-                    <li><a href="{{ route('admin.reports.customers.index') }}"><i class="bi bi-person-badge"></i> Customers</a></li>
-                    <li><a href="{{ route('admin.reports.inventory.index') }}"><i class="bi bi-boxes"></i> Inventory</a></li>
-                    @endif
-                </ul>
-            </li>
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.reports.*') ? 'open' : '' }}">
+                    <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}"
+                    href="{{ route('admin.reports.index') }}" data-tooltip="Reports">
+                        <i class="bi bi-graph-up"></i>
+                        <span class="nav-text">Reports</span>
+                        <i class="bi bi-chevron-down dropdown-arrow"></i>
+                    </a>
+                    <ul class="submenu">
+                        @if(auth('admin')->user()->hasPermission('reports.read'))
+                        <li><a href="{{ route('admin.reports.sales.monthly') }}"><i class="bi bi-cash-stack"></i> Sales Report</a></li>
+                        <li><a href="{{ route('admin.reports.revenue.index') }}"><i class="bi bi-currency-dollar"></i> Revenue</a></li>
+                        <li><a href="{{ route('admin.reports.products.top-selling') }}"><i class="bi bi-box-seam"></i> Products</a></li>
+                        <li><a href="{{ route('admin.reports.customers.index') }}"><i class="bi bi-person-badge"></i> Customers</a></li>
+                        <li><a href="{{ route('admin.reports.inventory.index') }}"><i class="bi bi-boxes"></i> Inventory</a></li>
+                        @endif
+                    </ul>
+                </li>
             @endif
             {{-- Reports & Analytics --}}
 
@@ -501,18 +501,31 @@
             </li>
             {{-- Content Management --}}
             @if(auth('admin')->user()->hasPermission('content.read'))
-            <li class="nav-item has-dropdown {{ request()->routeIs('admin.content.*') ? 'open' : '' }}">
-                <a class="nav-link {{ request()->routeIs('admin.content.*') ? 'active' : '' }}"
-                   href="#" data-tooltip="Content">
+            <li class="nav-item has-dropdown {{ request()->routeIs('admin.pages.*') ? 'open' : '' }}">
+                <a class="nav-link {{ request()->routeIs('admin.pages.*') ? 'active' : '' }}"
+                href="{{ route('admin.pages.index') }}"
+                data-tooltip="Content">
                     <i class="bi bi-file-text"></i>
                     <span class="nav-text">Content</span>
                     <i class="bi bi-chevron-down dropdown-arrow"></i>
                 </a>
                 <ul class="submenu">
                     @if(auth('admin')->user()->hasPermission('content.read'))
-                    <li><a href=""><i class="bi bi-file-earmark"></i> Pages</a></li>
-                    <li><a href=""><i class="bi bi-image"></i> Banners</a></li>
-                    <li><a href=""><i class="bi bi-envelope-paper"></i> Email Templates</a></li>
+                    <li>
+                        <a href="{{ route('admin.pages.index') }}">
+                            <i class="bi bi-file-earmark"></i> Pages
+                        </a>
+                    </li>
+                    @if(auth('admin')->user()->hasPermission('content.create'))
+                    <li>
+                        <a href="{{ route('admin.pages.create') }}">
+                            <i class="bi bi-plus-square"></i> Add New Page
+                        </a>
+                    </li>
+                    @endif
+                    {{-- Uncomment when ready --}}
+                    {{-- <li><a href=""><i class="bi bi-image"></i> Banners</a></li> --}}
+                    {{-- <li><a href=""><i class="bi bi-envelope-paper"></i> Email Templates</a></li> --}}
                     @endif
                 </ul>
             </li>
