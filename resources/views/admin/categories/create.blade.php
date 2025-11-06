@@ -26,11 +26,34 @@
         border-radius: 8px;
         padding: 10px;
         display: none;
+        position: relative;
     }
     .image-preview img {
         width: 100%;
         height: auto;
         border-radius: 5px;
+    }
+    .image-preview .remove-image {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        padding: 0;
+        z-index: 10;
+    }
+    .image-preview .remove-image:hover {
+        background: #c82333;
     }
     .btn-submit {
         background-color: #5B914C;
@@ -113,6 +136,7 @@
                             <input type="file" class="form-control" id="image" name="image" accept="image/*">
                             <small class="text-muted">Recommended: 800x800px</small>
                             <div class="image-preview mt-2" id="imagePreview">
+                                <button type="button" class="remove-image" data-target="image">&times;</button>
                                 <img src="" alt="Preview">
                             </div>
                         </div>
@@ -122,6 +146,7 @@
                             <input type="file" class="form-control" id="thumbnail" name="thumbnail" accept="image/*">
                             <small class="text-muted">Recommended: 200x200px</small>
                             <div class="image-preview mt-2" id="thumbnailPreview">
+                                <button type="button" class="remove-image" data-target="thumbnail">&times;</button>
                                 <img src="" alt="Preview">
                             </div>
                         </div>
@@ -131,6 +156,7 @@
                             <input type="file" class="form-control" id="banner_image" name="banner_image" accept="image/*">
                             <small class="text-muted">Recommended: 1920x400px</small>
                             <div class="image-preview mt-2" id="bannerPreview">
+                                <button type="button" class="remove-image" data-target="banner_image">&times;</button>
                                 <img src="" alt="Preview">
                             </div>
                         </div>
@@ -140,12 +166,12 @@
                             <input type="file" class="form-control" id="icon" name="icon" accept="image/*">
                             <small class="text-muted">Recommended: 64x64px (SVG preferred)</small>
                             <div class="image-preview mt-2" id="iconPreview">
+                                <button type="button" class="remove-image" data-target="icon">&times;</button>
                                 <img src="" alt="Preview">
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <!-- SEO Settings -->
                 <div class="form-section">
                     <h3 class="form-section-title"><i class="bi bi-search"></i> SEO Settings</h3>
@@ -289,6 +315,30 @@ $(document).ready(function() {
 
     $('#icon').on('change', function() {
         previewImage(this, 'iconPreview');
+    });
+
+    // ✅ Remove image functionality
+    $('.remove-image').on('click', function() {
+        const target = $(this).data('target');
+        const input = $(`#${target}`);
+        const preview = input.closest('.mb-3').find('.image-preview');
+
+        // Clear input
+        input.val('');
+
+        // Hide preview
+        preview.hide().find('img').attr('src', '');
+
+        // Show success message
+        Swal.fire({
+            icon: 'success',
+            title: 'Removed!',
+            text: 'Image has been removed',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000
+        });
     });
 
     // Form submission
