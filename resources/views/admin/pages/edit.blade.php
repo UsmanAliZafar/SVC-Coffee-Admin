@@ -629,7 +629,7 @@
 
 @push('scripts')
 <!-- TinyMCE Rich Text Editor -->
-<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="https://cdn.tiny.cloud/1/gi6hxeywu62rdkmcuajuwxtw2607xe85vdlppnr2859m4heb/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 
 <script>
     // Initialize TinyMCE
