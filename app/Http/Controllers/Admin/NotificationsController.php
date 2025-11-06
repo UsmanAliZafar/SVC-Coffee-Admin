@@ -130,8 +130,8 @@ class NotificationsController extends Controller
             $validated = $request->validate([
                 'settings' => 'required|array',
                 'settings.*.notification_type' => 'required|string',
-                'settings.*.is_enabled' => 'boolean',
-                'settings.*.send_email' => 'boolean',
+                'settings.*.is_enabled' => 'sometimes|boolean',
+                'settings.*.send_email' => 'sometimes|boolean',
                 'settings.*.email_address' => 'nullable|email',
                 'settings.*.threshold_value' => 'nullable|integer|min:0',
             ]);
@@ -145,7 +145,7 @@ class NotificationsController extends Controller
                         'notification_type' => $settingData['notification_type'],
                     ],
                     [
-                        'is_enabled' => $settingData['is_enabled'] ?? true,
+                        'is_enabled' => $settingData['is_enabled'] ?? false,
                         'send_email' => $settingData['send_email'] ?? false,
                         'email_address' => $settingData['email_address'] ?? null,
                         'threshold_value' => $settingData['threshold_value'] ?? null,
