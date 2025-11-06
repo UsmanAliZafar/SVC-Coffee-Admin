@@ -82,8 +82,8 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="{{ route('admin.profile.edit') }}"><i class="bi bi-person me-2"></i> Profile</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i> Settings</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="bi bi-question-circle me-2"></i> Help</a></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}"><i class="bi bi-gear me-2"></i> Settings</a></li>
+                        {{-- <li><a class="dropdown-item" href="#"><i class="bi bi-question-circle me-2"></i> Help</a></li> --}}
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <form action="{{ route('admin.logout') }}" method="POST" class="d-inline">
