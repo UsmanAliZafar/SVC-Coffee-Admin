@@ -416,7 +416,7 @@ class ProductsController extends Controller
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'session_id' => 'nullable|string',
-            'is_taxable' => 'nullable|boolean',
+            'is_taxable' => 'sometimes|boolean',
             'tax_type' => 'nullable|in:inclusive,exclusive',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
@@ -723,7 +723,7 @@ class ProductsController extends Controller
         // Validation
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:products,slug',
+            // 'slug' => 'nullable|string|max:255|unique:products,slug',
             'sku' => 'required|string|max:255|unique:products,sku',
             'barcode' => 'nullable|string|max:255|unique:products,barcode',
             'category_id' => 'nullable|exists:products_categories,id',
@@ -738,7 +738,7 @@ class ProductsController extends Controller
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'session_id' => 'nullable|string',
-            'is_taxable' => 'nullable|boolean',
+            'is_taxable' => 'sometimes|boolean',
             'tax_type' => 'nullable|in:inclusive,exclusive',
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
@@ -748,11 +748,6 @@ class ProductsController extends Controller
             'name.required' => 'Product name is required',
             'name.string' => 'Product name must be a valid text',
             'name.max' => 'Product name cannot exceed 255 characters',
-
-            // Slug validation messages
-            'slug.string' => 'Slug must be a valid text',
-            'slug.max' => 'Slug cannot exceed 255 characters',
-            'slug.unique' => 'This slug is already taken by another product',
 
             // SKU validation messages
             'sku.required' => 'SKU is required',
