@@ -193,6 +193,19 @@ class StoreSetting extends Model
     /**
      * Format currency amount
      */
+    // number format($number, 2, '.', ',')
+    public function numberformatCurrency($amount)
+    {
+        $formatted = number_format(
+            $amount,
+            $this->decimal_places,
+            $this->decimal_separator,
+            $this->thousand_separator
+        );
+
+        return $formatted;
+    }
+
     public function formatCurrency($amount)
     {
         $formatted = number_format(
@@ -202,7 +215,7 @@ class StoreSetting extends Model
             $this->thousand_separator
         );
 
-        return $this->currency_position === 'left'
+        return $this->currency_symbol . $formatted
             ? $this->currency_symbol . $formatted
             : $formatted . $this->currency_symbol;
     }

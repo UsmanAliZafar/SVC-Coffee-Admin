@@ -181,6 +181,24 @@ if (!function_exists('store_time_format')) {
     }
 }
 
+// Currency formatting helper
+
+if (!function_exists('number_format_store_price')) {
+    /**
+     * Format a price using store settings
+     *
+     * @param float $amount
+     * @return string
+     */
+    function number_format_store_price(float $amount): string
+    {
+        $settings = store_settings();
+
+        return $settings->numberformatCurrency($amount);
+    }
+}
+
+
 if (!function_exists('format_store_price')) {
     /**
      * Format a price using store settings

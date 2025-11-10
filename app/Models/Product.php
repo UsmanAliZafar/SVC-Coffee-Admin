@@ -647,7 +647,8 @@ class Product extends Model
      */
     public function getFormattedPrice(): string
     {
-        return $this->curency . ' ' . number_format($this->price, 2);
+        return format_store_price($this->price);
+        // return $this->curency . ' ' . number_format($this->price, 2);
     }
 
     /**
@@ -655,7 +656,8 @@ class Product extends Model
      */
     public function getFormattedSalePrice(): string
     {
-        return $this->sale_price ? $this->curency . ' ' . number_format($this->sale_price, 2) : '';
+        return format_store_price($this->sale_price);
+        // return $this->sale_price ? $this->curency . ' ' . number_format($this->sale_price, 2) : '';
     }
 
     /**
@@ -663,7 +665,8 @@ class Product extends Model
      */
     public function getFormattedFinalPrice(): string
     {
-        return $this->curency . ' ' . number_format($this->getFinalPrice(), 2);
+        return format_store_price($this->getFinalPrice());
+        // return $this->curency . ' ' . number_format($this->getFinalPrice(), 2);
     }
 
     /**

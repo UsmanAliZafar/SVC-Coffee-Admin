@@ -335,8 +335,6 @@ if (!function_exists('get_currency_positions')) {
         return [
             'left' => 'Left ($100.00)',
             'right' => 'Right (100.00$)',
-            'left_space' => 'Left with space ($ 100.00)',
-            'right_space' => 'Right with space (100.00 $)',
         ];
     }
 }
