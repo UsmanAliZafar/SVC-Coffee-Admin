@@ -89,7 +89,7 @@
                 <div class="stat-label">Total Uses</div>
             </div>
             <div class="col-md-3 stat-item">
-                <div class="stat-value" id="totalDiscount">$0</div>
+                <div class="stat-value" id="totalDiscount">{{ store_currency_symbol() }} 0</div>
                 <div class="stat-label">Total Discount Given</div>
             </div>
         </div>
@@ -528,7 +528,7 @@ $(document).ready(function() {
 
                 // Note: For total discount, you'd need to add this to the controller
                 // For now, we'll show a placeholder
-                $('#totalDiscount').text('$0');
+                $('#totalDiscount').text('{{ store_currency_symbol() }}  0');
             }
         });
     }

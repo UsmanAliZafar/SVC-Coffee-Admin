@@ -91,7 +91,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="text-muted mb-1">Total Refunded</h6>
-                            <h3 class="mb-0" id="totalRefunded">$0.00</h3>
+                            <h3 class="mb-0" id="totalRefunded">{{ store_currency_symbol() }} 0.00</h3>
                         </div>
                     </div>
                 </div>
@@ -544,7 +544,7 @@ $(document).ready(function() {
                 {
                     data: 'refunded_amount',
                     render: function(data) {
-                        return '<strong class="text-danger">$' + parseFloat(data).toFixed(2) + '</strong>';
+                        return '<strong class="text-danger">' + parseFloat(data).toFixed(2) + '</strong>';
                     }
                 },
                 {
@@ -632,7 +632,7 @@ $(document).ready(function() {
                 {
                     data: 'refunded_amount',
                     render: function(data) {
-                        return '<strong>$' + parseFloat(data).toFixed(2) + '</strong>';
+                        return '<strong>' + parseFloat(data).toFixed(2) + '</strong>';
                     }
                 },
                 {

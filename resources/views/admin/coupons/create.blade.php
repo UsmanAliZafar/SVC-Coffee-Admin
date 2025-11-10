@@ -164,7 +164,7 @@
                                 <input type="radio" name="discount_type" value="fixed_amount">
                                 <i class="bi bi-currency-dollar"></i>
                                 <div class="type-name">Fixed Amount</div>
-                                <small class="text-muted">$ off</small>
+                                <small class="text-muted">{{ store_currency_symbol() }}  off</small>
                             </label>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -204,7 +204,7 @@
                         <div class="col-md-6 mb-3" id="maxDiscountField">
                             <label for="max_discount_amount" class="form-label">Max Discount Amount</label>
                             <div class="input-group">
-                                <span class="input-group-text">$</span>
+                                <span class="input-group-text">{{ store_currency_symbol() }} </span>
                                 <input type="number" class="form-control" id="max_discount_amount"
                                     name="max_discount_amount" min="0" step="0.01" placeholder="0.00">
                             </div>
@@ -268,7 +268,7 @@
                         <div class="col-md-6 mb-3">
                             <label for="min_purchase_amount" class="form-label">Minimum Purchase Amount</label>
                             <div class="input-group">
-                                <span class="input-group-text">$</span>
+                                <span class="input-group-text">{{ store_currency_symbol() }} </span>
                                 <input type="number" class="form-control" id="min_purchase_amount"
                                     name="min_purchase_amount" min="0" step="0.01" value="0" placeholder="0.00">
                             </div>

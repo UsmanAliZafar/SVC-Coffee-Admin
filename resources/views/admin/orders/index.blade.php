@@ -92,7 +92,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="text-muted mb-1">Today's Revenue</h6>
-                            <h3 class="mb-0">${{ number_format($stats['today_revenue'], 2) }}</h3>
+                            <h3 class="mb-0">{{ store_currency_symbol() }} {{ number_format($stats['today_revenue'], 2) }}</h3>
                             <small class="text-muted">{{ $stats['today_orders'] }} orders</small>
                         </div>
                     </div>

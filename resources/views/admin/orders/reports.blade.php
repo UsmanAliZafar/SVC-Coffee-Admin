@@ -619,7 +619,7 @@ $(document).ready(function() {
                         <td>${index + 1}</td>
                         <td>${customer.name}</td>
                         <td>${customer.orders}</td>
-                        <td><strong>$${number_format(customer.total_spent, 2)}</strong></td>
+                        <td><strong>${number_format(customer.total_spent, 2)}</strong></td>
                     </tr>
                 `;
             });

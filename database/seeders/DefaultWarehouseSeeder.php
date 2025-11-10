@@ -22,41 +22,41 @@ class DefaultWarehouseSeeder extends Seeder
         $this->command->info('Creating default warehouse...');
 
         // Create default main warehouse
-        $mainWarehouse = Warehouse::create([
-            'id' => (string) Str::uuid(),
-            'name' => 'Main Warehouse',
-            'code' => 'WH-MAIN',
-            'email' => 'warehouse@example.com',
-            'phone' => '+1234567890',
-            'address' => '123 Main Street',
-            'city' => 'Lahore',
-            'state' => 'Punjab',
-            'country' => 'Pakistan',
-            'postal_code' => '54000',
-            'is_active' => true,
-            'is_default' => true,
-            'priority' => 100,
-            'notes' => 'Default main warehouse created by system seeder',
-        ]);
+        // $mainWarehouse = Warehouse::create([
+        //     'id' => (string) Str::uuid(),
+        //     'name' => 'Main Warehouse',
+        //     'code' => 'WH-MAIN',
+        //     'email' => 'warehouse@example.com',
+        //     'phone' => '+1234567890',
+        //     'address' => '123 Main Street',
+        //     'city' => 'Lahore',
+        //     'state' => 'Punjab',
+        //     'country' => 'Pakistan',
+        //     'postal_code' => '54000',
+        //     'is_active' => true,
+        //     'is_default' => true,
+        //     'priority' => 100,
+        //     'notes' => 'Default main warehouse created by system seeder',
+        // ]);
 
-        $this->command->info('✓ Main Warehouse created: ' . $mainWarehouse->name);
+        // $this->command->info('✓ Main Warehouse created: ' . $mainWarehouse->name);
 
         // Optionally create additional warehouses
         $additionalWarehouses = [
             [
                 'name' => 'Deafult Warehouse',
                 'code' => 'Deafult Warehouse',
-                'email' => 'secondary@example.com',
+                'email' => 'deafult@shop.com',
                 'phone' => '+1234567891',
-                'address' => '456 Secondary Road',
+                'address' => '456 deafult Road',
                 'city' => 'Deafult',
                 'state' => 'Deafult',
                 'country' => 'Deafult',
                 'postal_code' => '75000',
                 'is_active' => true,
-                'is_default' => false,
-                'priority' => 90,
-                'notes' => 'Secondary warehouse for additional storage',
+                'is_default' => true,
+                'priority' => 100,
+                'notes' => 'Deafult warehouse for additional storage',
             ],
         ];
 

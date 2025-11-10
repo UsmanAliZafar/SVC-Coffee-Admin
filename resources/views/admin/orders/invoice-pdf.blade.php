@@ -442,9 +442,9 @@
                         @endif
                     </td>
                     <td>{{ $item->quantity }}</td>
-                    <td>${{ number_format($item->unit_price, 2) }}</td>
-                    <td>${{ number_format($item->tax_amount, 2) }}</td>
-                    <td>${{ number_format($item->total, 2) }}</td>
+                    <td>{{ store_currency_symbol() }} {{ number_format($item->unit_price, 2) }}</td>
+                    <td>{{ store_currency_symbol() }} {{ number_format($item->tax_amount, 2) }}</td>
+                    <td>{{ store_currency_symbol() }} {{ number_format($item->total, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -455,7 +455,7 @@
             <table class="totals-table">
                 <tr>
                     <td>Subtotal:</td>
-                    <td>${{ number_format($order->subtotal, 2) }}</td>
+                    <td>{{ store_currency_symbol() }} {{ number_format($order->subtotal, 2) }}</td>
                 </tr>
                 @if($order->discount_amount > 0)
                 <tr>
@@ -471,15 +471,15 @@
                 @endif
                 <tr>
                     <td>Tax ({{ number_format($order->tax_rate ?? 0, 2) }}%):</td>
-                    <td>${{ number_format($order->tax_amount, 2) }}</td>
+                    <td>{{ store_currency_symbol() }} {{ number_format($order->tax_amount, 2) }}</td>
                 </tr>
                 <tr>
                     <td>Shipping:</td>
-                    <td>${{ number_format($order->shipping_amount, 2) }}</td>
+                    <td>{{ store_currency_symbol() }} {{ number_format($order->shipping_amount, 2) }}</td>
                 </tr>
                 <tr class="total-row">
                     <td>TOTAL:</td>
-                    <td>${{ number_format($order->total_amount, 2) }}</td>
+                    <td>{{ store_currency_symbol() }} {{ number_format($order->total_amount, 2) }}</td>
                 </tr>
             </table>
         </div>
