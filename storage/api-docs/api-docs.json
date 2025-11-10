@@ -1470,6 +1470,137 @@
                         "apiKey": []
                     }
                 ]
+            },
+            "delete": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Remove coupon code",
+                "description": "Remove an applied coupon code from cart",
+                "operationId": "removeCoupon",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "cart_id"
+                                ],
+                                "properties": {
+                                    "cart_id": {
+                                        "description": "Cart ID to remove coupon from",
+                                        "type": "string",
+                                        "example": "abc123xyz"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Coupon removed successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Coupon removed successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "cart_id": {
+                                                    "type": "string"
+                                                },
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "totals": {
+                                                    "properties": {
+                                                        "subtotal": {
+                                                            "type": "number",
+                                                            "example": 599.98
+                                                        },
+                                                        "discount_amount": {
+                                                            "type": "number",
+                                                            "example": 0
+                                                        },
+                                                        "tax_amount": {
+                                                            "type": "number",
+                                                            "example": 59.99
+                                                        },
+                                                        "total_amount": {
+                                                            "type": "number",
+                                                            "example": 659.97
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "No coupon applied to cart",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "No coupon applied to this cart"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Cart not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cart not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
             }
         },
         "/api/checkout/create-order": {

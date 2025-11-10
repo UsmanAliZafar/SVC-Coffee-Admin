@@ -700,6 +700,59 @@ class SwagerApiController extends Controller
     public function applyCoupon() {}
 
     /**
+     * @OA\Delete(
+     *     path="/api/cart/coupon",
+     *     operationId="removeCoupon",
+     *     tags={"Cart"},
+     *     summary="Remove coupon code",
+     *     description="Remove an applied coupon code from cart",
+     *     security={{"apiKey": {}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"cart_id"},
+     *             @OA\Property(property="cart_id", type="string", example="abc123xyz", description="Cart ID to remove coupon from")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Coupon removed successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Coupon removed successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="cart_id", type="string"),
+     *                 @OA\Property(property="items", type="array", @OA\Items()),
+     *                 @OA\Property(property="totals", type="object",
+     *                     @OA\Property(property="subtotal", type="number", example=599.98),
+     *                     @OA\Property(property="discount_amount", type="number", example=0),
+     *                     @OA\Property(property="tax_amount", type="number", example=59.99),
+     *                     @OA\Property(property="total_amount", type="number", example=659.97)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="No coupon applied to cart",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="No coupon applied to this cart")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Cart not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Cart not found")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
+    public function removeCoupon() {}
+    /**
      * ============================================
      * CHECKOUT ENDPOINTS
      * ============================================
