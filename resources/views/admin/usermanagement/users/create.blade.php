@@ -62,6 +62,19 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
+                                <div class="mb-3">
+                                    <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                                    <input type="text"
+                                           class="form-control @error('username') is-invalid @enderror"
+                                           id="username"
+                                           name="username"
+                                           value="{{ old('username') }}"
+                                           placeholder="Enter username"
+                                           required>
+                                    @error('username')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
 
                                 <div class="mb-3">
                                     <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
