@@ -196,11 +196,16 @@ class StoreSetting extends Model
     // number format($number, 2, '.', ',')
     public function numberformatCurrency($amount)
     {
+        // ✅ Handle null or invalid values
+        if ($amount === null || $amount === '' || !is_numeric($amount)) {
+            $amount = 0;
+        }
+
         $formatted = number_format(
-            $amount,
-            $this->decimal_places,
-            $this->decimal_separator,
-            $this->thousand_separator
+            (float) $amount,
+            $this->decimal_places ?? 2,
+            $this->decimal_separator ?? '.',
+            $this->thousand_separator ?? ','
         );
 
         return $formatted;
