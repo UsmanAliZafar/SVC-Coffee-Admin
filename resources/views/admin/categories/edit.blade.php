@@ -108,7 +108,7 @@
 
                     <div class="mb-3">
                         <label for="slug" class="form-label">Slug (URL)</label>
-                        <input type="text" class="form-control" id="slug" name="slug" value="{{ old('slug', $category->slug) }}">
+                        <input type="text" class="form-control" id="slug" name="slug" value="{{ old('slug', $category->slug) }}" readonly>
                         <small class="text-muted">Leave empty to auto-generate from title</small>
                         <div class="invalid-feedback"></div>
                     </div>
@@ -272,7 +272,7 @@
                         <select class="form-select" id="status_key_code" name="status_key_code" required>
                             @foreach($statusList as $status)
                                 <option value="{{ $status->key_code }}" {{ old('status_key_code', $category->status_key_code) == $status->key_code ? 'selected' : '' }}>
-                                    {{ $status->title }}
+                                    {{ $status->name }}
                                 </option>
                             @endforeach
                         </select>
@@ -337,18 +337,18 @@
 <script>
 $(document).ready(function() {
     // Auto-generate slug from title (only if empty)
-    let originalSlug = $('#slug').val();
-    $('#title').on('input', function() {
-        if (!originalSlug || $('#slug').val() === originalSlug) {
-            const title = $(this).val();
-            const slug = title.toLowerCase()
-                .replace(/[^a-z0-9\s-]/g, '')
-                .replace(/\s+/g, '-')
-                .replace(/-+/g, '-')
-                .trim();
-            $('#slug').val(slug);
-        }
-    });
+    // let originalSlug = $('#slug').val();
+    // $('#title').on('input', function() {
+    //     if (!originalSlug || $('#slug').val() === originalSlug) {
+    //         const title = $(this).val();
+    //         const slug = title.toLowerCase()
+    //             .replace(/[^a-z0-9\s-]/g, '')
+    //             .replace(/\s+/g, '-')
+    //             .replace(/-+/g, '-')
+    //             .trim();
+    //         $('#slug').val(slug);
+    //     }
+    // });
 
     // Image preview function
     function previewImage(input, previewId) {

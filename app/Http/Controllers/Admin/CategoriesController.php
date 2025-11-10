@@ -249,7 +249,7 @@ class CategoriesController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:products_categories,slug',
+            // 'slug' => 'nullable|string|max:255|unique:products_categories,slug',
             'description' => 'nullable|string',
             'short_description' => 'nullable|string',
             'parent_id' => 'nullable|uuid|exists:products_categories,id',
@@ -432,8 +432,9 @@ class CategoriesController extends Controller
      */
     public function empty()
     {
-        $categories = ProductsCategories::where('products_count', 0)
+        $categories = ProductsCategories::doesntHave('products')
             ->with(['parent', 'status'])
+            ->withCount('products') // This will show 0 for empty categories
             ->ordered()
             ->paginate(20);
 

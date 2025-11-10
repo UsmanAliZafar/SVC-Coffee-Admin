@@ -105,6 +105,7 @@
     .info-value {
         color: #6c757d;
         flex: 1;
+        overflow: hidden;
     }
 
     .action-buttons {

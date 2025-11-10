@@ -27,7 +27,7 @@
                         @if(auth('admin')->user()->hasPermission('products.read'))
                         <li><a href="{{ route('admin.products.index') }}"><i class="bi bi-list-ul"></i> All Products</a></li>
                         <li><a href="{{ route('admin.products.low-stock') }}"><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock</a></li>
-                        <li><a href="{{ route('admin.products.inactive') }}"><i class="bi bi-eye-slash text-danger"></i> Inactive</a></li>
+                        <li><a href="{{ route('admin.products.inactive') }}"><i class="bi bi-eye-slash text-danger"></i> Discontinued</a></li>
                         <li><a href="{{ route('admin.products.featured') }}"><i class="bi bi-star text-success"></i> Featured</a></li>
                         @endif
                     </ul>
@@ -64,12 +64,12 @@
                         @endif
 
                         @if(auth('admin')->user()->hasPermission('categories.read'))
-                        <li>
+                        {{-- <li>
                             <a href="{{ route('admin.categories.tree') }}"
                             class="{{ request()->routeIs('admin.categories.tree') ? 'active' : '' }}">
                                 <i class="bi bi-diagram-3"></i> Category Tree
                             </a>
-                        </li>
+                        </li> --}}
                         <li>
                             <a href="{{ route('admin.categories.empty') }}"
                             class="{{ request()->routeIs('admin.categories.empty') ? 'active' : '' }}">

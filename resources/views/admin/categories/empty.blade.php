@@ -210,7 +210,7 @@
                     <small>Root Level</small>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 d-none" style="display: none">
                 <div class="stat-box" style="background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%); color: white; padding: 20px; border-radius: 10px;">
                     <h3>{{ $categories->whereNotNull('parent_id')->count() }}</h3>
                     <small>Subcategories</small>

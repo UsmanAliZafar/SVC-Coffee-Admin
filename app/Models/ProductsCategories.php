@@ -563,6 +563,7 @@ class ProductsCategories extends Model
     public static function getFlatList(?string $parentId = null, int $level = 0)
     {
         $categories = static::where('parent_id', $parentId)
+                            ->active()
                             ->ordered()
                             ->get();
 
