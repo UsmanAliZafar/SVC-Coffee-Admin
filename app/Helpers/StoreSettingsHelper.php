@@ -181,7 +181,6 @@ if (!function_exists('store_time_format')) {
     }
 }
 
-
 if (!function_exists('format_store_price')) {
     /**
      * Format a price using store settings
