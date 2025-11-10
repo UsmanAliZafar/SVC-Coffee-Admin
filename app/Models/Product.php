@@ -665,7 +665,7 @@ class Product extends Model
      */
     public function getFormattedFinalPrice(): string
     {
-        return format_store_price($this->getFinalPrice());
+        return format_store_price($this->sale_price ?? $this->price);
         // return $this->curency . ' ' . number_format($this->getFinalPrice(), 2);
     }
 

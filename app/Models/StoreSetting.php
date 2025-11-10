@@ -193,7 +193,6 @@ class StoreSetting extends Model
     /**
      * Format currency amount
      */
-    // number format($number, 2, '.', ',')
 
     public function formatCurrency($amount)
     {
