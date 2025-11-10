@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Ramsey\Uuid\Type\Decimal;
 
 class ProductsController extends Controller
 {
@@ -506,9 +505,9 @@ class ProductsController extends Controller
                 'slug' => $product->category->slug,
             ] : null,
             'price' => [
-                'regular' => number_format_store_price($product->price) ?? null,
-                'sale' => number_format_store_price($product->sale_price) ? number_format_store_price($product->sale_price)  : null,
-                'final' => number_format_store_price($product->getFinalPrice()),
+                'regular' => (float) $product->price,
+                'sale' => $product->sale_price ? (float) $product->sale_price : null,
+                'final' => $product->getFinalPrice(),
                 'formatted_regular' => $product->getFormattedPrice(),
                 'formatted_sale' => $product->getFormattedSalePrice(),
                 'formatted_final' => $product->getFormattedFinalPrice(),
