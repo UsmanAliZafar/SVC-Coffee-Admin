@@ -22,13 +22,13 @@
                     </a>
                     <ul class="submenu">
                         @if(auth('admin')->user()->hasPermission('products.create'))
-                        <li><a href="{{ route('admin.products.create') }}"><i class="bi bi-plus-square"></i> Add Product</a></li>
+                        <li><a href="{{ route('admin.products.create') }}" class="{{ request()->routeIs('admin.products.create') ? 'active' : '' }}"><i class="bi bi-plus-square"></i> Add Product</a></li>
                         @endif
                         @if(auth('admin')->user()->hasPermission('products.read'))
-                        <li><a href="{{ route('admin.products.index') }}"><i class="bi bi-list-ul"></i> All Products</a></li>
-                        <li><a href="{{ route('admin.products.low-stock') }}"><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock</a></li>
-                        <li><a href="{{ route('admin.products.inactive') }}"><i class="bi bi-eye-slash text-danger"></i> Discontinued</a></li>
-                        <li><a href="{{ route('admin.products.featured') }}"><i class="bi bi-star text-success"></i> Featured</a></li>
+                        <li><a href="{{ route('admin.products.index') }}" class="{{ request()->routeIs('admin.products.index') ? 'active' : '' }}"><i class="bi bi-list-ul"></i> All Products</a></li>
+                        <li><a href="{{ route('admin.products.low-stock') }}" class="{{ request()->routeIs('admin.products.low-stock') ? 'active' : '' }}"><i class="bi bi-exclamation-triangle text-warning"></i> Low Stock</a></li>
+                        <li><a href="{{ route('admin.products.inactive') }}" class="{{ request()->routeIs('admin.products.inactive') ? 'active' : '' }}"><i class="bi bi-eye-slash text-danger"></i> Discontinued</a></li>
+                        <li><a href="{{ route('admin.products.featured') }}" class="{{ request()->routeIs('admin.products.featured') ? 'active' : '' }}"><i class="bi bi-star text-success"></i> Featured</a></li>
                         @endif
                     </ul>
                 </li>
@@ -484,11 +484,11 @@
                     </a>
                     <ul class="submenu">
                         @if(auth('admin')->user()->hasPermission('reports.read'))
-                        <li><a href="{{ route('admin.reports.sales.monthly') }}"><i class="bi bi-cash-stack"></i> Sales Report</a></li>
-                        <li><a href="{{ route('admin.reports.revenue.index') }}"><i class="bi bi-currency-dollar"></i> Revenue</a></li>
-                        <li><a href="{{ route('admin.reports.products.top-selling') }}"><i class="bi bi-box-seam"></i> Products</a></li>
-                        <li><a href="{{ route('admin.reports.customers.index') }}"><i class="bi bi-person-badge"></i> Customers</a></li>
-                        <li><a href="{{ route('admin.reports.inventory.index') }}"><i class="bi bi-boxes"></i> Inventory</a></li>
+                        <li><a href="{{ route('admin.reports.sales.monthly') }}" class="{{ request()->routeIs('admin.reports.sales.monthly') ? 'active' : '' }}"><i class="bi bi-cash-stack"></i> Sales Report</a></li>
+                        <li><a href="{{ route('admin.reports.revenue.index') }}" class="{{ request()->routeIs('admin.reports.revenue.index') ? 'active' : '' }}"><i class="bi bi-currency-dollar"></i> Revenue</a></li>
+                        <li><a href="{{ route('admin.reports.products.top-selling') }}" class="{{ request()->routeIs('admin.reports.products.top-selling') ? 'active' : '' }}"><i class="bi bi-box-seam"></i> Products</a></li>
+                        <li><a href="{{ route('admin.reports.customers.index') }}" class="{{ request()->routeIs('admin.reports.customers.index') ? 'active' : '' }}"><i class="bi bi-person-badge"></i> Customers</a></li>
+                        <li><a href="{{ route('admin.reports.inventory.index') }}" class="{{ request()->routeIs('admin.reports.inventory.index') ? 'active' : '' }}"><i class="bi bi-boxes"></i> Inventory</a></li>
                         @endif
                     </ul>
                 </li>
@@ -517,7 +517,7 @@
                     <ul class="submenu">
                         @if(auth('admin')->user()->hasPermission('notifications.read'))
                             <li class="nav-item {{ request()->routeIs('admin.notifications.*') ? 'active' : '' }}">
-                                <a class="nav-link" href="{{ route('admin.notifications.index') }}">
+                                <a class="nav-link {{ request()->routeIs('admin.notifications.index') ? 'active' : '' }}" href="{{ route('admin.notifications.index') }}">
                                     <i class="bi bi-bell"></i>
                                     <span class="nav-text">Notifications</span>
                                     @if((unread_notifications_count() ?? 0) > 0)
@@ -528,7 +528,7 @@
                         @endif
                         @if(auth('admin')->user()->hasPermission('notifications.update'))
                         <li>
-                            <a href="{{ route('admin.notifications.settings') }}">
+                            <a href="{{ route('admin.notifications.settings') }}" class="{{ request()->routeIs('admin.notifications.settings') ? 'active' : '' }}">
                                 <i class="bi bi-plus-square"></i> Notifications Settings
                             </a>
                         </li>
@@ -551,13 +551,13 @@
                     <ul class="submenu">
                         @if(auth('admin')->user()->hasPermission('content.read'))
                         <li>
-                            <a href="{{ route('admin.pages.index') }}">
+                            <a href="{{ route('admin.pages.index') }}" class="{{ request()->routeIs('admin.pages.index') ? 'active' : '' }}">
                                 <i class="bi bi-file-earmark"></i> Pages
                             </a>
                         </li>
                         @if(auth('admin')->user()->hasPermission('content.create'))
                         <li>
-                            <a href="{{ route('admin.pages.create') }}">
+                            <a href="{{ route('admin.pages.create') }}" class="{{ request()->routeIs('admin.pages.create') ? 'active' : '' }}">
                                 <i class="bi bi-plus-square"></i> Add New Page
                             </a>
                         </li>
@@ -583,18 +583,18 @@
                 </a>
                 <ul class="submenu">
                     @if(auth('admin')->user()->hasPermission('admin_users.create'))
-                    <li><a href="{{ route('admin.users.create') }}"><i class="bi bi-person-plus"></i> Add User</a></li>
+                    <li><a href="{{ route('admin.users.create') }}" class="{{ request()->routeIs('admin.users.create') ? 'active' : '' }}"><i class="bi bi-person-plus"></i> Add User</a></li>
                     @endif
                     @if(auth('admin')->user()->hasPermission('roles.read'))
-                    <li><a href="{{ route('admin.roles.index') }}"><i class="bi bi-shield-check"></i> Roles</a></li>
+                    <li><a href="{{ route('admin.roles.index') }}" class="{{ request()->routeIs('admin.roles.index') ? 'active' : '' }}"><i class="bi bi-shield-check"></i> Roles</a></li>
                     @endif
                     @if(auth('admin')->user()->hasPermission('roles.create'))
-                    <li><a href="{{ route('admin.roles.create') }}"><i class="bi bi-shield-plus"></i> Add Role</a></li>
+                    <li><a href="{{ route('admin.roles.create') }}" class="{{ request()->routeIs('admin.roles.create') ? 'active' : '' }}"><i class="bi bi-shield-plus"></i> Add Role</a></li>
                     @endif
                     @if(auth('admin')->user()->hasRole('super_admin'))
-                    <li><a href="{{ route('admin.permissions.index') }}"><i class="bi bi-key"></i> Permissions</a></li>
+                    <li><a href="{{ route('admin.permissions.index') }}" class="{{ request()->routeIs('admin.permissions.index') ? 'active' : '' }}"><i class="bi bi-key"></i> Permissions</a></li>
                     @endif
-                    <li><a href="{{ route('admin.profile.edit') }}"><i class="bi bi-person-circle"></i> My Profile</a></li>
+                    <li><a href="{{ route('admin.profile.edit') }}" class="{{ request()->routeIs('admin.profile.edit') ? 'active' : '' }}"><i class="bi bi-person-circle"></i> My Profile</a></li>
                 </ul>
             </li>
             @endif
@@ -621,118 +621,144 @@
 <div class="mobile-overlay" id="mobile-overlay" onclick="toggleMobileSidebar()"></div>
 
 <style>
-/* Compact Sidebar Styles */
-.sidebar .submenu {
-    display: none;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.sidebar .submenu li {
-    margin: 0;
-}
-
-.sidebar .submenu a {
-    display: flex;
-    align-items: center;
-    padding: 8px 15px 8px 45px;
-    color: rgb(16 16 16 / 80%);
-    text-decoration: none;
-    font-size: 13px;
-    transition: all 0.2s;
-}
-
-.sidebar .submenu a:hover {
-    background: rgba(91, 145, 76, 0.3);
-    color: #fff;
-    padding-left: 50px;
-}
-
-.sidebar .submenu a i {
-    margin-right: 8px;
-    font-size: 14px;
-    width: 16px;
-}
-
-.sidebar .has-dropdown > .nav-link {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: relative;
-}
-
-.sidebar .dropdown-arrow {
-    font-size: 12px;
-    transition: transform 0.3s;
-    margin-left: auto;
-}
-
-.sidebar .has-dropdown.open > .nav-link .dropdown-arrow {
-    transform: rotate(180deg);
-}
-
-.sidebar .has-dropdown.open .submenu {
-    display: block;
-    animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        max-height: 0;
+    /* Compact Sidebar Styles */
+    .sidebar .submenu {
+        display: none;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        overflow: hidden;
     }
-    to {
-        opacity: 1;
-        max-height: 500px;
+
+    .sidebar .submenu li {
+        margin: 0;
     }
-}
 
-.sidebar .nav-item {
-    margin-bottom: 4px;
-}
+    .sidebar .submenu a {
+        display: flex;
+        align-items: center;
+        padding: 8px 15px 8px 45px;
+        color: rgb(16 16 16 / 80%);
+        text-decoration: none;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
 
-.sidebar .nav-link {
-    padding: 10px 15px;
-    border-radius: 8px;
-    transition: all 0.2s;
-}
+    .sidebar .submenu a:hover {
+        background: rgba(91, 145, 76, 0.3);
+        color: #fff;
+        padding-left: 50px;
+    }
 
-.sidebar .section-divider {
-    margin: 15px 0 10px;
-    padding: 0;
-}
+    .sidebar .submenu a i {
+        margin-right: 8px;
+        font-size: 14px;
+        width: 16px;
+    }
 
-.sidebar .section-title {
-    display: block;
-    padding: 5px 15px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: rgba(40 37 37 / 50%);
-    letter-spacing: 1px;
-}
+    .sidebar .has-dropdown > .nav-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+    }
+
+    .sidebar .dropdown-arrow {
+        font-size: 12px;
+        transition: transform 0.3s;
+        margin-left: auto;
+    }
+
+    .sidebar .has-dropdown.open > .nav-link .dropdown-arrow {
+        transform: rotate(180deg);
+    }
+
+    .sidebar .has-dropdown.open .submenu {
+        display: block;
+        animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            max-height: 0;
+        }
+        to {
+            opacity: 1;
+            max-height: 500px;
+        }
+    }
+
+    .sidebar .nav-item {
+        margin-bottom: 4px;
+    }
+
+    .sidebar .nav-link {
+        padding: 10px 15px;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .sidebar .section-divider {
+        margin: 15px 0 10px;
+        padding: 0;
+    }
+
+    .sidebar .section-title {
+        display: block;
+        padding: 5px 15px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: rgba(40 37 37 / 50%);
+        letter-spacing: 1px;
+    }
+    .sidebar .submenu a.active {
+        background: rgba(91, 145, 76, 0.3);
+        color: #4b4040;
+        padding-left: 50px;
+        font-weight: 900;
+    }
 </style>
 
 <script>
-// Compact Sidebar Dropdown Toggle
-document.addEventListener('DOMContentLoaded', function() {
-    const dropdownItems = document.querySelectorAll('.sidebar .has-dropdown');
+    // Compact Sidebar Dropdown Toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropdownItems = document.querySelectorAll('.sidebar .has-dropdown');
 
-    dropdownItems.forEach(item => {
-        const link = item.querySelector('.nav-link');
+        dropdownItems.forEach(item => {
+            const link = item.querySelector('.nav-link');
 
-        link.addEventListener('click', function(e) {
-            // If clicking the main link, navigate to it
-            if (e.target === link || e.target.classList.contains('nav-text') || e.target.parentElement === link) {
-                // Only prevent default if clicking the arrow
-                const clickedArrow = e.target.classList.contains('dropdown-arrow') ||
-                                   e.target.classList.contains('bi-chevron-down');
+            link.addEventListener('click', function(e) {
+                // If clicking the main link, navigate to it
+                if (e.target === link || e.target.classList.contains('nav-text') || e.target.parentElement === link) {
+                    // Only prevent default if clicking the arrow
+                    const clickedArrow = e.target.classList.contains('dropdown-arrow') ||
+                                    e.target.classList.contains('bi-chevron-down');
 
-                if (clickedArrow) {
+                    if (clickedArrow) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // Close other dropdowns
+                        dropdownItems.forEach(other => {
+                            if (other !== item) {
+                                other.classList.remove('open');
+                            }
+                        });
+
+                        // Toggle current dropdown
+                        item.classList.toggle('open');
+                    }
+                }
+            });
+
+            // Add click handler for the arrow icon specifically
+            const arrow = link.querySelector('.dropdown-arrow');
+            if (arrow) {
+                arrow.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
 
@@ -745,29 +771,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // Toggle current dropdown
                     item.classList.toggle('open');
-                }
+                });
             }
         });
 
-        // Add click handler for the arrow icon specifically
-        const arrow = link.querySelector('.dropdown-arrow');
-        if (arrow) {
-            arrow.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                // Close other dropdowns
-                dropdownItems.forEach(other => {
-                    if (other !== item) {
-                        other.classList.remove('open');
-                    }
-                });
-
-                // Toggle current dropdown
-                item.classList.toggle('open');
-            });
-        }
     });
-
-});
 </script>
