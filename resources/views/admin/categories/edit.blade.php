@@ -61,6 +61,23 @@
     .existing-image {
         margin-bottom: 10px;
     }
+    .url-handle-container .input-group-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    .url-handle-container code {
+        background: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.875rem;
+    }
+    .url-handle-container .list-group-item {
+        padding: 10px 15px;
+    }
+    #urlEditSection .alert {
+        font-size: 0.875rem;
+        padding: 10px 15px;
+    }
 </style>
 @endpush
 
@@ -109,7 +126,7 @@
                     <div class="mb-3">
                         <label for="slug" class="form-label">Slug (URL)</label>
                         <input type="text" class="form-control" id="slug" name="slug" value="{{ old('slug', $category->slug) }}" readonly>
-                        <small class="text-muted">Leave empty to auto-generate from title</small>
+                        <small class="text-muted">To update URL, use the SEO Settings section below</small>
                         <div class="invalid-feedback"></div>
                     </div>
 
@@ -202,6 +219,94 @@
                 <!-- SEO Settings -->
                 <div class="form-section">
                     <h3 class="form-section-title"><i class="bi bi-search"></i> SEO Settings</h3>
+
+                    <!-- URL Handle -->
+                    <div class="mb-3">
+                        <label class="form-label">URL Handle</label>
+                        <div class="url-handle-container">
+                            <div class="input-group" id="urlHandleDisplay">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-link-45deg"></i> {{ url('/') }}/categories/
+                                </span>
+                                <input type="text" class="form-control bg-light" value="{{ $category->slug }}" readonly>
+                                <button type="button" class="btn btn-outline-secondary" id="editUrlBtn" title="Edit URL">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </div>
+
+                            <!-- Edit URL Section (Hidden by default) -->
+                            <div id="urlEditSection" class="mt-3" style="display: none;">
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <strong>Warning:</strong> Changing the URL will affect SEO and existing links.
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">New URL Slug</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            {{ url('/') }}/categories/
+                                        </span>
+                                        <input type="text" id="newSlugInput" class="form-control" value="{{ $category->slug }}" placeholder="new-category-url">
+                                    </div>
+                                    <div class="form-text">
+                                        Use lowercase letters, numbers, and hyphens only
+                                    </div>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="createRedirect" checked>
+                                    <label class="form-check-label" for="createRedirect">
+                                        <i class="bi bi-arrow-right-circle"></i> Create 301 redirect from old URL to new URL
+                                    </label>
+                                    <div class="form-text">
+                                        Recommended: This will automatically redirect visitors from the old URL to the new one
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-submit" id="saveUrlBtn">
+                                        <i class="bi bi-check-circle"></i> Save URL Change
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="cancelUrlBtn">
+                                        <i class="bi bi-x-circle"></i> Cancel
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Existing Redirects -->
+                            @if(isset($categoryRedirects) && $categoryRedirects->count() > 0)
+                            <div class="mt-3">
+                                <h6 class="text-muted mb-2">
+                                    <i class="bi bi-arrow-repeat"></i> Existing Redirects
+                                </h6>
+                                <div class="list-group">
+                                    @foreach($categoryRedirects as $redirect)
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <small class="text-muted">From:</small>
+                                                <code>{{ $redirect->old_url }}</code>
+                                                <i class="bi bi-arrow-right mx-2"></i>
+                                                <small class="text-muted">To:</small>
+                                                <code>{{ $redirect->new_url }}</code>
+                                            </div>
+                                            <div>
+                                                {!! $redirect->getTypeBadge() !!}
+                                                {!! $redirect->getStatusBadge() !!}
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="bi bi-bar-chart"></i> {{ $redirect->hit_count }} hits
+                                            | Created: {{ $redirect->created_at->format('M d, Y') }}
+                                        </small>
+                                    </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @endif
+                        </div>
+                    </div>
 
                     <div class="mb-3">
                         <label for="meta_title" class="form-label">Meta Title</label>
@@ -335,21 +440,9 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-$(document).ready(function() {
-    // Auto-generate slug from title (only if empty)
-    // let originalSlug = $('#slug').val();
-    // $('#title').on('input', function() {
-    //     if (!originalSlug || $('#slug').val() === originalSlug) {
-    //         const title = $(this).val();
-    //         const slug = title.toLowerCase()
-    //             .replace(/[^a-z0-9\s-]/g, '')
-    //             .replace(/\s+/g, '-')
-    //             .replace(/-+/g, '-')
-    //             .trim();
-    //         $('#slug').val(slug);
-    //     }
-    // });
+const CATEGORY_ID = '{{ $category->id }}';
 
+$(document).ready(function() {
     // Image preview function
     function previewImage(input, previewId) {
         if (input.files && input.files[0]) {
@@ -394,7 +487,6 @@ $(document).ready(function() {
         }).then((result) => {
             if (result.isConfirmed) {
                 imageContainer.remove();
-                // Add hidden input to mark for removal
                 $('<input>').attr({
                     type: 'hidden',
                     name: `remove_${field}`,
@@ -413,10 +505,8 @@ $(document).ready(function() {
         const submitBtn = $('#submitBtn');
         const originalText = submitBtn.html();
 
-        // Disable submit button
         submitBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Updating...');
 
-        // Clear previous errors
         $('.is-invalid').removeClass('is-invalid');
         $('.invalid-feedback').text('');
 
@@ -443,7 +533,6 @@ $(document).ready(function() {
                 submitBtn.prop('disabled', false).html(originalText);
 
                 if (xhr.status === 422) {
-                    // Validation errors
                     const errors = xhr.responseJSON.errors;
 
                     $.each(errors, function(key, messages) {
@@ -455,12 +544,10 @@ $(document).ready(function() {
                         if (feedback.length) {
                             feedback.text(messages[0]).show();
                         } else {
-                            // Create feedback element if it doesn't exist
                             input.after(`<div class="invalid-feedback d-block">${messages[0]}</div>`);
                         }
                     });
 
-                    // Scroll to first error
                     const firstError = $('.is-invalid').first();
                     if (firstError.length) {
                         $('html, body').animate({
@@ -478,12 +565,132 @@ $(document).ready(function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Failed to create category'
+                        text: xhr.responseJSON?.message || 'Failed to update category'
                     });
                 }
             }
         });
     });
+
+    // ==================== URL HANDLE MANAGEMENT ====================
+
+    // Show URL edit section
+    $('#editUrlBtn').on('click', function() {
+        $('#urlEditSection').slideDown();
+        $('#newSlugInput').focus();
+    });
+
+    // Cancel URL edit
+    $('#cancelUrlBtn').on('click', function() {
+        $('#urlEditSection').slideUp();
+        $('#newSlugInput').val('{{ $category->slug }}');
+    });
+
+    // Auto-generate slug from input
+    $('#newSlugInput').on('keyup', function() {
+        let value = $(this).val();
+        let slug = value.toLowerCase()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        $(this).val(slug);
+    });
+
+    // Save URL change
+    $('#saveUrlBtn').on('click', function() {
+        const oldSlug = '{{ $category->slug }}';
+        const newSlug = $('#newSlugInput').val().trim();
+        const createRedirect = $('#createRedirect').is(':checked');
+
+        if (!newSlug) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Please enter a valid URL slug'
+            });
+            return;
+        }
+
+        if (newSlug === oldSlug) {
+            Swal.fire({
+                icon: 'info',
+                title: 'No Changes',
+                text: 'The URL slug is the same as before'
+            });
+            return;
+        }
+
+        // Show confirmation
+        Swal.fire({
+            title: 'Change Category URL?',
+            html: `
+                <div class="text-start">
+                    <p><strong>Old URL:</strong><br><code>{{ url('/') }}/categories/${oldSlug}</code></p>
+                    <p><strong>New URL:</strong><br><code>{{ url('/') }}/categories/${newSlug}</code></p>
+                    ${createRedirect ? '<p class="text-success"><i class="bi bi-check-circle"></i> A 301 redirect will be created</p>' : '<p class="text-warning"><i class="bi bi-exclamation-triangle"></i> No redirect will be created</p>'}
+                </div>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, change URL',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                updateCategoryUrl(newSlug, createRedirect);
+            }
+        });
+    });
+
+    // Update category URL
+    function updateCategoryUrl(newSlug, createRedirect) {
+        $.ajax({
+            url: `/admin/categories/${CATEGORY_ID}/update-url`,
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                slug: newSlug,
+                create_redirect: createRedirect ? 1 : 0
+            },
+            beforeSend: function() {
+                Swal.fire({
+                    title: 'Updating URL...',
+                    text: 'Please wait',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+            },
+            success: function(response) {
+                if (response.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: response.message,
+                        confirmButtonColor: '#5B914C'
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: response.message
+                    });
+                }
+            },
+            error: function(xhr) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: xhr.responseJSON?.message || 'Failed to update URL'
+                });
+            }
+        });
+    }
 });
 </script>
 @endpush

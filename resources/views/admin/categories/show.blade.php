@@ -75,6 +75,37 @@
         justify-content: space-between;
         align-items: center;
     }
+
+    .detail-card .table {
+        margin-bottom: 0;
+    }
+
+    .detail-card .table code {
+        background: #f8f9fa;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        display: inline-block;
+        max-width: 250px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .detail-card .table code.text-danger {
+        background: #fff5f5;
+        border: 1px solid #fecaca;
+    }
+
+    .detail-card .table code.text-success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+    }
+
+    .table-responsive {
+        border-radius: 6px;
+        overflow: hidden;
+    }
 </style>
 @endpush
 
@@ -219,6 +250,62 @@
                     </div>
                 </div>
             </div>
+            <!-- URL Redirects -->
+            @if(isset($categoryRedirects) && $categoryRedirects->count() > 0)
+            <div class="detail-card">
+                <h3 class="detail-card-title"><i class="bi bi-arrow-repeat"></i> URL Redirects ({{ $categoryRedirects->count() }})</h3>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Old URL</th>
+                                <th>New URL</th>
+                                <th>Type</th>
+                                <th>Hits</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($categoryRedirects as $redirect)
+                            <tr>
+                                <td>
+                                    <code class="text-danger">{{ $redirect->old_url }}</code>
+                                </td>
+                                <td>
+                                    <i class="bi bi-arrow-right text-muted mx-2"></i>
+                                    <code class="text-success">{{ $redirect->new_url }}</code>
+                                </td>
+                                <td>{!! $redirect->getTypeBadge() !!}</td>
+                                <td>
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-bar-chart"></i> {{ $redirect->hit_count }}
+                                    </span>
+                                </td>
+                                <td>{!! $redirect->getStatusBadge() !!}</td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ $redirect->created_at->format('M d, Y') }}<br>
+                                        {{ $redirect->created_at->diffForHumans() }}
+                                    </small>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                @if($redirect->notes)
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Last Note:</strong> {{ $categoryRedirects->first()->notes }}
+                    </small>
+                </div>
+                @endif
+            </div>
+            @endif
 
             <!-- Children Categories -->
             @if($category->children->count() > 0)
@@ -266,9 +353,9 @@
                         <tbody>
                             @foreach($category->products->take(10) as $product)
                             <tr>
-                                <td>{{ $product->title }}</td>
+                                <td>{{ $product->name }}</td>
                                 <td><code>{{ $product->sku }}</code></td>
-                                <td>${{ number_format($product->price, 2) }}</td>
+                                <td>{{ store_currency_symbol() }}{{ number_format($product->price, 2) }}</td>
                                 <td>{{ $product->stock_quantity }}</td>
                                 <td>{!! $product->getStatusBadge() !!}</td>
                                 <td>

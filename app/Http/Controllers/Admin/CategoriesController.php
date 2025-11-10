@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ProductsCategories;
-use App\Models\SystemStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Support\Facades\Validator;
+// Models
+use App\Models\ProductsCategories;
+use App\Models\SystemStatus;
+use App\Models\UrlRedirect;
 
 class CategoriesController extends Controller
 {
@@ -224,7 +227,12 @@ class CategoriesController extends Controller
             ->withCount('products')
             ->findOrFail($id);
 
-        return view('admin.categories.show', compact('category'));
+        // ADD THIS LINE - Get redirects for this category
+        $categoryRedirects = UrlRedirect::forEntity('category', $id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+        return view('admin.categories.show', compact('category', 'categoryRedirects'));
     }
 
     /**
@@ -233,11 +241,22 @@ class CategoriesController extends Controller
     public function edit($id)
     {
         $category = ProductsCategories::findOrFail($id);
+
+        // Get redirects for this category
+        $categoryRedirects = UrlRedirect::forEntity('category', $id)
+                ->orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get();
+
         $statusList = SystemStatus::where('module', 'categories')->get();
-        $parentCategories = ProductsCategories::where('id', '!=', $id)->get();
         $parentCategories = ProductsCategories::getFlatList();
 
-        return view('admin.categories.edit', compact('category', 'statusList', 'parentCategories'));
+        return view('admin.categories.edit', compact(
+            'category',
+            'statusList',
+            'parentCategories',
+            'categoryRedirects'
+        ));
     }
 
     /**
@@ -311,6 +330,77 @@ class CategoriesController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update category: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update category URL and create redirect if needed
+     */
+    public function updateUrl(Request $request, $id)
+    {
+        try {
+            $category = ProductsCategories::findOrFail($id);
+
+            $validator = Validator::make($request->all(), [
+                'slug' => 'required|string|max:255|unique:products_categories,slug,' . $id,
+                'create_redirect' => 'nullable|boolean',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $oldSlug = $category->slug;
+            $newSlug = Str::slug($request->slug);
+
+            // Check if slug actually changed
+            if ($oldSlug === $newSlug) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'New URL is the same as the current URL'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            try {
+                // Update category slug
+                $category->update(['slug' => $newSlug]);
+
+                // Create redirect if requested
+                if ($request->create_redirect) {
+                    UrlRedirect::create([
+                        'old_url' => '/categories/' . $oldSlug,
+                        'new_url' => '/categories/' . $newSlug,
+                        'redirect_type' => '301',
+                        'entity_type' => 'category',
+                        'entity_id' => $category->id,
+                        'is_active' => true,
+                        'notes' => 'Auto-generated redirect due to category slug change',
+                    ]);
+                }
+
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Category URL updated successfully' . ($request->create_redirect ? ' with redirect' : '')
+                ]);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update URL: ' . $e->getMessage()
             ], 500);
         }
     }

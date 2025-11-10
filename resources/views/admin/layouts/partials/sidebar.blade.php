@@ -719,7 +719,7 @@
         background: rgba(91, 145, 76, 0.3);
         color: #4b4040;
         padding-left: 50px;
-        font-weight: 900;
+        font-weight: 700;
     }
 </style>
 

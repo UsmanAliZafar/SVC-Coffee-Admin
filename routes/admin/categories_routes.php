@@ -45,6 +45,8 @@ Route::prefix('categories')->name('categories.')->group(function () {
 
         // Toggle featured
         Route::post('/{id}/toggle-featured', [CategoriesController::class, 'toggleFeatured'])->name('toggle-featured');
+
+        Route::post('/{id}/update-url', [CategoriesController::class, 'updateUrl'])->name('update-url');
     });
 
     // Delete category

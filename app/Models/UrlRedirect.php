@@ -96,7 +96,9 @@ class UrlRedirect extends Model
         if ($this->entity_type === 'product') {
             return $this->belongsTo(Product::class, 'entity_id');
         }
-        // Add other entity types as needed
+        if ($this->entity_type === 'category') {
+            return $this->belongsTo(ProductsCategories::class, 'entity_id');
+        }
         return null;
     }
 
@@ -246,5 +248,26 @@ class UrlRedirect extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'entity_id')->where('entity_type', 'product');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProductsCategories::class, 'entity_id')->where('entity_type', 'category');
+    }
+
+    // Add helper method for category redirects
+    public static function createCategoryRedirect($oldSlug, $newSlug, $categoryId, $redirectType = '301')
+    {
+        $oldUrl = '/categories/' . $oldSlug;
+        $newUrl = '/categories/' . $newSlug;
+
+        return self::create([
+            'old_url' => $oldUrl,
+            'new_url' => $newUrl,
+            'redirect_type' => $redirectType,
+            'entity_type' => 'category',
+            'entity_id' => $categoryId,
+            'notes' => 'Auto-generated redirect due to category slug change',
+        ]);
     }
 }
