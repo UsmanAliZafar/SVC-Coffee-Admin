@@ -954,24 +954,50 @@ $(document).ready(function() {
                 }
             },
             error: function(xhr) {
-                let errorMessage = 'An error occurred while creating the order.';
+                Swal.close();
 
-                if (xhr.responseJSON) {
-                    if (xhr.responseJSON.message) {
-                        errorMessage = xhr.responseJSON.message;
-                    } else if (xhr.responseJSON.errors) {
-                        const errors = Object.values(xhr.responseJSON.errors).flat();
-                        errorMessage = errors.join('<br>');
-                    }
-                }
-
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error!',
-                    html: errorMessage
-                });
-
+                // ✅ FIX: Re-enable button immediately
                 $('#submitBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Create Order');
+
+                if (xhr.status === 422) {
+                    // Validation errors
+                    const errors = xhr.responseJSON.errors;
+
+                    $.each(errors, function(key, messages) {
+                        const input = $(`[name="${key}"]`);
+                        const feedback = input.closest('.mb-3').find('.invalid-feedback');
+
+                        input.addClass('is-invalid');
+
+                        if (feedback.length) {
+                            feedback.text(messages[0]).show();
+                        } else {
+                            // Create feedback element if it doesn't exist
+                            input.after(`<div class="invalid-feedback d-block">${messages[0]}</div>`);
+                        }
+                    });
+
+                    // Scroll to first error
+                    const firstError = $('.is-invalid').first();
+                    if (firstError.length) {
+                        $('html, body').animate({
+                            scrollTop: firstError.offset().top - 100
+                        }, 500);
+                    }
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Validation Error',
+                        html: 'Please check the form:<br>' +
+                            Object.values(errors).flat().map(err => `• ${err}`).join('<br>')
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: xhr.responseJSON?.message || 'Failed to create order'
+                    });
+                }
             }
         });
     });

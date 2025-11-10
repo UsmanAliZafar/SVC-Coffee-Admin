@@ -11,6 +11,7 @@ use Yajra\DataTables\Facades\DataTables;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 use App\Services\NotificationService;
+use Illuminate\Support\Facades\Validator;
 // MODELS
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -193,57 +194,76 @@ class OrdersController extends Controller
      */
     public function store(Request $request)
     {
-        try {
-            $validated = $request->validate([
-                'customer_id' => 'nullable|uuid|exists:customers,id',
-                'guest_email' => 'required_without:customer_id|nullable|email',
-                'guest_name' => 'required_without:customer_id|nullable|string|max:255',
-                'guest_phone' => 'nullable|string|max:20',
-
-                'items' => 'required|array|min:1',
-                'items.*.product_id' => 'required|uuid|exists:products,id',
-                'items.*.quantity' => 'required|integer|min:1',
-                'items.*.unit_price' => 'required|numeric|min:0',
-
-                'shipping_first_name' => 'required|string|max:100',
-                'shipping_last_name' => 'required|string|max:100',
-                'shipping_address_line1' => 'required|string|max:255',
-                'shipping_address_line2' => 'nullable|string|max:255',
-                'shipping_city' => 'required|string|max:100',
-                'shipping_state' => 'nullable|string|max:100',
-                'shipping_postal_code' => 'required|string|max:20',
-                'shipping_country' => 'required|string|max:100',
-                'shipping_phone' => 'nullable|string|max:20',
-
-                'billing_same_as_shipping' => 'boolean',
-                'billing_first_name' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
-                'billing_last_name' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
-                'billing_address_line1' => 'nullable|required_if:billing_same_as_shipping,false|string|max:255',
-                'billing_address_line2' => 'nullable|string|max:255',
-                'billing_city' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
-                'billing_state' => 'nullable|string|max:100',
-                'billing_postal_code' => 'nullable|required_if:billing_same_as_shipping,false|string|max:20',
-                'billing_country' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
-                'billing_phone' => 'nullable|string|max:20',
-
-                'shipping_method' => 'nullable|string|max:100',
-                'currency' => 'required|string|max:3',
-                'shipping_amount' => 'nullable|numeric|min:0',
-                'discount_code' => 'nullable|string|max:50',
-                'discount_amount' => 'nullable|numeric|min:0',
-                'tax_rate' => 'nullable|numeric|min:0',
-                'customer_notes' => 'nullable|string',
-                'admin_notes' => 'nullable|string',
-                'payment_method' => 'nullable|string|max:50',
-                'status_key_code' => 'required|string',
-                'payment_status_key_code' => 'required|string',
-            ]);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('Order validation failed', ['errors' => $e->errors()]);
-            return back()->withErrors($e->errors())->withInput();
+        // Check permission
+        if (!auth('admin')->user()->hasPermission('orders.create')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
+        $validator = Validator::make($request->all(), [
+            'customer_id' => 'nullable|uuid|exists:customers,id',
+            'guest_email' => 'required_without:customer_id|email|max:255',
+            'guest_name' => 'required_without:customer_id|string|max:255',
+            'guest_phone' => 'required_without:customer_id|string|max:20',
 
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|uuid|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit_price' => 'required|numeric|min:0',
+
+            'shipping_first_name' => 'required|string|max:100',
+            'shipping_last_name' => 'required|string|max:100',
+            'shipping_address_line1' => 'required|string|max:255',
+            'shipping_address_line2' => 'nullable|string|max:255',
+            'shipping_city' => 'required|string|max:100',
+            'shipping_state' => 'nullable|string|max:100',
+            'shipping_postal_code' => 'required|string|max:20',
+            'shipping_country' => 'required|string|max:100',
+            'shipping_phone' => 'nullable|string|max:20',
+
+            'billing_same_as_shipping' => 'boolean',
+            'billing_first_name' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
+            'billing_last_name' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
+            'billing_address_line1' => 'nullable|required_if:billing_same_as_shipping,false|string|max:255',
+            'billing_address_line2' => 'nullable|string|max:255',
+            'billing_city' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
+            'billing_state' => 'nullable|string|max:100',
+            'billing_postal_code' => 'nullable|required_if:billing_same_as_shipping,false|string|max:20',
+            'billing_country' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
+            'billing_phone' => 'nullable|string|max:20',
+
+            'shipping_method' => 'nullable|string|max:100',
+            'currency' => 'required|string|max:3',
+            'shipping_amount' => 'nullable|numeric|min:0',
+            'discount_code' => 'nullable|string|max:50',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'tax_rate' => 'nullable|numeric|min:0',
+            'customer_notes' => 'nullable|string',
+            'admin_notes' => 'nullable|string',
+            'payment_method' => 'nullable|string|max:50',
+            'status_key_code' => 'required|string',
+            'payment_status_key_code' => 'required|string',
+        ],[
+            'guest_name.required_without' => 'Guest name is required when no customer is selected.',
+            'guest_email.required_without' => 'Guest email is required when no customer is selected.',
+            'guest_email.email' => 'Please enter a valid email address.',
+            'guest_phone.required_without' => 'Guest phone is required when no customer is selected.',
+            'items.required' => 'Please add at least one item to the order.',
+            'items.min' => 'Order must contain at least one item.',
+            'shipping_first_name.required' => 'Shipping first name is required.',
+            'shipping_last_name.required' => 'Shipping last name is required.',
+            'shipping_address_line1.required' => 'Shipping address is required.',
+            'shipping_city.required' => 'Shipping city is required.',
+            'shipping_postal_code.required' => 'Shipping postal code is required.',
+            'shipping_country.required' => 'Shipping country is required.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+        $validated = $validator->validated();
         DB::beginTransaction();
         try {
             // ============================================================
