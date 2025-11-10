@@ -643,27 +643,44 @@ class Product extends Model
     }
 
     /**
-     * Get formatted price
+     * Get formatted price using store settings
      */
     public function getFormattedPrice(): string
     {
-        return $this->curency . ' ' . number_format($this->price, 2);
+        return format_store_price($this->price);
     }
 
     /**
-     * Get formatted sale price
+     * Get formatted sale price using store settings
      */
     public function getFormattedSalePrice(): string
     {
-        return $this->sale_price ? $this->curency . ' ' . number_format($this->sale_price, 2) : '';
+        return $this->sale_price ? format_store_price($this->sale_price) : '';
     }
 
     /**
-     * Get formatted final price
+     * Get formatted final price using store settings
      */
     public function getFormattedFinalPrice(): string
     {
-        return $this->curency . ' ' . number_format($this->getFinalPrice(), 2);
+        return format_store_price($this->getFinalPrice());
+    }
+
+    /**
+     * Get formatted cost price using store settings
+     */
+    public function getFormattedCostPrice(): string
+    {
+        return $this->cost_price ? format_store_price($this->cost_price) : '';
+    }
+
+    /**
+     * Get formatted discount amount
+     */
+    public function getFormattedDiscountAmount(): string
+    {
+        $discountAmount = $this->getDiscountAmount();
+        return $discountAmount > 0 ? format_store_price($discountAmount) : '';
     }
 
     /**

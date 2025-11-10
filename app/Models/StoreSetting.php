@@ -191,6 +191,19 @@ class StoreSetting extends Model
     }
 
     /**
+     * Format amount without currency symbol
+     */
+    public function formatAmount($amount)
+    {
+        return number_format(
+            $amount,
+            $this->decimal_places,
+            $this->decimal_separator,
+            $this->thousand_separator
+        );
+    }
+
+    /**
      * Format currency amount
      */
     public function formatCurrency($amount)

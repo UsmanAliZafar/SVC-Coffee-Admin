@@ -181,6 +181,20 @@ if (!function_exists('store_time_format')) {
     }
 }
 
+if (!function_exists('format_amount')) {
+    /**
+     * Format amount without currency symbol using store settings
+     *
+     * @param float $amount
+     * @return string
+     */
+    function format_amount(float $amount): string
+    {
+        $settings = store_settings();
+        return $settings->formatAmount($amount);
+    }
+}
+
 if (!function_exists('format_store_price')) {
     /**
      * Format a price using store settings

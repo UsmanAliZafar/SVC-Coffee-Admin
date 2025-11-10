@@ -505,9 +505,9 @@ class ProductsController extends Controller
                 'slug' => $product->category->slug,
             ] : null,
             'price' => [
-                'regular' => (float) $product->price,
-                'sale' => $product->sale_price ? (float) $product->sale_price : null,
-                'final' => $product->getFinalPrice(),
+                'regular' => format_amount($product->price),
+                'sale' => $product->sale_price ? format_amount($product->sale_price) : 00.00,
+                'final' =>  format_amount($product->getFinalPrice()) ?? 00.00,
                 'formatted_regular' => $product->getFormattedPrice(),
                 'formatted_sale' => $product->getFormattedSalePrice(),
                 'formatted_final' => $product->getFormattedFinalPrice(),
