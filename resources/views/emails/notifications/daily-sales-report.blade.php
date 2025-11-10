@@ -99,7 +99,6 @@
                     <li>Keep up the great work! 💪</li>
                 </ul>
             </div>
-
             <div style="text-align: center; margin: 30px 0;">
                 <a href="{{ route('admin.orders.index') }}" style="display: inline-block; padding: 14px 35px; background-color: #5B914C; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
                     View Full Report

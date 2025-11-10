@@ -55,7 +55,6 @@
                     </tr>
                 </table>
             </div>
-
             <div style="text-align: center; margin: 30px 0;">
                 <a href="{{ $notification->action_url }}" style="display: inline-block; padding: 14px 35px; background-color: #17a2b8; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
                     Track Order

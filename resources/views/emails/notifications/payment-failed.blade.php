@@ -85,7 +85,6 @@
                 </a>
             </div>
         </div>
-
         <!-- Footer -->
         <div style="background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 13px; color: #666;">
             <p style="margin: 0 0 10px 0;">

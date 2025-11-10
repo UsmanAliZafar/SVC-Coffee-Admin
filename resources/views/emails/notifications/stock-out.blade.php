@@ -63,7 +63,6 @@
                     <li><strong>Consider alternative products</strong> to offer customers</li>
                 </ol>
             </div>
-
             <div style="text-align: center; margin: 30px 0;">
                 <a href="{{ $notification->action_url }}" style="display: inline-block; padding: 14px 35px; background-color: #dc3545; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
                     Manage Product Now

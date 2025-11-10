@@ -227,7 +227,6 @@
                 </a>
             </div>
             @endif
-
             <div class="divider"></div>
 
             <!-- Admin Info -->
