@@ -569,7 +569,7 @@ function loadProductStock(productId, warehouseId) {
                 } else {
                     $('#currentStockValue').text(product.stock_quantity);
                     $('#warehouseStockInfo').html(
-                        '<i class="bi bi-info-circle"></i> No stock in this warehouse (Product level: ' + product.stock_quantity + ')'
+                        '<i class="bi bi-info-circle"></i> No stock in this warehouse (Overall Product Qty: ' + product.stock_quantity + ')'
                     );
                 }
 
