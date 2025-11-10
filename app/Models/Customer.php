@@ -574,7 +574,7 @@ class Customer extends Authenticatable
         return match($this->customer_type) {
             'individual' => '<span class="badge bg-primary">Individual</span>',
             'business' => '<span class="badge bg-info">Business</span>',
-            'wholesale' => '<span class="badge bg-purple">Wholesale</span>',
+            'wholesale' => '<span class="badge bg-warning">Wholesale</span>',
             'vip' => '<span class="badge bg-warning text-dark">VIP</span>',
             default => '<span class="badge bg-light text-dark">' . ucfirst($this->customer_type) . '</span>',
         };

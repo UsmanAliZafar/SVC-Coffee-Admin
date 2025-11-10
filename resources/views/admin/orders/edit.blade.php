@@ -325,7 +325,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="shipping_amount" class="form-label">Shipping Amount ($)</label>
+                            <label for="shipping_amount" class="form-label">Shipping Amount ({{ store_currency_symbol() }})</label>
                             <input type="number" class="form-control" id="shipping_amount" name="shipping_amount"
                                    value="{{ $order->shipping_amount }}" min="0" step="0.01">
                         </div>
@@ -343,7 +343,7 @@
                         </div>
 
                         <div class="mb-0">
-                            <label for="discount_amount" class="form-label">Discount Amount ($)</label>
+                            <label for="discount_amount" class="form-label">Discount Amount ({{ store_currency_symbol() }})</label>
                             <input type="number" class="form-control" id="discount_amount" name="discount_amount"
                                    value="{{ $order->discount_amount }}" min="0" step="0.01">
                         </div>
@@ -391,7 +391,7 @@
                                 data-price="{{ $product->getFinalPrice() }}"
                                 data-stock="{{ $product->stock_quantity }}"
                                 data-image="{{ $product->getMainImageUrl() }}">
-                            {{ $product->name }} - {{ $product->sku }} (Stock: {{ $product->stock_quantity }}) - ${{ number_format($product->getFinalPrice(), 2) }}
+                            {{ $product->name }} - {{ $product->sku }} (Stock: {{ $product->stock_quantity }}) - {{ store_currency_symbol() }} {{ number_format($product->getFinalPrice(), 2) }}
                         </option>
                         @endforeach
                     </select>
@@ -402,7 +402,7 @@
                         <input type="number" class="form-control" id="itemQuantity" value="1" min="1">
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Unit Price ($) <span class="text-danger">*</span></label>
+                        <label class="form-label">Unit Price ({{ store_currency_symbol() }}) <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="itemPrice" step="0.01" min="0">
                     </div>
                 </div>
