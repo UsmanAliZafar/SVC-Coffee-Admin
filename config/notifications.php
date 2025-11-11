@@ -15,6 +15,7 @@ return [
             'color' => 'success',
             'default_email' => true,
             'priority' => 'high',
+            'send_to_customer' => false,
         ],
         'order_confirmed' => [
             'label' => 'Order Confirmed',
@@ -24,6 +25,7 @@ return [
             'color' => 'info',
             'default_email' => false,
             'priority' => 'normal',
+            'send_to_customer' => true,
         ],
         'order_processing' => [
             'label' => 'Order Processing',
@@ -33,6 +35,7 @@ return [
             'color' => 'primary',
             'default_email' => false,
             'priority' => 'normal',
+            'send_to_customer' => true,
         ],
         'order_packed' => [
             'label' => 'Order Packed',
@@ -42,6 +45,7 @@ return [
             'color' => 'info',
             'default_email' => false,
             'priority' => 'normal',
+            'send_to_customer' => true,
         ],
         'order_shipped' => [
             'label' => 'Order Shipped',
@@ -51,6 +55,7 @@ return [
             'color' => 'primary',
             'default_email' => true,
             'priority' => 'normal',
+            'send_to_customer' => true,
         ],
         'order_delivered' => [
             'label' => 'Order Delivered',
@@ -60,6 +65,7 @@ return [
             'color' => 'success',
             'default_email' => false,
             'priority' => 'normal',
+            'send_to_customer' => true,
         ],
         'order_cancelled' => [
             'label' => 'Order Cancelled',
@@ -69,6 +75,7 @@ return [
             'color' => 'danger',
             'default_email' => true,
             'priority' => 'high',
+            'send_to_customer' => true,
         ],
         'order_refund_requested' => [
             'label' => 'Refund Requested',
@@ -78,6 +85,7 @@ return [
             'color' => 'warning',
             'default_email' => true,
             'priority' => 'high',
+            'send_to_customer' => true,
         ],
         'order_refunded' => [
             'label' => 'Order Refunded',
@@ -87,6 +95,7 @@ return [
             'color' => 'info',
             'default_email' => true,
             'priority' => 'normal',
+            'send_to_customer' => true,
         ],
         'order_requires_action' => [
             'label' => 'Order Requires Action',
@@ -96,6 +105,7 @@ return [
             'color' => 'warning',
             'default_email' => true,
             'priority' => 'urgent',
+            'send_to_customer' => true,
         ],
 
         // ==================== INVENTORY NOTIFICATIONS ====================

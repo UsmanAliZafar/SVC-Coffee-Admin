@@ -3,16 +3,26 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use App\Services\NotificationService;
+// Models
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Customer;
 use App\Models\Product;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
+
 
 class OrdersController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct()
+    {
+        $this->notificationService = app(NotificationService::class);
+    }
+
     /**
      * Get customer's orders
      *
@@ -230,6 +240,16 @@ class OrdersController extends Controller
 
             DB::commit();
 
+            $this->notificationService->notify('order_cancelled', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'reason' => $validated['reason'],
+                'cancelled_by' => 'Customer',
+                'customer_name' => $order->getCustomerName(),
+                'customer_email' => $order->getCustomerEmail(),
+                'total_amount' => $order->getFormattedTotal(),
+            ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Order cancelled successfully',
@@ -291,6 +311,16 @@ class OrdersController extends Controller
 
             $order->update([
                 'customer_notes' => ($order->customer_notes ?? '') . "\n\n" . $returnNote
+            ]);
+
+            $this->notificationService->notify('order_return_requested', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'return_method' => $validated['return_method'],
+                'items_count' => count($validated['items']),
+                'customer_name' => $order->getCustomerName(),
+                'customer_email' => $order->getCustomerEmail(),
+                'notes' => $validated['additional_notes'] ?? null,
             ]);
 
             return response()->json([

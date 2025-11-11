@@ -182,6 +182,38 @@ class CheckoutController extends Controller
 
             DB::commit();
 
+            // ✅ ADD THIS NOTIFICATION TRIGGER HERE:
+            app(\App\Services\NotificationService::class)->notify('order_created', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
+                'customer_name' => $order->customer_id
+                    ? $order->customer->getFullName()
+                    : ($validated['guest_name'] ?? $validated['shipping_first_name'] . ' ' . $validated['shipping_last_name']),
+                'customer_email' => $order->customer_id
+                    ? $order->customer->email
+                    : ($validated['guest_email'] ?? ''),
+                'customer_phone' => $validated['guest_phone'] ?? $validated['shipping_phone'],
+                'customer_type' => $order->customer_id ? 'returning' : 'new',
+                'items_count' => count($cart),
+                'payment_method' => ucfirst($validated['payment_method']),
+                'payment_status' => 'pending',
+                'shipping_method' => ucfirst($validated['shipping_method']),
+            ]);
+
+            // ✅ CHECK IF HIGH-VALUE ORDER:
+            if ($order->total_amount >= 500) { // Or use config('notifications.thresholds.high_value_order', 500)
+                app(\App\Services\NotificationService::class)->notify('customer_high_value_order', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->customer_id
+                        ? $order->customer->getFullName()
+                        : ($validated['guest_name'] ?? ''),
+                    'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
+                    'customer_id' => $order->customer_id,
+                ]);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Order created successfully',

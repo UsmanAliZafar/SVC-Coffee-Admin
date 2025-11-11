@@ -331,6 +331,16 @@ class OrdersController extends Controller
                 'customer_email' => $order->getCustomerEmail(),
             ]);
 
+            if ($order->payment_status_key_code === 'PAYMENT_PAID') {
+                $this->notificationService->notify('payment_received', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'amount' => $order->getFormattedTotal(),
+                    'payment_method' => $orderData['payment_method'] ?? 'N/A',
+                    'customer_name' => $order->getCustomerName(),
+                ]);
+            }
+
             // Check if high-value order
             if ($order->total_amount >= config('notifications.thresholds.high_value_order', 500)) {
                 $this->notificationService->notify('customer_high_value_order', [
@@ -588,7 +598,16 @@ class OrdersController extends Controller
             // CONFIRMED - DEDUCT STOCK IMMEDIATELY (PREVENTS OVERSELLING)
             // ============================================================
             if ($newStatus === 'ORDER_CONFIRMED' && $oldStatus === 'ORDER_PENDING') {
-                if (!$item->stock_deducted) {
+
+                    $this->notificationService->notify('order_requires_action', [
+                        'order_id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'action_required' => 'Payment verification needed',
+                        'customer_name' => $order->getCustomerName(),
+                        'total_amount' => $order->getFormattedTotal(),
+                    ]);
+
+                    if (!$item->stock_deducted) {
                     // Check if enough stock available
                     if ($product->stock_quantity >= $quantity) {
                         // ⚡ DEDUCT STOCK NOW - PREVENTS OVERSELLING
@@ -869,17 +888,24 @@ class OrdersController extends Controller
 
             if ($newStatus === 'ORDER_PROCESSING' && $oldStatus !== 'ORDER_PROCESSING') {
                 $order->markAsProcessing();
-                // ✅ TRIGGER: Order Processing Notification
-                $this->notificationService->notify('order_shipped', [
+                // ✅ CORRECT
+                $this->notificationService->notify('order_processing', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
-                    'tracking_number' => $order->shipping_tracking_number,
-                    'carrier' => $order->shipping_carrier,
+                    'customer_name' => $order->getCustomerName(),
+                    'customer_email' => $order->getCustomerEmail(),
+                    'total_amount' => $order->getFormattedTotal(),
                 ]);
             }
 
             if ($newStatus === 'ORDER_PACKED' && $oldStatus !== 'ORDER_PACKED') {
                 $order->markAsPacked();
+                $this->notificationService->notify('order_packed', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->getCustomerName(),
+                    'items_count' => $order->getTotalItemsCount(),
+                ]);
             }
 
             if ($newStatus === 'ORDER_SHIPPED' && $oldStatus !== 'ORDER_SHIPPED') {
@@ -1039,6 +1065,17 @@ class OrdersController extends Controller
             ], 400);
         }
 
+        $this->notificationService->notify('order_refund_requested', [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'refund_type' => $validated['refund_type'],
+            'refund_amount' => $validated['refund_type'] === 'full'
+                ? $order->getFormattedTotal()
+                : $order->currency . ' ' . number_format($validated['refund_amount'], 2),
+            'reason' => $validated['refund_reason'],
+            'customer_name' => $order->getCustomerName(),
+            'customer_email' => $order->getCustomerEmail(),
+        ]);
         DB::beginTransaction();
         try {
             if ($validated['refund_type'] === 'full') {
@@ -1054,13 +1091,6 @@ class OrdersController extends Controller
                     'refunded_amount' => $order->total_amount,
                     'refunded_at' => now(),
                     'status_key_code' => 'ORDER_REFUNDED',
-                ]);
-
-                // ✅ TRIGGER: Order Refunded
-                $this->notificationService->notify('order_refunded', [
-                    'order_id' => $order->id,
-                    'order_number' => $order->order_number,
-                    'amount' => $order->currency . ' ' . number_format($refundAmount, 2),
                 ]);
 
             } else {

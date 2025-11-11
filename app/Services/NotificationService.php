@@ -253,4 +253,67 @@ class NotificationService
     {
         return Notification::getStatsForAdmin($adminId);
     }
+
+    /**
+     * Send notification to customer
+     *
+     * @param string $notificationType
+     * @param Order $order
+     * @param array $additionalData
+     * @return void
+     */
+    public function notifyCustomer(
+        string $notificationType,
+        Order $order,
+        array $additionalData = []
+    ): void {
+        // Get notification configuration
+        $config = config("notifications.types.{$notificationType}");
+
+        if (!$config || !($config['send_to_customer'] ?? false)) {
+            return; // This notification type doesn't go to customers
+        }
+
+        try {
+            $customerEmail = $order->customer
+                ? $order->customer->email
+                : $order->guest_email;
+
+            if (!$customerEmail) {
+                return;
+            }
+
+            // Send customer email
+            $mailClass = $this->getCustomerMailClass($notificationType);
+
+            if ($mailClass) {
+                Mail::to($customerEmail)->send(new $mailClass($order, $additionalData));
+
+                Log::info("Customer notification sent", [
+                    'order_id' => $order->id,
+                    'notification_type' => $notificationType,
+                    'customer_email' => $customerEmail,
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Failed to send customer notification: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get customer mail class
+     */
+    private function getCustomerMailClass(string $notificationType): ?string
+    {
+        return match($notificationType) {
+            'order_confirmed' => \App\Mail\Customer\OrderConfirmedMail::class,
+            'order_shipped' => \App\Mail\Customer\OrderShippedMail::class,
+            'order_delivered' => \App\Mail\Customer\OrderDeliveredMail::class,
+            'order_cancelled' => \App\Mail\Customer\OrderCancelledMail::class,
+            'order_refunded' => \App\Mail\Customer\OrderRefundedMail::class,
+            'payment_received' => \App\Mail\Customer\PaymentReceivedMail::class,
+            default => null,
+        };
+    }
 }
