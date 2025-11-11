@@ -7,7 +7,8 @@ use App\Models\NotificationSetting;
 use App\Models\AdminUser;
 use App\Jobs\SendNotificationEmail;
 use Illuminate\Support\Facades\Log;
-
+use Illuminate\Support\Facades\Mail;
+use App\Models\Order;
 class NotificationService
 {
     /**

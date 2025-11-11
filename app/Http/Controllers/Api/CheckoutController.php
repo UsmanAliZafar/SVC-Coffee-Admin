@@ -201,6 +201,7 @@ class CheckoutController extends Controller
                 'shipping_method' => ucfirst($validated['shipping_method']),
             ]);
 
+
             // ✅ CHECK IF HIGH-VALUE ORDER:
             if ($order->total_amount >= 500) { // Or use config('notifications.thresholds.high_value_order', 500)
                 app(\App\Services\NotificationService::class)->notify('customer_high_value_order', [
@@ -213,6 +214,12 @@ class CheckoutController extends Controller
                     'customer_id' => $order->customer_id,
                 ]);
             }
+            // ✅ NOTIFY CUSTOMER:
+            app(\App\Services\NotificationService::class)->notifyCustomer('order_created', $order, [
+                'items_count' => count($cart),
+                'payment_method' => ucfirst($validated['payment_method']),
+                'shipping_method' => ucfirst($validated['shipping_method']),
+            ]);
 
             return response()->json([
                 'success' => true,

@@ -884,6 +884,9 @@ class OrdersController extends Controller
                     'order_number' => $order->order_number,
                     'total_amount' => $order->getFormattedTotal(),
                 ]);
+
+                //Send email to customer
+                $this->notificationService->notifyCustomer('order_confirmed', $order);
             }
 
             if ($newStatus === 'ORDER_PROCESSING' && $oldStatus !== 'ORDER_PROCESSING') {
@@ -896,6 +899,9 @@ class OrdersController extends Controller
                     'customer_email' => $order->getCustomerEmail(),
                     'total_amount' => $order->getFormattedTotal(),
                 ]);
+
+                //Send email to customer
+                $this->notificationService->notifyCustomer('order_processing', $order);
             }
 
             if ($newStatus === 'ORDER_PACKED' && $oldStatus !== 'ORDER_PACKED') {
@@ -906,6 +912,7 @@ class OrdersController extends Controller
                     'customer_name' => $order->getCustomerName(),
                     'items_count' => $order->getTotalItemsCount(),
                 ]);
+                $this->notificationService->notifyCustomer('order_packed', $order);
             }
 
             if ($newStatus === 'ORDER_SHIPPED' && $oldStatus !== 'ORDER_SHIPPED') {
@@ -928,6 +935,11 @@ class OrdersController extends Controller
                     'tracking_number' => $order->shipping_tracking_number,
                     'carrier' => $order->shipping_carrier,
                 ]);
+                // ✅ ADD THIS - Send email to customer with tracking
+                $this->notificationService->notifyCustomer('order_shipped', $order, [
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'carrier' => $order->shipping_carrier,
+                ]);
             }
 
             if ($newStatus === 'ORDER_DELIVERED' && $oldStatus !== 'ORDER_DELIVERED') {
@@ -937,6 +949,7 @@ class OrdersController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                 ]);
+                $this->notificationService->notifyCustomer('order_delivered', $order);
             }
 
             if ($newStatus === 'ORDER_CANCELLED') {
@@ -968,6 +981,10 @@ class OrdersController extends Controller
                 $this->notificationService->notify('order_cancelled', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
+                ]);
+
+                $this->notificationService->notifyCustomer('order_cancelled', $order, [
+                    'reason' => $validated['notes'] ?? 'Cancelled by admin',
                 ]);
             }
 
@@ -1093,6 +1110,12 @@ class OrdersController extends Controller
                     'status_key_code' => 'ORDER_REFUNDED',
                 ]);
 
+                $this->notificationService->notifyCustomer('order_refunded', $order, [
+                    'refund_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
+                    'refund_type' => 'full',
+                    'reason' => $validated['refund_reason'],
+                ]);
+
             } else {
                 // Partial refund
                 $refundAmount = 0;
@@ -1119,6 +1142,12 @@ class OrdersController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'amount' => $order->currency . ' ' . number_format($refundAmount, 2),
+                ]);
+
+                $this->notificationService->notifyCustomer('order_refunded', $order, [
+                    'refund_amount' => $order->currency . ' ' . number_format($refundAmount, 2),
+                    'refund_type' => 'partial',
+                    'reason' => $validated['refund_reason'],
                 ]);
             }
 

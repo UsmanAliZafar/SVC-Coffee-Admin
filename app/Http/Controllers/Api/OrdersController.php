@@ -250,6 +250,11 @@ class OrdersController extends Controller
                 'total_amount' => $order->getFormattedTotal(),
             ]);
 
+            $this->notificationService->notifyCustomer('order_cancelled', $order, [
+                'reason' => $validated['reason'],
+                'cancelled_by' => 'Customer',
+            ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Order cancelled successfully',
