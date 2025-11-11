@@ -230,7 +230,7 @@
                                     name="discount_type"
                                     value="fixed_amount"
                                     {{ $coupon->discount_type === 'fixed_amount' ? 'checked' : '' }}>
-                                <i class="bi bi-currency-dollar"></i>
+                                {{ store_currency_symbol() }}
                                 <div class="type-name">Fixed Amount</div>
                                 <small class="text-muted">{{ store_currency_symbol() }} off</small>
                             </label>

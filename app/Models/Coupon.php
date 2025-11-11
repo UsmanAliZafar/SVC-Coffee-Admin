@@ -345,7 +345,7 @@ class Coupon extends Model
     {
         return match($this->discount_type) {
             'percentage' => $this->discount_value . '%',
-            'fixed_amount' => '$' . number_format($this->discount_value, 2),
+            'fixed_amount' =>  store_currency_symbol() . number_format($this->discount_value, 2),
             'free_shipping' => 'Free Shipping',
             'buy_x_get_y' => "Buy {$this->buy_quantity} Get {$this->get_quantity} Free",
         };

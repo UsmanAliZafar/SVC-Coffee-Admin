@@ -469,6 +469,7 @@
                     </ul>
                 </li>
             @endif
+
             {{-- End Coupons Management --}}
             <li class="section-divider">
                 <span class="section-title">Reports</span>

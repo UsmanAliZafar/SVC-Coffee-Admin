@@ -162,7 +162,7 @@
                         <div class="col-md-3 mb-3">
                             <label class="discount-type-card" data-type="fixed_amount">
                                 <input type="radio" name="discount_type" value="fixed_amount">
-                                <i class="bi bi-currency-dollar"></i>
+                                {{ store_currency_symbol() }}
                                 <div class="type-name">Fixed Amount</div>
                                 <small class="text-muted">{{ store_currency_symbol() }}  off</small>
                             </label>
