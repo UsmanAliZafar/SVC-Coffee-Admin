@@ -47,7 +47,7 @@ class PaymentFailedMail extends Mailable
                 'failureReason' => $this->additionalData['failure_reason'] ?? 'Payment could not be processed',
                 'failureDate' => now()->format('F d, Y h:i A'),
                 'retryUrl' => route('customer.orders.payment', $this->order->id),
-                'supportUrl' => route('customer.support'),
+                'supportUrl' => config('app.url') . '/support',
             ],
         );
     }

@@ -62,7 +62,8 @@ class OrderConfirmedMail extends Mailable
                 'totalAmount' => $this->order->getFormattedTotal(),
                 'items' => $this->order->items,
                 'shippingAddress' => $this->order->getShippingAddress(),
-                'trackingUrl' => $this->order->action_url ?? route('customer.orders.track', $this->order->order_number),
+                // 'trackingUrl' => $this->order->action_url ?? route('customer.orders.track', $this->order->order_number),
+                'trackingUrl' => $this->order->action_url ?? config('app.url') . '/track-order/' . $this->order->order_number,
             ],
         );
     }

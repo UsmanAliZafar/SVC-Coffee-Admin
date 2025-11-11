@@ -74,7 +74,7 @@
                     </div>
                     <div style="display: table-cell; vertical-align: top; text-align: right; width: 30%;">
                         <p style="margin: 0; font-weight: 700; color: #5B914C; font-size: 16px;">
-                            ${{ number_format($item->total, 2) }}
+                        {{ store_currency_symbol() }} {{ number_format($item->total, 2) }}
                         </p>
                     </div>
                 </div>

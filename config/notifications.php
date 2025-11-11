@@ -240,6 +240,7 @@ return [
             'color' => 'success',
             'default_email' => false,
             'priority' => 'normal',
+            'send_to_customer' => true,
         ],
         'payment_failed' => [
             'label' => 'Payment Failed',

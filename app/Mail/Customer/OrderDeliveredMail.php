@@ -46,7 +46,7 @@ class OrderDeliveredMail extends Mailable
                 'totalAmount' => $this->order->getFormattedTotal(),
                 'items' => $this->order->items,
                 'reviewUrl' => route('customer.orders.review', $this->order->id),
-                'supportUrl' => route('customer.support'),
+                'supportUrl' => config('app.url') . '/support',
             ],
         );
     }

@@ -48,7 +48,7 @@ class OrderCancelledMail extends Mailable
                 'refundInfo' => $this->order->payment_status_key_code === 'PAYMENT_PAID'
                     ? 'Your refund will be processed within 5-7 business days.'
                     : 'No charges were made to your payment method.',
-                'supportUrl' => route('customer.support'),
+                'supportUrl' => config('app.url') . '/support',
             ],
         );
     }

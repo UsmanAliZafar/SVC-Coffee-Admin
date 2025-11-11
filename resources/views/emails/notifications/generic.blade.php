@@ -44,7 +44,7 @@
             width: 60px;
             height: 60px;
             margin: 0 auto 20px;
-            background-color: {{ $iconColor }};
+            background-color: #17a2b8;
             border-radius: 50%;
             display: flex;
             align-items: center;

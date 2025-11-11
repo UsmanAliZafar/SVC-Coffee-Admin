@@ -87,13 +87,32 @@ class NotificationService
             ->where('notification_type', $notificationType)
             ->first();
 
-        if ($setting) {
-            return $setting->send_email;
+        // ✅ ONLY send email if:
+        // 1. Setting exists
+        // 2. send_email is true
+        // 3. email_address is configured
+        if ($setting && $setting->send_email && !empty($setting->email_address)) {
+            return true;
         }
 
-        // Use default from config if no setting exists
-        return config("notifications.types.{$notificationType}.default_email", false);
+        // ❌ DON'T send email if no setting or no email configured
+        return false;
     }
+
+    // private function shouldSendEmail(string $adminId, string $notificationType): bool
+    // {
+    //     // Get admin's notification setting
+    //     $setting = NotificationSetting::where('admin_user_id', $adminId)
+    //         ->where('notification_type', $notificationType)
+    //         ->first();
+
+    //     if ($setting) {
+    //         return $setting->send_email;
+    //     }
+
+    //     // Use default from config if no setting exists
+    //     return config("notifications.types.{$notificationType}.default_email", false);
+    // }
 
     /**
      * Get recipients based on criteria
@@ -101,15 +120,24 @@ class NotificationService
     private function getRecipients($recipients, $notificationType)
     {
         if (is_null($recipients)) {
-            // Send to all active admins with this notification enabled
-            return AdminUser::active()->get();
+            // ✅ ONLY get admins who configured this notification
+            $adminIdsWithSettings = NotificationSetting::where('notification_type', $notificationType)
+                ->where('send_email', true)
+                ->whereNotNull('email_address')
+                ->where('email_address', '!=', '')
+                ->pluck('admin_user_id');
+
+            if ($adminIdsWithSettings->isEmpty()) {
+                return collect([]);
+            }
+
+            return AdminUser::whereIn('id', $adminIdsWithSettings)->active()->get();
         }
 
         if (is_array($recipients)) {
             return AdminUser::whereIn('id', $recipients)->get();
         }
 
-        // Single admin ID
         return AdminUser::where('id', $recipients)->get();
     }
 

@@ -1405,17 +1405,43 @@ class Product extends Model
     /**
      * Reserve stock for an order
      */
-    public function reserveStock(string $warehouseId, int $quantity): bool
+    public function reserveStock()
     {
-        $stock = ProductWarehouseStock::where('product_id', $this->id)
-                                    ->where('warehouse_id', $warehouseId)
-                                    ->first();
+        if ($this->product && $this->product->track_inventory) {
+            // Get warehouse_id from order item or use default warehouse
+            $warehouseId = $this->warehouse_id ?? $this->getDefaultWarehouse();
 
-        if (!$stock) {
-            return false;
+            if (!$warehouseId) {
+                \Log::warning("No warehouse found for order item", [
+                    'order_item_id' => $this->id,
+                    'product_id' => $this->product_id,
+                ]);
+                return false;
+            }
+
+            return $this->product->reserveStock($warehouseId, $this->quantity);
+        }
+        return false;
+    }
+
+    /**
+     * Get default warehouse ID
+     */
+    private function getDefaultWarehouse(): ?string
+    {
+        // Option 1: Get from product's warehouse stock (first available)
+        $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $this->product_id)
+            ->where('available_quantity', '>=', $this->quantity)
+            ->first();
+
+        if ($warehouseStock) {
+            return $warehouseStock->warehouse_id;
         }
 
-        return $stock->reserveStock($quantity);
+        // Option 2: Get system default warehouse
+        $defaultWarehouse = \App\Models\Warehouse::where('is_default', true)->first();
+
+        return $defaultWarehouse?->id;
     }
 
     /**

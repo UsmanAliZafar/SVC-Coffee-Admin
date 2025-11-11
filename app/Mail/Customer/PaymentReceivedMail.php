@@ -48,7 +48,8 @@ class PaymentReceivedMail extends Mailable
                 'paidDate' => now()->format('F d, Y h:i A'),
                 'orderStatus' => $this->order->getStatusLabel(),
                 'items' => $this->order->items,
-                'invoiceUrl' => route('customer.orders.invoice', $this->order->id),
+                // 'invoiceUrl' => //route('customer.orders.invoice', $this->order->id),
+                'invoiceUrl' => config('app.url') . '/invoices/' . $this->order->order_number,
             ],
         );
     }

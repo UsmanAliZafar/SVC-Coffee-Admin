@@ -198,17 +198,28 @@ class OrdersController extends Controller
         if (!auth('admin')->user()->hasPermission('orders.create')) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
-        $validator = Validator::make($request->all(), [
-            'customer_id' => 'nullable|uuid|exists:customers,id',
-            'guest_email' => 'required_without:customer_id|email|max:255',
-            'guest_name' => 'required_without:customer_id|string|max:255',
-            'guest_phone' => 'required_without:customer_id|string|max:20',
 
+        // ✅ Clean guest fields if customer is selected
+        if ($request->filled('customer_id')) {
+            $request->merge([
+                'guest_email' => null,
+                'guest_name' => null,
+                'guest_phone' => null,
+            ]);
+        }
+
+        // ✅ Build validation rules dynamically
+        $rules = [
+            // Customer Information
+            'customer_id' => 'nullable|uuid|exists:customers,id',
+
+            // Order Items
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|uuid|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
 
+            // Shipping Address
             'shipping_first_name' => 'required|string|max:100',
             'shipping_last_name' => 'required|string|max:100',
             'shipping_address_line1' => 'required|string|max:255',
@@ -219,42 +230,118 @@ class OrdersController extends Controller
             'shipping_country' => 'required|string|max:100',
             'shipping_phone' => 'nullable|string|max:20',
 
-            'billing_same_as_shipping' => 'boolean',
-            'billing_first_name' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
-            'billing_last_name' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
-            'billing_address_line1' => 'nullable|required_if:billing_same_as_shipping,false|string|max:255',
+            // Billing Address
+            'billing_same_as_shipping' => 'nullable|boolean',
+            'billing_first_name' => 'nullable|required_if:billing_same_as_shipping,0|string|max:100',
+            'billing_last_name' => 'nullable|required_if:billing_same_as_shipping,0|string|max:100',
+            'billing_address_line1' => 'nullable|required_if:billing_same_as_shipping,0|string|max:255',
             'billing_address_line2' => 'nullable|string|max:255',
-            'billing_city' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
+            'billing_city' => 'nullable|required_if:billing_same_as_shipping,0|string|max:100',
             'billing_state' => 'nullable|string|max:100',
-            'billing_postal_code' => 'nullable|required_if:billing_same_as_shipping,false|string|max:20',
-            'billing_country' => 'nullable|required_if:billing_same_as_shipping,false|string|max:100',
+            'billing_postal_code' => 'nullable|required_if:billing_same_as_shipping,0|string|max:20',
+            'billing_country' => 'nullable|required_if:billing_same_as_shipping,0|string|max:100',
             'billing_phone' => 'nullable|string|max:20',
 
+            // Shipping & Payment
             'shipping_method' => 'nullable|string|max:100',
             'currency' => 'required|string|max:3',
             'shipping_amount' => 'nullable|numeric|min:0',
             'discount_code' => 'nullable|string|max:50',
             'discount_amount' => 'nullable|numeric|min:0',
-            'tax_rate' => 'nullable|numeric|min:0',
-            'customer_notes' => 'nullable|string',
-            'admin_notes' => 'nullable|string',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
             'payment_method' => 'nullable|string|max:50',
-            'status_key_code' => 'required|string',
-            'payment_status_key_code' => 'required|string',
-        ],[
-            'guest_name.required_without' => 'Guest name is required when no customer is selected.',
-            'guest_email.required_without' => 'Guest email is required when no customer is selected.',
+
+            // Order Status
+            'status_key_code' => 'required|string|exists:system_statuses,key_code',
+            'payment_status_key_code' => 'required|string|exists:system_statuses,key_code',
+
+            // Notes
+            'customer_notes' => 'nullable|string|max:5000',
+            'admin_notes' => 'nullable|string|max:5000',
+        ];
+
+        // ✅ Only require guest fields if no customer selected
+        if (!$request->filled('customer_id')) {
+            $rules['guest_email'] = 'required|email|max:255';
+            $rules['guest_name'] = 'required|string|max:255';
+            $rules['guest_phone'] = 'required|string|max:20';
+        }
+
+        // ✅ Custom validation messages
+        $messages = [
+            // Guest Customer Messages
+            'guest_name.required' => 'Guest name is required when no customer is selected.',
+            'guest_email.required' => 'Guest email is required when no customer is selected.',
             'guest_email.email' => 'Please enter a valid email address.',
-            'guest_phone.required_without' => 'Guest phone is required when no customer is selected.',
+            'guest_phone.required' => 'Guest phone is required when no customer is selected.',
+
+            // Customer Messages
+            'customer_id.uuid' => 'Invalid customer ID format.',
+            'customer_id.exists' => 'Selected customer does not exist.',
+
+            // Order Items Messages
             'items.required' => 'Please add at least one item to the order.',
             'items.min' => 'Order must contain at least one item.',
+            'items.*.product_id.required' => 'Product is required for each item.',
+            'items.*.product_id.exists' => 'One or more selected products do not exist.',
+            'items.*.quantity.required' => 'Quantity is required for each item.',
+            'items.*.quantity.integer' => 'Quantity must be a whole number.',
+            'items.*.quantity.min' => 'Quantity must be at least 1.',
+            'items.*.unit_price.required' => 'Unit price is required for each item.',
+            'items.*.unit_price.numeric' => 'Unit price must be a valid number.',
+            'items.*.unit_price.min' => 'Unit price cannot be negative.',
+
+            // Shipping Address Messages
             'shipping_first_name.required' => 'Shipping first name is required.',
+            'shipping_first_name.max' => 'Shipping first name cannot exceed 100 characters.',
             'shipping_last_name.required' => 'Shipping last name is required.',
+            'shipping_last_name.max' => 'Shipping last name cannot exceed 100 characters.',
             'shipping_address_line1.required' => 'Shipping address is required.',
+            'shipping_address_line1.max' => 'Shipping address cannot exceed 255 characters.',
             'shipping_city.required' => 'Shipping city is required.',
+            'shipping_city.max' => 'Shipping city cannot exceed 100 characters.',
             'shipping_postal_code.required' => 'Shipping postal code is required.',
+            'shipping_postal_code.max' => 'Shipping postal code cannot exceed 20 characters.',
             'shipping_country.required' => 'Shipping country is required.',
-        ]);
+            'shipping_country.max' => 'Shipping country cannot exceed 100 characters.',
+            'shipping_phone.max' => 'Shipping phone cannot exceed 20 characters.',
+
+            // Billing Address Messages
+            'billing_same_as_shipping.boolean' => 'Billing same as shipping must be true or false.',
+            'billing_first_name.required_if' => 'Billing first name is required when billing address differs from shipping.',
+            'billing_last_name.required_if' => 'Billing last name is required when billing address differs from shipping.',
+            'billing_address_line1.required_if' => 'Billing address is required when billing address differs from shipping.',
+            'billing_city.required_if' => 'Billing city is required when billing address differs from shipping.',
+            'billing_postal_code.required_if' => 'Billing postal code is required when billing address differs from shipping.',
+            'billing_country.required_if' => 'Billing country is required when billing address differs from shipping.',
+
+            // Shipping & Payment Messages
+            'shipping_method.max' => 'Shipping method cannot exceed 100 characters.',
+            'currency.required' => 'Currency is required.',
+            'currency.max' => 'Currency code must be 3 characters.',
+            'shipping_amount.numeric' => 'Shipping amount must be a valid number.',
+            'shipping_amount.min' => 'Shipping amount cannot be negative.',
+            'discount_code.max' => 'Discount code cannot exceed 50 characters.',
+            'discount_amount.numeric' => 'Discount amount must be a valid number.',
+            'discount_amount.min' => 'Discount amount cannot be negative.',
+            'tax_rate.numeric' => 'Tax rate must be a valid number.',
+            'tax_rate.min' => 'Tax rate cannot be negative.',
+            'tax_rate.max' => 'Tax rate cannot exceed 100%.',
+            'payment_method.max' => 'Payment method cannot exceed 50 characters.',
+
+            // Order Status Messages
+            'status_key_code.required' => 'Order status is required.',
+            'status_key_code.exists' => 'Invalid order status selected.',
+            'payment_status_key_code.required' => 'Payment status is required.',
+            'payment_status_key_code.exists' => 'Invalid payment status selected.',
+
+            // Notes Messages
+            'customer_notes.max' => 'Customer notes cannot exceed 5000 characters.',
+            'admin_notes.max' => 'Admin notes cannot exceed 5000 characters.',
+        ];
+
+        // ✅ Perform validation
+        $validator = Validator::make($request->all(), $rules, $messages);
 
         if ($validator->fails()) {
             return response()->json([
@@ -263,6 +350,7 @@ class OrdersController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
+
         $validated = $validator->validated();
         DB::beginTransaction();
         try {
@@ -338,6 +426,10 @@ class OrdersController extends Controller
                     'amount' => $order->getFormattedTotal(),
                     'payment_method' => $orderData['payment_method'] ?? 'N/A',
                     'customer_name' => $order->getCustomerName(),
+                ]);
+
+                $this->notificationService->notifyCustomer('payment_received', $order, [
+                    'payment_method' => $order->payment_method ?? 'N/A',
                 ]);
             }
 
@@ -856,7 +948,7 @@ class OrdersController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $order = Order::with('items.product')->findOrFail($id);
-
+        Log::info("Updating status for order #{$order->order_number} (Current status: {$order->status_key_code})");
         $validated = $request->validate([
             'status_key_code' => 'required|string|exists:system_statuses,key_code',
             'tracking_number' => 'nullable|string|max:100',
@@ -1717,9 +1809,13 @@ class OrdersController extends Controller
                 'payment_status_key_code' => 'nullable|string|exists:system_statuses,key_code',
             ]);
 
-            $order = Order::findOrFail($id);
+            $order = Order::with('items.product')->findOrFail($id); // ✅ Load relationships
 
             DB::beginTransaction();
+
+            // ✅ CAPTURE OLD STATUS for notification comparison
+            $oldStatus = $order->status_key_code;
+            $oldPaymentStatus = $order->payment_status_key_code;
 
             // Update order status if provided
             if (isset($validated['status_key_code'])) {
@@ -1730,21 +1826,43 @@ class OrdersController extends Controller
                     ], 400);
                 }
 
-                $order->status_key_code = $validated['status_key_code'];
+                $newStatus = $validated['status_key_code'];
+                $order->status_key_code = $newStatus;
 
                 // Handle stock for shipped orders
-                if ($validated['status_key_code'] === 'ORDER_SHIPPED') {
+                if ($newStatus === 'ORDER_SHIPPED') {
                     foreach ($order->items as $item) {
                         if ($item->stock_reserved && !$item->stock_deducted) {
                             $item->deductStock();
                         }
                     }
                 }
+
+                // ✅ TRIGGER NOTIFICATIONS based on new status
+                if ($oldStatus !== $newStatus) {
+                    $this->triggerStatusNotification($order, $newStatus);
+                }
             }
 
             // Update payment status if provided
             if (isset($validated['payment_status_key_code'])) {
-                $order->payment_status_key_code = $validated['payment_status_key_code'];
+                $newPaymentStatus = $validated['payment_status_key_code'];
+                $order->payment_status_key_code = $newPaymentStatus;
+
+                // ✅ TRIGGER PAYMENT NOTIFICATIONS
+                if ($oldPaymentStatus !== $newPaymentStatus && $newPaymentStatus === 'PAYMENT_PAID') {
+                    $this->notificationService->notify('payment_received', [
+                        'order_id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'amount' => $order->getFormattedTotal(),
+                        'payment_method' => $order->payment_method ?? 'N/A',
+                        'customer_name' => $order->getCustomerName(),
+                    ]);
+                }
+
+                $this->notificationService->notifyCustomer('payment_received', $order, [
+                    'payment_method' => $order->payment_method ?? 'N/A',
+                ]);
             }
 
             $order->save();
@@ -1767,6 +1885,75 @@ class OrdersController extends Controller
                 'success' => false,
                 'message' => 'Failed to update order: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW HELPER METHOD: Trigger notifications based on status
+     */
+    private function triggerStatusNotification($order, $newStatus)
+    {
+        switch ($newStatus) {
+            case 'ORDER_CONFIRMED':
+                $this->notificationService->notify('order_confirmed', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'total_amount' => $order->getFormattedTotal(),
+                ]);
+                $this->notificationService->notifyCustomer('order_confirmed', $order);
+                break;
+
+            case 'ORDER_PROCESSING':
+                $this->notificationService->notify('order_processing', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->getCustomerName(),
+                    'customer_email' => $order->getCustomerEmail(),
+                    'total_amount' => $order->getFormattedTotal(),
+                ]);
+                $this->notificationService->notifyCustomer('order_processing', $order);
+                break;
+
+            case 'ORDER_PACKED':
+                $this->notificationService->notify('order_packed', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->getCustomerName(),
+                    'items_count' => $order->getTotalItemsCount(),
+                ]);
+                $this->notificationService->notifyCustomer('order_packed', $order);
+                break;
+
+            case 'ORDER_SHIPPED':
+                $this->notificationService->notify('order_shipped', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'carrier' => $order->shipping_carrier,
+                ]);
+                $this->notificationService->notifyCustomer('order_shipped', $order, [
+                    'tracking_number' => $order->shipping_tracking_number,
+                    'carrier' => $order->shipping_carrier,
+                ]);
+                break;
+
+            case 'ORDER_DELIVERED':
+                $this->notificationService->notify('order_delivered', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                ]);
+                $this->notificationService->notifyCustomer('order_delivered', $order);
+                break;
+
+            case 'ORDER_CANCELLED':
+                $this->notificationService->notify('order_cancelled', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                ]);
+                $this->notificationService->notifyCustomer('order_cancelled', $order, [
+                    'reason' => 'Cancelled by admin',
+                ]);
+                break;
         }
     }
 
