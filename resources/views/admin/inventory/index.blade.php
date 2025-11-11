@@ -128,6 +128,9 @@
             <a href="{{ route('admin.inventory.movement') }}" class="btn btn-outline-info">
                 <i class="bi bi-clock-history"></i> Movement History
             </a>
+            <button type="button" class="btn btn-warning" id="cleanupBtn">
+                Cleanup Deleted Products
+            </button>
         </div>
     </div>
 
@@ -761,6 +764,90 @@ $(document).on('click', '.adjust-product-stock', function() {
 
     $('#adjustProductId').val(productId).trigger('change');
     $('#adjustStockModal').modal('show');
+});
+// Cleanup deleted products button
+$('#cleanupBtn').on('click', function() {
+    Swal.fire({
+        title: 'Cleanup Orphaned Stock Records?',
+        html: `
+            <div class="text-start">
+                <p class="mb-2"><strong>This action will:</strong></p>
+                <ul class="text-muted">
+                    <li>Find all stock records linked to <strong>deleted products</strong></li>
+                    <li>Permanently <strong>remove these orphaned records</strong> from the database</li>
+                    <li>Clean up inventory data to prevent errors</li>
+                </ul>
+                <p class="mt-3 mb-2"><strong class="text-danger">⚠️ Warning:</strong></p>
+                <ul class="text-danger">
+                    <li>This action <strong>cannot be undone</strong></li>
+                    <li>Stock history for deleted products will be lost</li>
+                    <li>No products will be deleted, only their stock records</li>
+                </ul>
+                <p class="mt-3 text-info">
+                    <i class="bi bi-info-circle"></i>
+                    <em>Active products and their stock will NOT be affected</em>
+                </p>
+            </div>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f0ad4e',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, Clean Up Now',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true,
+        customClass: {
+            popup: 'swal-wide',
+            confirmButton: 'btn btn-warning',
+            cancelButton: 'btn btn-secondary'
+        },
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            return $.ajax({
+                url: '{{ route("admin.inventory.cleanup-orphaned") }}',
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                dataType: 'json'
+            }).then(response => {
+                if (!response.success) {
+                    throw new Error(response.message || 'Cleanup failed');
+                }
+                return response;
+            }).catch(error => {
+                Swal.showValidationMessage(
+                    `Request failed: ${error.message || error.responseJSON?.message || 'Unknown error'}`
+                );
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed && result.value) {
+            const response = result.value;
+
+            Swal.fire({
+                title: 'Cleanup Complete!',
+                html: `
+                    <div class="text-center">
+                        <p class="mb-3">
+                            <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                        </p>
+                        <p class="mb-2"><strong>${response.message}</strong></p>
+                        <p class="text-muted">
+                            Removed <span class="badge bg-success">${response.count}</span> orphaned record(s)
+                        </p>
+                    </div>
+                `,
+                icon: 'success',
+                confirmButtonColor: '#28a745',
+                confirmButtonText: 'OK'
+            }).then(() => {
+                // Reload the DataTable to show updated results
+                $('#inventoryTable').DataTable().ajax.reload();
+            });
+        }
+    });
 });
 </script>
 @endpush

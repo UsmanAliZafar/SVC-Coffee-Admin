@@ -160,7 +160,7 @@ class ProductImage extends Model
         }
 
         // Return placeholder image
-        return asset('images/placeholders/product-image-placeholder.jpg');
+        return asset('images/placeholders/not_availble.jpg');
     }
 
     /**

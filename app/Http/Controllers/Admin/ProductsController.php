@@ -162,8 +162,7 @@ class ProductsController extends Controller
                             alt="' . htmlspecialchars($product->name) . '"
                             class="img-thumbnail product-image-preview"
                             style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;"
-                            onclick="viewProductImage(\'' . $imageUrl . '\', \'' . htmlspecialchars($product->name, ENT_QUOTES) . '\')"
-                            onerror="this.style.display=\'none\'; this.parentElement.innerHTML+=\'<div class=\\\'img-thumbnail d-flex align-items-center justify-content-center\\\' style=\\\'width: 50px; height: 50px; background-color: #f8f9fa;\\\'><i class=\\\'bi bi-image-fill text-muted\\\'></i></div>\'">';
+                            onclick="viewProductImage(\'' . $imageUrl . '\', \'' . htmlspecialchars($product->name, ENT_QUOTES) . '\')">';
             })
             ->addColumn('name_link', function($product) {
                 $editUrl = route('admin.products.edit', $product->id);

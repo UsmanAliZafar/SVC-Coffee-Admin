@@ -98,6 +98,7 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
     Route::middleware('admin.permission:inventory.delete')->group(function () {
         // Delete movement record (audit purposes - rarely used)
         Route::delete('/movement/{movement}', [InventoryController::class, 'deleteMovement'])->name('movement.delete');
+        Route::post('/cleanup-orphaned', [InventoryController::class, 'cleanupOrphanedStock'])->name('cleanup-orphaned');
 
         // Clear old movements
         Route::post('/movement/clear-old', [InventoryController::class, 'clearOldMovements'])->name('movement.clear-old');

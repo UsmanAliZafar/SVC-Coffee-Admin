@@ -117,41 +117,81 @@ class InventoryController extends Controller
     /**
      * DataTable for warehouse stock
      */
+        /**
+     * DataTable for warehouse stock
+     * FIXED: Handles soft deleted products gracefully
+     */
     private function getWarehouseStockDataTable($query)
     {
         return DataTables::of($query)
-            ->addColumn('product_info', function($stock) {
+            ->addColumn('product_info', function ($stock) {
                 $product = $stock->product;
+
+                // Handle soft deleted or missing products
+                if (!$product) {
+                    return '<div>
+                        <strong class="text-danger">Product Deleted</strong><br>
+                        <small class="text-muted">ID: ' . e($stock->product_id) . '</small>
+                    </div>';
+                }
+
                 return '<div>
-                    <strong>' . $product->name . '</strong><br>
-                    <small class="text-muted">SKU: ' . $product->sku . '</small>
+                    <strong>' . e($product->name) . '</strong><br>
+                    <small class="text-muted">SKU: ' . e($product->sku) . '</small>
                 </div>';
             })
-            ->addColumn('quantity', function($stock) {
-                $class = $stock->quantity <= 0 ? 'text-danger' :
-                        ($stock->isLowStock() ? 'text-warning' : 'text-success');
+            ->addColumn('quantity', function ($stock) {
+                // Check if product exists before accessing isLowStock
+                $product = $stock->product;
+                if (!$product) {
+                    return '<strong class="text-muted">' . $stock->quantity . '</strong>';
+                }
+
+                $class = $stock->quantity <= 0 ? 'text-danger'
+                        : ($stock->isLowStock() ? 'text-warning' : 'text-success');
                 return '<strong class="' . $class . '">' . $stock->quantity . '</strong>';
             })
-            ->addColumn('available', function($stock) {
+            ->addColumn('available', function ($stock) {
                 return '<span class="badge bg-success">' . $stock->available_quantity . '</span>';
             })
-            ->addColumn('reserved', function($stock) {
-                return $stock->reserved_quantity > 0 ?
-                    '<span class="badge bg-warning">' . $stock->reserved_quantity . '</span>' :
-                    '<span class="text-muted">0</span>';
+            ->addColumn('reserved', function ($stock) {
+                return $stock->reserved_quantity > 0
+                    ? '<span class="badge bg-warning">' . $stock->reserved_quantity . '</span>'
+                    : '<span class="text-muted">0</span>';
             })
-            ->addColumn('location', function($stock) {
+            ->addColumn('location', function ($stock) {
                 return $stock->location ?? '<span class="text-muted">—</span>';
             })
-            ->addColumn('actions', function($stock) {
+            ->addColumn('actions', function ($stock) {
+                $product = $stock->product;
+
+                // If product is deleted, only show delete stock option
+                if (!$product) {
+                    $actions = '<div class="btn-group" role="group">';
+
+                    if (auth('admin')->user()->hasPermission('inventory.delete')) {
+                        $actions .= '<button type="button" class="btn btn-sm btn-danger delete-orphan-stock"
+                            data-id="' . $stock->id . '"
+                            title="Delete Stock Record">
+                            <i class="bi bi-trash"></i>
+                        </button>';
+                    }
+
+                    $actions .= '</div>';
+                    return $actions;
+                }
+
+                $productName = $product->name;
+                $warehouseName = $stock->warehouse->name ?? 'Unknown Warehouse';
+
                 $actions = '<div class="btn-group" role="group">';
 
                 if (auth('admin')->user()->hasPermission('inventory.update')) {
                     $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-stock"
                         data-id="' . $stock->id . '"
-                        data-product="' . htmlspecialchars($stock->product->name) . '"
-                        data-warehouse="' . htmlspecialchars($stock->warehouse->name) . '"
-                        data-quantity="' . $stock->quantity . '"
+                        data-product="' . e($productName) . '"
+                        data-warehouse="' . e($warehouseName) . '"
+                        data-quantity="' . e($stock->quantity) . '"
                         title="Adjust Stock">
                         <i class="bi bi-pencil"></i>
                     </button>';
@@ -165,9 +205,7 @@ class InventoryController extends Controller
                 $actions .= '</div>';
                 return $actions;
             })
-            // FIX: Tell DataTables not to order by server-side for these columns
             ->rawColumns(['product_info', 'quantity', 'available', 'reserved', 'location', 'actions'])
-            ->skipTotalRecords() // Optional: skip total records count for performance
             ->make(true);
     }
 
@@ -180,8 +218,8 @@ class InventoryController extends Controller
         return DataTables::of($query)
             ->addColumn('product_info', function($product) {
                 return '<div>
-                    <strong>' . $product->name . '</strong><br>
-                    <small class="text-muted">SKU: ' . $product->sku . '</small>
+                    <strong>' . e($product->name) . '</strong><br>
+                    <small class="text-muted">SKU: ' . e($product->sku) . '</small>
                 </div>';
             })
             ->addColumn('total_stock', function($product) {
@@ -213,7 +251,7 @@ class InventoryController extends Controller
                 }
 
                 if ($warehouses->count() === 1) {
-                    return $warehouses->first()->warehouse->name;
+                    return e($warehouses->first()->warehouse->name);
                 }
 
                 return '<span class="badge bg-info">' . $warehouses->count() . ' warehouses</span>';
@@ -249,7 +287,7 @@ class InventoryController extends Controller
                 $html = '';
                 foreach ($warehouses as $stock) {
                     $html .= '<div class="mb-1">
-                        <small><strong>' . $stock->warehouse->name . ':</strong> ' . $stock->quantity . '</small>
+                        <small><strong>' . e($stock->warehouse->name) . ':</strong> ' . $stock->quantity . '</small>
                     </div>';
                 }
                 return $html;
@@ -260,7 +298,7 @@ class InventoryController extends Controller
                 if (auth('admin')->user()->hasPermission('inventory.update')) {
                     $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-product-stock"
                         data-id="' . $product->id . '"
-                        data-name="' . htmlspecialchars($product->name) . '"
+                        data-name="' . e($product->name) . '"
                         title="Adjust Stock">
                         <i class="bi bi-pencil"></i>
                     </button>';
@@ -290,6 +328,89 @@ class InventoryController extends Controller
             })
             ->rawColumns(['product_info','threshold','warehouse_name', 'total_stock', 'available', 'reserved', 'warehouses', 'actions'])
             ->make(true);
+    }
+
+    public function cleanupOrphanedStock(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('inventory.delete')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            // Get all stock records where product doesn't exist (soft deleted)
+            $orphanedStocks = ProductWarehouseStock::whereDoesntHave('product')->get();
+
+            $count = $orphanedStocks->count();
+
+            foreach ($orphanedStocks as $stock) {
+                // Log before deleting
+                \Log::info('Deleting orphaned stock', [
+                    'stock_id' => $stock->id,
+                    'product_id' => $stock->product_id,
+                    'warehouse_id' => $stock->warehouse_id,
+                    'quantity' => $stock->quantity
+                ]);
+
+                $stock->delete();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Cleaned up {$count} orphaned stock record(s)",
+                'count' => $count
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to cleanup orphaned stock: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cleanup orphaned stock: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete single orphaned stock record
+     * NEW METHOD
+     */
+    public function deleteOrphanedStock(Request $request, $id)
+    {
+        if (!auth('admin')->user()->hasPermission('inventory.delete')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            $stock = ProductWarehouseStock::findOrFail($id);
+
+            // Verify it's actually orphaned
+            if ($stock->product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete: Product still exists'
+                ], 400);
+            }
+
+            \Log::info('Deleting single orphaned stock', [
+                'stock_id' => $stock->id,
+                'product_id' => $stock->product_id,
+                'warehouse_id' => $stock->warehouse_id,
+                'quantity' => $stock->quantity
+            ]);
+
+            $stock->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Orphaned stock record deleted successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete stock record: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
