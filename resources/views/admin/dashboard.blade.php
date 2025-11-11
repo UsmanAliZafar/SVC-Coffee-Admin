@@ -435,7 +435,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="mb-1">
-                                    <a href="#" class="text-decoration-none">Order #{{ $order->order_number }}</a>
+                                    <a href="{{ route('admin.orders.show', $order->id) }}" class="text-decoration-none">Order #{{ $order->order_number }}</a>
                                 </h6>
                                 <small class="text-muted">
                                     <i class="bi bi-person"></i> {{ $order->customer ? $order->customer->name : $order->guest_name }}
@@ -776,13 +776,14 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
     // Sales Chart
+    const currencySymbol = '{{ store_currency_symbol() }}';
     const salesCtx = document.getElementById('salesChart').getContext('2d');
     const salesChart = new Chart(salesCtx, {
         type: 'line',
         data: {
             labels: @json($salesChartData['labels']),
             datasets: [{
-                label: 'Sales Amount ($)',
+                label: 'Sales Amount (' + currencySymbol + ')',
                 data: @json($salesChartData['sales_amounts']),
                 borderColor: '#5B914C',
                 backgroundColor: 'rgba(91, 145, 76, 0.1)',
@@ -821,7 +822,7 @@
                     position: 'left',
                     title: {
                         display: true,
-                        text: 'Sales Amount ($)'
+                        text: 'Sales Amount ({{ store_currency_symbol())'
                     }
                 },
                 y1: {

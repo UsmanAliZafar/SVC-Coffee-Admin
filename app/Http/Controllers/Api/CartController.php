@@ -109,6 +109,7 @@ class CartController extends Controller
                     'image' => $product->getMainImageUrl(),
                     'price' => $product->getFinalPrice(),
                     'regular_price' => (float) $product->price,
+                    'product_currency' => $product->curency ?? 'USD', // Get from config
                     'quantity' => $validated['quantity'],
                     'is_taxable' => $product->is_taxable,
                     'tax_rate' => $product->tax_percentage ?? 0,
@@ -505,13 +506,13 @@ class CartController extends Controller
         $total = $subtotal + $taxAmount;
 
         return [
-            'subtotal' => round($subtotal, 2),
-            'tax_amount' => round($taxAmount, 2),
+            'subtotal' => format_amount($subtotal),
+            'tax_amount' => format_amount($taxAmount),
             'shipping_amount' => 0, // Calculate based on shipping method
             'discount_amount' => 0,
-            'total_amount' => round($total, 2),
+            'total_amount' => format_amount($total),
             'total_items' => $totalItems,
-            'currency' => 'USD', // Get from config
+            'currency' => store_currency_symbol(), // Get from config
         ];
     }
 
