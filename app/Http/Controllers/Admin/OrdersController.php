@@ -434,7 +434,7 @@ class OrdersController extends Controller
             }
 
             // Check if high-value order
-            if ($order->total_amount >= config('notifications.thresholds.high_value_order', 500)) {
+            if ($order->total_amount >= config('notifications.thresholds.high_value_order', 5000)) {
                 $this->notificationService->notify('customer_high_value_order', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,

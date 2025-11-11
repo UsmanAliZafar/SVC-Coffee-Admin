@@ -402,7 +402,7 @@ return [
      * Thresholds
      */
     'thresholds' => [
-        'high_value_order' => 500, // Orders above this amount trigger VIP notification
+        'high_value_order' => 5000, // Orders above this amount trigger VIP notification
         'high_value_transaction' => 1000, // Transactions above this amount
         'low_stock_percentage' => 50, // Alert when stock is 50% of threshold
     ],
