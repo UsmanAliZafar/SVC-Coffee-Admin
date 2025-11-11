@@ -2,23 +2,35 @@
 
 namespace App\Mail\Customer;
 
+use App\Models\Order;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Mail\Mailables\Address;
 
 class OrderConfirmedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
     /**
+     * The order instance.
+     */
+    public $order;
+
+    /**
+     * Additional data for the email
+     */
+    public $additionalData;
+
+    /**
      * Create a new message instance.
      */
-    public function __construct()
+    public function __construct(Order $order, array $additionalData = [])
     {
-        //
+        $this->order = $order;
+        $this->additionalData = $additionalData;
     }
 
     /**
@@ -27,7 +39,11 @@ class OrderConfirmedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Order Confirmed Mail',
+            from: new Address(
+                config('mail.from.address'),
+                config('app.name')
+            ),
+            subject: "Order Confirmed - #{$this->order->order_number}",
         );
     }
 
@@ -37,7 +53,17 @@ class OrderConfirmedMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'view.name',
+            view: 'emails.customer.order-confirmed',
+            with: [
+                'order' => $this->order,
+                'customerName' => $this->order->getCustomerName(),
+                'orderNumber' => $this->order->order_number,
+                'orderDate' => $this->order->created_at->format('F d, Y'),
+                'totalAmount' => $this->order->getFormattedTotal(),
+                'items' => $this->order->items,
+                'shippingAddress' => $this->order->getShippingAddress(),
+                'trackingUrl' => $this->order->action_url ?? route('customer.orders.track', $this->order->order_number),
+            ],
         );
     }
 

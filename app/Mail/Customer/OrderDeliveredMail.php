@@ -2,50 +2,55 @@
 
 namespace App\Mail\Customer;
 
+use App\Models\Order;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Mail\Mailables\Address;
 
 class OrderDeliveredMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * Create a new message instance.
-     */
-    public function __construct()
+    public $order;
+    public $additionalData;
+
+    public function __construct(Order $order, array $additionalData = [])
     {
-        //
+        $this->order = $order;
+        $this->additionalData = $additionalData;
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Order Delivered Mail',
+            from: new Address(
+                config('mail.from.address'),
+                config('app.name')
+            ),
+            subject: "Your Order Has Been Delivered! - #{$this->order->order_number}",
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
-            view: 'view.name',
+            view: 'emails.customer.order-delivered',
+            with: [
+                'order' => $this->order,
+                'customerName' => $this->order->getCustomerName(),
+                'orderNumber' => $this->order->order_number,
+                'deliveredDate' => $this->order->delivered_at->format('F d, Y h:i A'),
+                'totalAmount' => $this->order->getFormattedTotal(),
+                'items' => $this->order->items,
+                'reviewUrl' => route('customer.orders.review', $this->order->id),
+                'supportUrl' => route('customer.support'),
+            ],
         );
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];
