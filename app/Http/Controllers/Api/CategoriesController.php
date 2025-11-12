@@ -820,17 +820,91 @@ class CategoriesController extends Controller
             }
 
             // Variants if loaded
+            $data['has_variants'] = $product->has_variants;
+            // Variants if loaded - COMPLETE VERSION WITH ALL FIELDS
             if ($product->relationLoaded('variants') && $product->variants->isNotEmpty()) {
                 $data['variants'] = $product->variants->map(function ($variant) {
                     return [
+                        // Basic Information
                         'id' => $variant->id,
-                        'name' => $variant->name,
+                        'variant_name' => $variant->variant_name,  // e.g., "Size", "Color", "Weight"
+                        'variant_value' => $variant->variant_value, // e.g., "Large", "Red", "500g"
+                        'full_name' => $variant->getFullName(), // e.g., "Size: Large"
+                        'display_name' => $variant->getDisplayName(), // e.g., "Large"
                         'sku' => $variant->sku,
-                        'price' => (float) $variant->price,
-                        'stock_quantity' => $variant->stock_quantity,
+
+                        // Pricing
+                        'price' => [
+                            'regular' => format_amount($variant->price),
+                            'sale' => $variant->sale_price ? format_amount($variant->sale_price) : null,
+                            'final' => format_amount($variant->getFinalPrice()),
+                            'formatted_regular' => $variant->getFormattedPrice(),
+                            'formatted_sale' => $variant->getFormattedSalePrice(),
+                            'formatted_final' => $variant->getFormattedFinalPrice(),
+                            'is_on_sale' => $variant->isOnSale(),
+                            'discount_percentage' => $variant->getDiscountPercentage(),
+                            'discount_amount' => $variant->getDiscountAmount(),
+                        ],
+
+                        // Stock Information
+                        'stock' => [
+                            'quantity' => $variant->stock_quantity,
+                            'low_stock_threshold' => $variant->low_stock_threshold,
+                            'is_in_stock' => $variant->isInStock(),
+                            'is_low_stock' => $variant->isLowStock(),
+                            'is_out_of_stock' => $variant->isOutOfStock(),
+                            'total_warehouse_stock' => $variant->getTotalWarehouseStock(),
+                            'total_available_stock' => $variant->getTotalAvailableStock(),
+                            'total_reserved_stock' => $variant->getTotalReservedStock(),
+                        ],
+
+                        // Shipping Information
+                        'shipping' => [
+                            'weight' => $variant->weight,
+                            'formatted_weight' => $variant->getFormattedWeight(),
+                            'dimensions' => [
+                                'length' => $variant->length,
+                                'width' => $variant->width,
+                                'height' => $variant->height,
+                                'formatted' => $variant->getDimensions(), // e.g., "10 × 5 × 3 cm"
+                            ],
+                            'has_dimensions' => $variant->hasPhysicalDimensions(),
+                            'has_weight' => $variant->hasWeight(),
+                        ],
+
+                        // Image
+                        'image' => [
+                            'path' => $variant->image_path,
+                            'url' => $variant->getImageUrl(),
+                            'alt_text' => $variant->getFullName(),
+                        ],
+
+                        // Status & Availability
+                        'status' => [
+                            'code' => $variant->status_key_code,
+                            'is_active' => $variant->isActive(),
+                            'badge' => strip_tags($variant->getStatusBadge()), // Remove HTML for API
+                        ],
+
+                        // Flags
                         'is_default' => $variant->is_default,
+                        'sort_order' => $variant->sort_order,
+
+                        // Timestamps
+                        'created_at' => $variant->created_at?->toIso8601String(),
+                        'updated_at' => $variant->updated_at?->toIso8601String(),
                     ];
                 });
+
+                // Additional variant metadata
+                $data['variant_metadata'] = [
+                    'total_variants' => $product->variants->count(),
+                    'default_variant_id' => $product->defaultVariant()?->id,
+                    'has_variants' => $product->has_variants,
+                    'active_variants_count' => $product->activeVariants()->count(),
+                    'in_stock_variants_count' => $product->variants->filter(fn($v) => $v->isInStock())->count(),
+                    'out_of_stock_variants_count' => $product->variants->filter(fn($v) => $v->isOutOfStock())->count(),
+                ];
             }
 
             // Tags if loaded
