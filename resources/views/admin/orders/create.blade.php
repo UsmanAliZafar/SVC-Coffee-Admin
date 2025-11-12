@@ -2,6 +2,27 @@
 
 @section('title', 'Create New Order')
 
+@push('styles')
+<style>
+    .order-item-card {
+        border-left: 4px solid #0d6efd;
+    }
+    .order-item-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 8px;
+    }
+    .sticky-top {
+        position: sticky;
+        z-index: 1020;
+    }
+    #productSelect option {
+        padding: 8px;
+        font-size: 14px;
+    }
+</style>
+@endpush
 @section('content')
 <div class="container-fluid">
 
@@ -389,15 +410,16 @@
 <div class="modal fade" id="addItemModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add Order Item</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header" style="background-color: #5B914C; color: white;">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add Order Item</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">Search Product</label>
                     <input type="text" class="form-control" id="productSearch" placeholder="Search by name or SKU...">
                 </div>
+
                 <div class="mb-3">
                     <label class="form-label">Select Product <span class="text-danger">*</span></label>
                     <select class="form-select" id="productSelect" size="10">
@@ -407,26 +429,63 @@
                                 data-sku="{{ $product->sku }}"
                                 data-price="{{ $product->getFinalPrice() }}"
                                 data-stock="{{ $product->stock_quantity }}"
-                                data-image="{{ $product->getMainImageUrl() }}">
-                            {{ $product->name }} - {{ $product->sku }} (Stock: {{ $product->stock_quantity }}) - {{ store_currency_symbol() }} {{ number_format($product->getFinalPrice(), 2) }}
+                                data-image="{{ $product->getMainImageUrl() }}"
+                                data-has-variants="{{ $product->has_variants ? 'true' : 'false' }}">
+                            {{ $product->name }} - {{ $product->sku }}
+                            @if($product->has_variants)
+                                <span class="badge bg-info">Has Variants</span>
+                            @else
+                                (Stock: {{ $product->stock_quantity }})
+                            @endif
+                            - {{ store_currency_symbol() }} {{ number_format($product->getFinalPrice(), 2) }}
                         </option>
                         @endforeach
                     </select>
                 </div>
+
+                {{-- ✅ NEW: Variant Selection Section --}}
+                <div id="variantSection" style="display: none;">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> This product has variants. Please select one below.
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Select Variant <span class="text-danger">*</span></label>
+                        <select class="form-select" id="variantSelect" size="5">
+                            <option value="">Loading variants...</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Quantity <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="itemQuantity" value="1" min="1">
+                        <small class="text-muted" id="stockInfo"></small>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Unit Price ({{ store_currency_symbol() }}) <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="itemPrice" step="0.01" min="0">
                     </div>
                 </div>
+
+                {{-- ✅ NEW: Selected Variant Preview --}}
+                <div id="selectedVariantPreview" style="display: none;" class="alert alert-success">
+                    <div class="d-flex align-items-center">
+                        <img id="variantPreviewImage" src="" class="me-3" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">
+                        <div>
+                            <strong id="variantPreviewName"></strong><br>
+                            <small class="text-muted">SKU: <span id="variantPreviewSku"></span></small><br>
+                            <small class="text-muted">Stock: <span id="variantPreviewStock"></span></small>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="confirmAddItem">Add Item</button>
+                <button type="button" class="btn btn-primary" id="confirmAddItem" style="background-color: #5B914C; border-color: #5B914C;">
+                    <i class="bi bi-check-circle"></i> Add Item
+                </button>
             </div>
         </div>
     </div>
@@ -605,33 +664,12 @@
 </div>
 @endsection
 
-@push('styles')
-<style>
-    .order-item-card {
-        border-left: 4px solid #0d6efd;
-    }
-    .order-item-image {
-        width: 60px;
-        height: 60px;
-        object-fit: cover;
-        border-radius: 8px;
-    }
-    .sticky-top {
-        position: sticky;
-        z-index: 1020;
-    }
-    #productSelect option {
-        padding: 8px;
-        font-size: 14px;
-    }
-</style>
-@endpush
-
 @push('scripts')
 <script>
 $(document).ready(function() {
     let orderItems = [];
     let itemCounter = 0;
+    let selectedVariant = null; // ✅ NEW: Track selected variant
 
     // Toggle Customer Type
     $('input[name="customer_type"]').on('change', function() {
@@ -648,7 +686,7 @@ $(document).ready(function() {
         }
     });
 
-    // Customer Selection - Auto-fill addresses
+    // Customer Selection - Auto-fill addresses (same as before)
     $('#customer_id').on('change', function() {
         const selectedOption = $(this).find('option:selected');
 
@@ -656,7 +694,6 @@ $(document).ready(function() {
             const shippingData = selectedOption.data('shipping');
             const billingData = selectedOption.data('billing');
 
-            // Fill shipping address
             if (shippingData) {
                 $('#shipping_first_name').val(shippingData.first_name || '');
                 $('#shipping_last_name').val(shippingData.last_name || '');
@@ -668,7 +705,6 @@ $(document).ready(function() {
                 $('#shipping_country').val(shippingData.country || 'United States');
             }
 
-            // Fill billing address if checkbox is not checked
             if (!$('#billing_same_as_shipping').is(':checked') && billingData) {
                 $('#billing_first_name').val(billingData.first_name || '');
                 $('#billing_last_name').val(billingData.last_name || '');
@@ -682,7 +718,7 @@ $(document).ready(function() {
         }
     });
 
-    // Toggle Billing Address
+    // Toggle Billing Address (same as before)
     $('#billing_same_as_shipping').on('change', function() {
         if ($(this).is(':checked')) {
             $('#billingAddressSection').slideUp();
@@ -697,6 +733,9 @@ $(document).ready(function() {
         $('#addItemModal').modal('show');
         $('#productSearch').val('');
         $('#productSelect option').show();
+        $('#variantSection').hide();
+        $('#selectedVariantPreview').hide();
+        selectedVariant = null;
     });
 
     // Product Search
@@ -713,14 +752,101 @@ $(document).ready(function() {
         });
     });
 
-    // Product Selection - Auto-fill price
+    // ✅ NEW: Product Selection - Load Variants if Product Has Them
     $('#productSelect').on('change', function() {
         const selectedOption = $(this).find('option:selected');
         const price = selectedOption.data('price');
+        const stock = selectedOption.data('stock');
+        const hasVariants = selectedOption.data('has-variants') === true || selectedOption.data('has-variants') === 'true';
+        const productId = selectedOption.val();
+
+        selectedVariant = null;
         $('#itemPrice').val(price);
+
+        if (hasVariants && productId) {
+            // Product has variants - load them
+            $('#variantSection').show();
+            $('#variantSelect').html('<option value="">Loading variants...</option>');
+            $('#stockInfo').text('');
+            $('#selectedVariantPreview').hide();
+
+            // Load variants via AJAX
+            $.ajax({
+                url: `/admin/orders/products/${productId}/variants`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.variants.length > 0) {
+                        let variantOptions = '<option value="">Select a variant...</option>';
+
+                        response.variants.forEach(variant => {
+                            const stockBadge = variant.is_in_stock
+                                ? `(Stock: ${variant.stock})`
+                                : '(Out of Stock)';
+
+                            variantOptions += `
+                                <option value="${variant.id}"
+                                        data-name="${variant.name}"
+                                        data-sku="${variant.sku}"
+                                        data-price="${variant.price}"
+                                        data-stock="${variant.stock}"
+                                        data-image="${variant.image}"
+                                        ${!variant.is_in_stock ? 'disabled' : ''}>
+                                    ${variant.name} - ${variant.sku} ${stockBadge} - ${variant.formatted_price}
+                                </option>
+                            `;
+                        });
+
+                        $('#variantSelect').html(variantOptions);
+                    } else {
+                        $('#variantSelect').html('<option value="">No variants available</option>');
+                    }
+                },
+                error: function() {
+                    $('#variantSelect').html('<option value="">Failed to load variants</option>');
+                }
+            });
+        } else {
+            // No variants - show main product stock
+            $('#variantSection').hide();
+            $('#selectedVariantPreview').hide();
+            $('#stockInfo').text(`Available stock: ${stock}`);
+        }
     });
 
-    // Confirm Add Item
+    // ✅ NEW: Variant Selection - Update Price and Show Preview
+    $('#variantSelect').on('change', function() {
+        const selectedOption = $(this).find('option:selected');
+
+        if (selectedOption.val()) {
+            selectedVariant = {
+                id: selectedOption.val(),
+                name: selectedOption.data('name'),
+                sku: selectedOption.data('sku'),
+                price: selectedOption.data('price'),
+                stock: selectedOption.data('stock'),
+                image: selectedOption.data('image')
+            };
+
+            // Update price
+            $('#itemPrice').val(selectedVariant.price);
+
+            // Update stock info
+            $('#stockInfo').text(`Available stock: ${selectedVariant.stock}`);
+
+            // Show preview
+            $('#variantPreviewImage').attr('src', selectedVariant.image);
+            $('#variantPreviewName').text(selectedVariant.name);
+            $('#variantPreviewSku').text(selectedVariant.sku);
+            $('#variantPreviewStock').text(selectedVariant.stock);
+            $('#selectedVariantPreview').slideDown();
+        } else {
+            selectedVariant = null;
+            $('#selectedVariantPreview').hide();
+            $('#stockInfo').text('');
+        }
+    });
+
+    // ✅ UPDATED: Confirm Add Item - WITH VARIANT SUPPORT
     $('#confirmAddItem').on('click', function() {
         const selectedProduct = $('#productSelect option:selected');
 
@@ -729,6 +855,18 @@ $(document).ready(function() {
                 icon: 'warning',
                 title: 'No Product Selected',
                 text: 'Please select a product first.'
+            });
+            return;
+        }
+
+        const hasVariants = selectedProduct.data('has-variants') === true || selectedProduct.data('has-variants') === 'true';
+
+        // Check if variant is required but not selected
+        if (hasVariants && !selectedVariant) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Variant Selected',
+                text: 'This product has variants. Please select a variant.'
             });
             return;
         }
@@ -745,15 +883,20 @@ $(document).ready(function() {
             return;
         }
 
+        // ✅ Build item object with variant support
         const item = {
             id: itemCounter++,
             product_id: selectedProduct.val(),
-            name: selectedProduct.data('name'),
-            sku: selectedProduct.data('sku'),
-            image: selectedProduct.data('image'),
+            variant_id: selectedVariant ? selectedVariant.id : null, // ← NEW
+            name: selectedVariant
+                ? `${selectedProduct.data('name')} - ${selectedVariant.name}`
+                : selectedProduct.data('name'),
+            sku: selectedVariant ? selectedVariant.sku : selectedProduct.data('sku'),
+            image: selectedVariant ? selectedVariant.image : selectedProduct.data('image'),
             quantity: quantity,
             unit_price: price,
-            subtotal: quantity * price
+            subtotal: quantity * price,
+            has_variant: selectedVariant !== null
         };
 
         orderItems.push(item);
@@ -764,9 +907,13 @@ $(document).ready(function() {
         $('#itemQuantity').val(1);
         $('#itemPrice').val('');
         $('#productSelect').val('');
+        $('#variantSelect').val('');
+        $('#variantSection').hide();
+        $('#selectedVariantPreview').hide();
+        selectedVariant = null;
     });
 
-    // Render Order Items
+    // ✅ UPDATED: Render Order Items - WITH VARIANT INDICATION
     function renderOrderItems() {
         if (orderItems.length === 0) {
             $('#orderItemsContainer').html('');
@@ -786,7 +933,10 @@ $(document).ready(function() {
                                 <img src="${item.image}" class="order-item-image" alt="${item.name}">
                             </div>
                             <div class="col">
-                                <h6 class="mb-1">${item.name}</h6>
+                                <h6 class="mb-1">
+                                    ${item.name}
+                                    ${item.has_variant ? '<span class="badge bg-info badge-sm ms-2">Variant</span>' : ''}
+                                </h6>
                                 <small class="text-muted">SKU: ${item.sku}</small>
                             </div>
                             <div class="col-auto text-center">
@@ -810,6 +960,7 @@ $(document).ready(function() {
                             </div>
                         </div>
                         <input type="hidden" name="items[${index}][product_id]" value="${item.product_id}">
+                        ${item.variant_id ? `<input type="hidden" name="items[${index}][variant_id]" value="${item.variant_id}">` : ''}
                         <input type="hidden" name="items[${index}][quantity]" value="${item.quantity}" class="hidden-quantity-${index}">
                         <input type="hidden" name="items[${index}][unit_price]" value="${item.unit_price}" class="hidden-price-${index}">
                     </div>
@@ -820,7 +971,7 @@ $(document).ready(function() {
         $('#orderItemsContainer').html(html);
     }
 
-    // Update Item Quantity
+    // Update Item Quantity (same as before)
     $(document).on('change', '.item-quantity', function() {
         const index = $(this).data('index');
         const newQuantity = parseInt($(this).val());
@@ -839,7 +990,7 @@ $(document).ready(function() {
         calculateTotals();
     });
 
-    // Update Item Price
+    // Update Item Price (same as before)
     $(document).on('change', '.item-price', function() {
         const index = $(this).data('index');
         const newPrice = parseFloat($(this).val());
@@ -858,7 +1009,7 @@ $(document).ready(function() {
         calculateTotals();
     });
 
-    // Remove Item
+    // Remove Item (same as before)
     $(document).on('click', '.remove-item', function() {
         const index = $(this).data('index');
 
@@ -878,13 +1029,15 @@ $(document).ready(function() {
             }
         });
     });
+
+    // Calculate Totals (same as before)
     let currentCurrency = '{{ store_currency_symbol() }}';
     $('#currency').on('change', function() {
         const selected = $(this).find('option:selected').text();
-        currentCurrency = selected.match(/\(([^)]+)\)/)[1]; // Extract symbol from parentheses
+        currentCurrency = selected.match(/\(([^)]+)\)/)[1];
         calculateTotals();
     });
-    // Calculate Totals
+
     function calculateTotals() {
         let subtotal = 0;
 
@@ -912,7 +1065,7 @@ $(document).ready(function() {
         calculateTotals();
     });
 
-    // Form Submission
+    // Form Submission (same as before)
     $('#createOrderForm').on('submit', function(e) {
         e.preventDefault();
 
@@ -925,10 +1078,8 @@ $(document).ready(function() {
             return;
         }
 
-        // Disable submit button
         $('#submitBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Creating...');
 
-        // Submit form via AJAX
         $.ajax({
             url: $(this).attr('action'),
             type: 'POST',
@@ -955,12 +1106,9 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 Swal.close();
-
-                // ✅ FIX: Re-enable button immediately
                 $('#submitBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Create Order');
 
                 if (xhr.status === 422) {
-                    // Validation errors
                     const errors = xhr.responseJSON.errors;
 
                     $.each(errors, function(key, messages) {
@@ -972,12 +1120,10 @@ $(document).ready(function() {
                         if (feedback.length) {
                             feedback.text(messages[0]).show();
                         } else {
-                            // Create feedback element if it doesn't exist
                             input.after(`<div class="invalid-feedback d-block">${messages[0]}</div>`);
                         }
                     });
 
-                    // Scroll to first error
                     const firstError = $('.is-invalid').first();
                     if (firstError.length) {
                         $('html, body').animate({
@@ -1002,15 +1148,11 @@ $(document).ready(function() {
         });
     });
 
-    // Initialize
-    $('#noItemsAlert').removeClass('d-none');
-    calculateTotals();
-
+    // Add Customer Modal (keep existing code)
     $('#addCustomerBtn').on('click', function() {
         $('#addCustomerModal').modal('show');
     });
 
-    // Copy Billing to Shipping Address
     $('#sameAsBilling').on('change', function() {
         if ($(this).is(':checked')) {
             $('#modal_shipping_address_line1').val($('#modal_billing_address_line1').val());
@@ -1022,7 +1164,7 @@ $(document).ready(function() {
         }
     });
 
-    // Submit Add Customer Form
+     // Submit Add Customer Form
     $('#addCustomerForm').on('submit', function(e) {
         e.preventDefault();
 
@@ -1139,6 +1281,10 @@ $(document).ready(function() {
         $('#addCustomerForm')[0].reset();
         $('#sameAsBilling').prop('checked', false);
     });
+
+    // Initialize
+    $('#noItemsAlert').removeClass('d-none');
+    calculateTotals();
 });
 </script>
 @endpush

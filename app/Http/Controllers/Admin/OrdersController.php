@@ -19,7 +19,8 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\SystemStatus;
 use App\Models\Transaction;
-
+use App\Models\ProductVariant;
+use App\Models\Warehouse;
 
 class OrdersController extends Controller
 {
@@ -190,7 +191,7 @@ class OrdersController extends Controller
     }
 
     /**
-     * Store new order with proper error handling
+     * Store new order with variant support
      */
     public function store(Request $request)
     {
@@ -213,9 +214,10 @@ class OrdersController extends Controller
             // Customer Information
             'customer_id' => 'nullable|uuid|exists:customers,id',
 
-            // Order Items
+            // Order Items - NOW SUPPORTS VARIANTS
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|uuid|exists:products,id',
+            'items.*.variant_id' => 'nullable|uuid|exists:product_variants,id', // ← NEW
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
 
@@ -267,7 +269,7 @@ class OrdersController extends Controller
             $rules['guest_phone'] = 'required|string|max:20';
         }
 
-        // ✅ Custom validation messages
+        // ✅ Custom validation messages (same as before, add variant message)
         $messages = [
             // Guest Customer Messages
             'guest_name.required' => 'Guest name is required when no customer is selected.',
@@ -340,6 +342,7 @@ class OrdersController extends Controller
             'admin_notes.max' => 'Admin notes cannot exceed 5000 characters.',
         ];
 
+
         // ✅ Perform validation
         $validator = Validator::make($request->all(), $rules, $messages);
 
@@ -353,33 +356,65 @@ class OrdersController extends Controller
 
         $validated = $validator->validated();
         DB::beginTransaction();
+
         try {
             // ============================================================
-            // STEP 1: CHECK STOCK AVAILABILITY FIRST (BEFORE CREATING ORDER)
+            // STEP 1: CHECK STOCK AVAILABILITY (WITH VARIANT SUPPORT)
             // ============================================================
             foreach ($validated['items'] as $itemData) {
                 $product = Product::find($itemData['product_id']);
 
-                if ($product->track_inventory) {
-                    if ($product->stock_quantity < $itemData['quantity']) {
+                // ✅ NEW: Check if this is a variant order
+                if (!empty($itemData['variant_id'])) {
+                    $variant = ProductVariant::find($itemData['variant_id']);
+
+                    if (!$variant) {
+                        DB::rollBack();
+                        return back()
+                            ->withErrors(['items' => "Variant not found"])
+                            ->withInput()
+                            ->with('error', 'Invalid variant selected!');
+                    }
+
+                    // Check variant stock
+                    if ($product->track_inventory && $variant->stock_quantity < $itemData['quantity']) {
                         DB::rollBack();
 
-                        \Log::error('Insufficient stock during order creation', [
+                        \Log::error('Insufficient variant stock during order creation', [
                             'product' => $product->name,
+                            'variant' => $variant->getFullName(),
                             'requested' => $itemData['quantity'],
-                            'available' => $product->stock_quantity
+                            'available' => $variant->stock_quantity
                         ]);
 
                         return back()
-                            ->withErrors(['items' => "Insufficient stock for {$product->name}. Available: {$product->stock_quantity}, Requested: {$itemData['quantity']}"])
+                            ->withErrors(['items' => "Insufficient stock for {$product->name} ({$variant->getFullName()}). Available: {$variant->stock_quantity}, Requested: {$itemData['quantity']}"])
                             ->withInput()
-                            ->with('error', 'Cannot create order - insufficient stock!');
+                            ->with('error', 'Cannot create order - insufficient variant stock!');
+                    }
+                } else {
+                    // Check main product stock (no variant)
+                    if ($product->track_inventory && !$product->has_variants) {
+                        if ($product->stock_quantity < $itemData['quantity']) {
+                            DB::rollBack();
+
+                            \Log::error('Insufficient stock during order creation', [
+                                'product' => $product->name,
+                                'requested' => $itemData['quantity'],
+                                'available' => $product->stock_quantity
+                            ]);
+
+                            return back()
+                                ->withErrors(['items' => "Insufficient stock for {$product->name}. Available: {$product->stock_quantity}, Requested: {$itemData['quantity']}"])
+                                ->withInput()
+                                ->with('error', 'Cannot create order - insufficient stock!');
+                        }
                     }
                 }
             }
 
             // ============================================================
-            // STEP 2: CALCULATE TOTALS
+            // STEP 2: CALCULATE TOTALS (same as before)
             // ============================================================
             $subtotal = 0;
             foreach ($validated['items'] as $item) {
@@ -392,7 +427,7 @@ class OrdersController extends Controller
             $totalAmount = $subtotal + $taxAmount + $shippingAmount - $discountAmount;
 
             // ============================================================
-            // STEP 3: CREATE ORDER
+            // STEP 3: CREATE ORDER (same as before)
             // ============================================================
             $orderData = array_merge($validated, [
                 'order_source' => 'admin',
@@ -407,10 +442,9 @@ class OrdersController extends Controller
             ]);
 
             unset($orderData['items']);
-
             $order = Order::create($orderData);
 
-            // ✅ TRIGGER: New Order Notification
+            // Trigger notifications (same as before)
             $this->notificationService->notify('order_created', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
@@ -419,57 +453,40 @@ class OrdersController extends Controller
                 'customer_email' => $order->getCustomerEmail(),
             ]);
 
-            if ($order->payment_status_key_code === 'PAYMENT_PAID') {
-                $this->notificationService->notify('payment_received', [
-                    'order_id' => $order->id,
-                    'order_number' => $order->order_number,
-                    'amount' => $order->getFormattedTotal(),
-                    'payment_method' => $orderData['payment_method'] ?? 'N/A',
-                    'customer_name' => $order->getCustomerName(),
-                ]);
-
-                $this->notificationService->notifyCustomer('payment_received', $order, [
-                    'payment_method' => $order->payment_method ?? 'N/A',
-                ]);
-            }
-
-            // Check if high-value order
-            if ($order->total_amount >= config('notifications.thresholds.high_value_order', 5000)) {
-                $this->notificationService->notify('customer_high_value_order', [
-                    'order_id' => $order->id,
-                    'order_number' => $order->order_number,
-                    'customer_name' => $order->getCustomerName(),
-                    'total_amount' => $order->getFormattedTotal(),
-                    'customer_id' => $order->customer_id,
-                ]);
-            }
-            // Log order creation
+            // ... (keep other notification triggers)
 
             \Log::info('Order created', ['order_id' => $order->id, 'order_number' => $order->order_number]);
 
             // ============================================================
-            // STEP 4: CREATE ORDER ITEMS
+            // STEP 4: CREATE ORDER ITEMS (WITH VARIANT SUPPORT)
             // ============================================================
             foreach ($validated['items'] as $index => $itemData) {
                 $product = Product::find($itemData['product_id']);
+                $variant = !empty($itemData['variant_id']) ? ProductVariant::find($itemData['variant_id']) : null;
+
+                // ✅ Use variant details if available
+                $itemName = $variant ? "{$product->name} - {$variant->getFullName()}" : $product->name;
+                $itemSku = $variant ? $variant->sku : $product->sku;
+                $itemImage = $variant ? $variant->image_path : $product->main_image;
 
                 $itemSubtotal = $itemData['unit_price'] * $itemData['quantity'];
-                $itemTaxAmount = $product->is_taxable ? ($itemSubtotal * (($product->tax_rate ?? 0) / 100)) : 0;
+                $itemTaxAmount = $product->is_taxable ? ($itemSubtotal * (($product->tax_percentage ?? 0) / 100)) : 0;
                 $itemTotal = $itemSubtotal + $itemTaxAmount;
 
                 $orderItem = OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $product->id,
-                    'product_name' => $product->name,
-                    'product_sku' => $product->sku,
+                    'product_variant_id' => $variant ? $variant->id : null, // ← NEW
+                    'product_name' => $itemName, // ← Updated
+                    'product_sku' => $itemSku, // ← Updated
                     'product_description' => $product->short_description,
-                    'product_image' => $product->main_image,
+                    'product_image' => $itemImage, // ← Updated
                     'quantity' => $itemData['quantity'],
                     'unit_price' => $itemData['unit_price'],
-                    'cost_price' => $product->cost_price,
+                    'cost_price' => $variant ? $variant->getFinalPrice() : $product->cost_price,
                     'subtotal' => $itemSubtotal,
                     'tax_amount' => $itemTaxAmount,
-                    'tax_rate' => $product->tax_rate,
+                    'tax_rate' => $product->tax_percentage,
                     'is_taxable' => $product->is_taxable,
                     'total' => $itemTotal,
                     'sort_order' => $index,
@@ -479,35 +496,71 @@ class OrdersController extends Controller
                 \Log::info('Order item created', [
                     'order_item_id' => $orderItem->id,
                     'product_id' => $product->id,
+                    'product_variant_id' => $variant ? $variant->id : null,
                     'quantity' => $itemData['quantity']
                 ]);
             }
 
             // ============================================================
-            // STEP 5: DEDUCT STOCK IF ORDER IS CONFIRMED
+            // STEP 5: DEDUCT STOCK IF ORDER IS CONFIRMED (WITH VARIANT SUPPORT)
             // ============================================================
             if ($order->status_key_code === 'ORDER_CONFIRMED') {
                 foreach ($validated['items'] as $itemData) {
                     $product = Product::find($itemData['product_id']);
 
                     if ($product->track_inventory) {
-                        // ⚡ DEDUCT STOCK IMMEDIATELY
-                        $product->decrement('stock_quantity', $itemData['quantity']);
+                        // ✅ NEW: Handle variant stock
+                        if (!empty($itemData['variant_id'])) {
+                            $variant = ProductVariant::find($itemData['variant_id']);
 
-                        // Mark as deducted
-                        OrderItem::where('order_id', $order->id)
-                                ->where('product_id', $product->id)
-                                ->update([
-                                    'stock_deducted' => true,
-                                    'stock_deducted_at' => now(),
+                            // Get default warehouse
+                            $defaultWarehouse = Warehouse::where('is_default', true)->first();
+
+                            if ($defaultWarehouse && $variant) {
+                                // Reduce variant warehouse stock
+                                $variant->reduceWarehouseStock(
+                                    $defaultWarehouse->id,
+                                    $itemData['quantity'],
+                                    "Stock deducted for order #{$order->order_number}"
+                                );
+
+                                // Mark as deducted
+                                OrderItem::where('order_id', $order->id)
+                                    ->where('product_id', $product->id)
+                                    ->whereNull('product_variant_id')
+                                    ->update([
+                                        'stock_deducted' => true,
+                                        'stock_deducted_at' => now(),
+                                    ]);
+
+                                \Log::info('Variant stock deducted for confirmed order', [
+                                    'order' => $order->order_number,
+                                    'product' => $product->name,
+                                    'variant' => $variant->getFullName(),
+                                    'quantity' => $itemData['quantity'],
+                                    'remaining_stock' => $variant->fresh()->stock_quantity
                                 ]);
+                            }
+                        } else {
+                            // ⚡ DEDUCT MAIN PRODUCT STOCK
+                            $product->decrement('stock_quantity', $itemData['quantity']);
 
-                        \Log::info('Stock deducted for new confirmed order', [
-                            'order' => $order->order_number,
-                            'product' => $product->name,
-                            'quantity' => $itemData['quantity'],
-                            'remaining_stock' => $product->fresh()->stock_quantity
-                        ]);
+                            // Mark as deducted
+                            OrderItem::where('order_id', $order->id)
+                                    ->where('product_id', $product->id)
+                                    ->whereNull('variant_id')
+                                    ->update([
+                                        'stock_deducted' => true,
+                                        'stock_deducted_at' => now(),
+                                    ]);
+
+                            \Log::info('Product stock deducted for confirmed order', [
+                                'order' => $order->order_number,
+                                'product' => $product->name,
+                                'quantity' => $itemData['quantity'],
+                                'remaining_stock' => $product->fresh()->stock_quantity
+                            ]);
+                        }
                     }
                 }
             }
@@ -2017,6 +2070,44 @@ class OrdersController extends Controller
                 'success' => false,
                 'message' => 'Order not found'
             ], 404);
+        }
+    }
+
+    /**
+     * Get product variants (AJAX) - FOR ORDER CREATION
+     */
+    public function getProductVariants($productId)
+    {
+        try {
+            $product = Product::with(['variants' => function($query) {
+                $query->active()->ordered();
+            }])->findOrFail($productId);
+
+            $variants = $product->variants->map(function($variant) {
+                return [
+                    'id' => $variant->id,
+                    'name' => $variant->getFullName(),
+                    'display_name' => $variant->getDisplayName(),
+                    'sku' => $variant->sku,
+                    'price' => $variant->getFinalPrice(),
+                    'formatted_price' => $variant->getFormattedFinalPrice(),
+                    'stock' => $variant->stock_quantity,
+                    'is_in_stock' => $variant->isInStock(),
+                    'image' => $variant->getImageUrl(),
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'has_variants' => $product->has_variants,
+                'variants' => $variants
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load variants: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

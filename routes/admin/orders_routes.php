@@ -46,6 +46,9 @@ Route::prefix('orders')->name('orders.')->group(function () {
         Route::get('/{id}/invoice', [OrdersController::class, 'invoice'])->name('invoice');
         Route::get('/{id}/shipping-label', [OrdersController::class, 'shippingLabel'])->name('shipping-label');
         Route::get('/{id}/data', [OrdersController::class, 'getOrderData'])->name('get-data');
+        //
+        //
+        Route::get('/products/{product}/variants', [OrdersController::class, 'getProductVariants'])->name('products.variants');
     });
 
     // Update order
