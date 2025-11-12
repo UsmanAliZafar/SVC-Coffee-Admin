@@ -20,9 +20,15 @@ return new class extends Migration
         });
 
         // Drop any existing similar indexes
-        DB::statement('ALTER TABLE product_warehouse_stock DROP INDEX IF EXISTS idx_product_warehouse');
-        // DB::statement('ALTER TABLE product_warehouse_stock DROP INDEX IF EXISTS idx_variant_warehouse');
-        DB::statement('ALTER TABLE product_warehouse_stock DROP INDEX IF EXISTS unique_product_variant_warehouse');
+        $indexes = DB::select("SHOW INDEXES FROM product_warehouse_stock");
+        $indexNames = collect($indexes)->pluck('Key_name')->toArray();
+
+        foreach (['idx_product_warehouse', 'idx_variant_warehouse', 'unique_product_variant_warehouse'] as $index) {
+            if (in_array($index, $indexNames)) {
+                DB::statement("ALTER TABLE product_warehouse_stock DROP INDEX $index");
+            }
+        }
+
 
         // Add correct unique constraint
         Schema::table('product_warehouse_stock', function (Blueprint $table) {
