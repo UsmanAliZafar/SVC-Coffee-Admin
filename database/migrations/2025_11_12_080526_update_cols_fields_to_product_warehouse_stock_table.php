@@ -19,16 +19,31 @@ return new class extends Migration
             }
         });
 
-        // Drop any existing similar indexes
+        // Get all indexes and foreign keys
         $indexes = DB::select("SHOW INDEXES FROM product_warehouse_stock");
         $indexNames = collect($indexes)->pluck('Key_name')->toArray();
 
-        foreach (['idx_product_warehouse', 'idx_variant_warehouse', 'unique_product_variant_warehouse'] as $index) {
-            if (in_array($index, $indexNames)) {
-                DB::statement("ALTER TABLE product_warehouse_stock DROP INDEX $index");
+        $foreignKeys = collect(DB::select("
+            SELECT CONSTRAINT_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_NAME = 'product_warehouse_stock'
+              AND TABLE_SCHEMA = DATABASE()
+              AND REFERENCED_TABLE_NAME IS NOT NULL
+        "))->pluck('CONSTRAINT_NAME')->toArray();
+
+        // Drop foreign keys related to variant_id (if any)
+        foreach ($foreignKeys as $fk) {
+            if (str_contains($fk, 'variant') || str_contains($fk, 'warehouse')) {
+                DB::statement("ALTER TABLE product_warehouse_stock DROP FOREIGN KEY `$fk`");
             }
         }
 
+        // Drop indexes if they exist (only after removing foreign keys)
+        foreach (['idx_product_warehouse', 'idx_variant_warehouse', 'unique_product_variant_warehouse'] as $index) {
+            if (in_array($index, $indexNames)) {
+                DB::statement("ALTER TABLE product_warehouse_stock DROP INDEX `$index`");
+            }
+        }
 
         // Add correct unique constraint
         Schema::table('product_warehouse_stock', function (Blueprint $table) {
@@ -38,8 +53,15 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement('ALTER TABLE product_warehouse_stock DROP INDEX IF EXISTS unique_product_variant_warehouse');
+        // Drop the new constraint if exists
+        $indexes = DB::select("SHOW INDEXES FROM product_warehouse_stock");
+        $indexNames = collect($indexes)->pluck('Key_name')->toArray();
 
+        if (in_array('unique_product_variant_warehouse', $indexNames)) {
+            DB::statement("ALTER TABLE product_warehouse_stock DROP INDEX `unique_product_variant_warehouse`");
+        }
+
+        // Recreate old unique constraint
         Schema::table('product_warehouse_stock', function (Blueprint $table) {
             $table->unique(['product_id', 'warehouse_id'], 'idx_product_warehouse');
         });
