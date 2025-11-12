@@ -19,6 +19,9 @@ use App\Models\ProductVariant;
 use App\Models\UrlRedirect;
 use App\Models\SystemStatus;
 use App\Models\Vendor;
+use App\Models\ProductWarehouseStock;
+use App\Models\Warehouse;
+use App\Models\InventoryMovement;
 
 class ProductsController extends Controller
 {
@@ -1734,31 +1737,31 @@ class ProductsController extends Controller
     /**
      * Get product variants
      */
-    public function getVariants($id)
-    {
-        // Check permission
-        if (!auth('admin')->user()->hasPermission('products.read')) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
+    // public function getVariants($id)
+    // {
+    //     // Check permission
+    //     if (!auth('admin')->user()->hasPermission('products.read')) {
+    //         return response()->json(['error' => 'Unauthorized'], 403);
+    //     }
 
-        $product = Product::with('variants')->findOrFail($id);
+    //     $product = Product::with('variants')->findOrFail($id);
 
-        return response()->json([
-            'success' => true,
-            'variants' => $product->variants->map(function($variant) {
-                return [
-                    'id' => $variant->id,
-                    'name' => $variant->getFullName(),
-                    'sku' => $variant->sku,
-                    'price' => $variant->price,
-                    'sale_price' => $variant->sale_price,
-                    'stock' => $variant->getTotalStock(),
-                    'is_default' => $variant->is_default,
-                    'status' => $variant->status_key_code,
-                ];
-            })
-        ]);
-    }
+    //     return response()->json([
+    //         'success' => true,
+    //         'variants' => $product->variants->map(function($variant) {
+    //             return [
+    //                 'id' => $variant->id,
+    //                 'name' => $variant->getFullName(),
+    //                 'sku' => $variant->sku,
+    //                 'price' => $variant->price,
+    //                 'sale_price' => $variant->sale_price,
+    //                 'stock' => $variant->getTotalStock(),
+    //                 'is_default' => $variant->is_default,
+    //                 'status' => $variant->status_key_code,
+    //             ];
+    //         })
+    //     ]);
+    // }
 
     /**
      * Update product published status
@@ -2635,5 +2638,310 @@ class ProductsController extends Controller
                 }),
             ]
         ]);
+    }
+
+    // varients
+    /**
+     * Get all variants for a product (AJAX)
+     */
+    public function getVariants($productId)
+    {
+        $product = Product::findOrFail($productId);
+        $variants = $product->variants()->ordered()->get();
+
+        $html = '';
+        foreach ($variants as $variant) {
+            $html .= view('admin.products.partials.variant-card', compact('variant'))->render();
+        }
+
+        return response()->json([
+            'success' => true,
+            'html' => $html
+        ]);
+    }
+
+    /**
+     * Store a new variant
+     */
+    public function storeVariant(Request $request, $productId)
+    {
+        $product = Product::findOrFail($productId);
+
+        $validator = Validator::make($request->all(), [
+            'variant_name' => 'required|string|max:255',
+            'variant_value' => 'required|string|max:255',
+            'sku' => 'required|string|max:255|unique:product_variants,sku',
+            'price' => 'required|numeric|min:0',
+            'sale_price' => 'nullable|numeric|min:0|lt:price',
+            'weight' => 'nullable|numeric|min:0',
+            'length' => 'nullable|numeric|min:0',
+            'width' => 'nullable|numeric|min:0',
+            'height' => 'nullable|numeric|min:0',
+            'stock_quantity' => 'nullable|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+            'variant_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'status_key_code' => 'required|string',
+            'is_default' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $variantData = $request->only([
+                'variant_name', 'variant_value', 'sku', 'price', 'sale_price',
+                'weight', 'length', 'width', 'height',
+                'low_stock_threshold', 'status_key_code'
+            ]);
+
+            $variantData['product_id'] = $product->id;
+            $variantData['is_default'] = $request->has('is_default');
+            $variantData['stock_quantity'] = 0; // ← Start with 0
+
+            // Handle image upload
+            if ($request->hasFile('variant_image')) {
+                $image = $request->file('variant_image');
+                $imageName = time() . '_' . Str::random(10) . '.' . $image->extension();
+                $imagePath = $image->storeAs('variants', $imageName, 'public');
+                $variantData['image_path'] = $imagePath;
+            }
+
+            $variant = ProductVariant::create($variantData);
+
+            // ✅ ADD STOCK IF PROVIDED
+            if ($request->filled('stock_quantity') && $request->stock_quantity > 0) {
+                $defaultWarehouse = Warehouse::where('is_default', true)->first();
+
+                if (!$defaultWarehouse) {
+                    throw new \Exception('No default warehouse found. Please set a default warehouse first.');
+                }
+
+                $stockQty = (int) $request->stock_quantity;
+
+                // Create warehouse stock
+                $warehouseStock = ProductWarehouseStock::create([
+                    'product_id' => $product->id,
+                    'variant_id' => $variant->id,
+                    'warehouse_id' => $defaultWarehouse->id,
+                    'quantity' => $stockQty,
+                    'reserved_quantity' => 0,
+                    'available_quantity' => $stockQty,
+                ]);
+
+                // Create inventory movement
+                InventoryMovement::create([
+                    'product_id' => $product->id,
+                    'variant_id' => $variant->id,
+                    'warehouse_id' => $defaultWarehouse->id,
+                    'type' => 'adjustment',
+                    'quantity' => $stockQty,
+                    'previous_quantity' => 0,
+                    'new_quantity' => $stockQty,
+                    'reason' => 'Initial stock on variant creation',
+                ]);
+
+                // Update variant stock_quantity
+                $variant->update(['stock_quantity' => $stockQty]);
+
+                // Update product total stock
+                $product->updateTotalStock();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Variant created successfully',
+                'variant' => $variant
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to create variant: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create variant: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get single variant data
+     */
+    public function getVariant($productId, $variantId)
+    {
+        $variant = ProductVariant::where('product_id', $productId)
+                                ->findOrFail($variantId);
+
+        return response()->json([
+            'success' => true,
+            'variant' => [
+                'id' => $variant->id,
+                'variant_name' => $variant->variant_name,
+                'variant_value' => $variant->variant_value,
+                'sku' => $variant->sku,
+                'price' => $variant->price,
+                'sale_price' => $variant->sale_price,
+                'weight' => $variant->weight,
+                'length' => $variant->length,
+                'width' => $variant->width,
+                'height' => $variant->height,
+                'stock_quantity' => $variant->stock_quantity,
+                'low_stock_threshold' => $variant->low_stock_threshold,
+                'status_key_code' => $variant->status_key_code,
+                'is_default' => $variant->is_default,
+                'image_path' => $variant->image_path,
+                'image_url' => $variant->getImageUrl(),
+            ]
+        ]);
+    }
+
+    /**
+     * Update variant
+     */
+    public function updateVariant(Request $request, $productId, $variantId)
+    {
+        $product = Product::findOrFail($productId);
+        $variant = ProductVariant::where('product_id', $productId)->findOrFail($variantId);
+
+        $validator = Validator::make($request->all(), [
+            'variant_name' => 'required|string|max:255',
+            'variant_value' => 'required|string|max:255',
+            'sku' => 'required|string|max:255|unique:product_variants,sku,' . $variant->id,
+            'price' => 'required|numeric|min:0',
+            'sale_price' => 'nullable|numeric|min:0|lt:price',
+            'weight' => 'nullable|numeric|min:0',
+            'length' => 'nullable|numeric|min:0',
+            'width' => 'nullable|numeric|min:0',
+            'height' => 'nullable|numeric|min:0',
+            'stock_quantity' => 'nullable|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+            'variant_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'status_key_code' => 'required|string',
+            'is_default' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $variantData = $request->only([
+                'variant_name', 'variant_value', 'sku', 'price', 'sale_price',
+                'weight', 'length', 'width', 'height',
+                'low_stock_threshold', 'status_key_code'
+            ]);
+
+            $variantData['is_default'] = $request->has('is_default');
+
+            // Handle image upload
+            if ($request->hasFile('variant_image')) {
+                // Delete old image
+                $variant->deleteImage();
+
+                $image = $request->file('variant_image');
+                $imageName = time() . '_' . Str::random(10) . '.' . $image->extension();
+                $imagePath = $image->storeAs('variants', $imageName, 'public');
+                $variantData['image_path'] = $imagePath;
+            }
+
+            $variant->update($variantData);
+
+            // Handle stock update if changed
+            if ($request->filled('stock_quantity')) {
+                $newStock = (int) $request->stock_quantity;
+                $currentStock = $variant->stock_quantity;
+
+                if ($newStock != $currentStock) {
+                    $defaultWarehouse = Warehouse::where('is_default', true)->first();
+                    if ($defaultWarehouse) {
+                        $warehouseStock = ProductWarehouseStock::where('product_id', $product->id)
+                                                            ->where('variant_id', $variant->id)
+                                                            ->where('warehouse_id', $defaultWarehouse->id)
+                                                            ->first();
+
+                        if ($warehouseStock) {
+                            $difference = $newStock - $currentStock;
+                            if ($difference > 0) {
+                                $variant->addWarehouseStock($defaultWarehouse->id, $difference, 'Stock updated from admin panel');
+                            } elseif ($difference < 0) {
+                                $variant->reduceWarehouseStock($defaultWarehouse->id, abs($difference), 'Stock updated from admin panel');
+                            }
+                        } else {
+                            $variant->addWarehouseStock($defaultWarehouse->id, $newStock, 'Stock set from admin panel');
+                        }
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Variant updated successfully',
+                'variant' => $variant
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update variant: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Set variant as default
+     */
+    public function setDefaultVariant($productId, $variantId)
+    {
+        $variant = ProductVariant::where('product_id', $productId)->findOrFail($variantId);
+
+        if ($variant->setAsDefault()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Default variant updated successfully'
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to set default variant'
+        ], 500);
+    }
+
+    /**
+     * Delete variant
+     */
+    public function deleteVariant($productId, $variantId)
+    {
+        $variant = ProductVariant::where('product_id', $productId)->findOrFail($variantId);
+
+        if ($variant->delete()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Variant deleted successfully'
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to delete variant'
+        ], 500);
     }
 }

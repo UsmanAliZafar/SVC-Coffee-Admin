@@ -672,7 +672,7 @@
                 </div>
 
                 <!-- Product Variants Toggle -->
-                <div class="form-section d-none">
+                <div class="form-section">
                     <h5 class="section-title"><i class="bi bi-grid-3x3-gap"></i> Product Variants</h5>
 
                     <div class="form-check mb-3">

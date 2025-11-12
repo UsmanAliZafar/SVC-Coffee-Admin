@@ -565,8 +565,62 @@
                         </div>
                     </div>
                 </div>
-                {{-- FeatureLinting. --}}
+                <!--  FeatureLinting. -->
                 @include('admin.products.partials.features', ['product' => $product])
+                <!--   -->
+
+                <!-- Product Variants -->
+                <div class="form-section" id="variants-section">
+                    <h5 class="section-title"><i class="bi bi-grid-3x3-gap"></i> Product Variants</h5>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="has_variants" id="hasVariants" class="form-check-input"
+                            {{ old('has_variants', $product->has_variants) ? 'checked' : '' }}
+                            onchange="toggleVariantsSection()">
+                        <label class="form-check-label" for="hasVariants">
+                            <i class="bi bi-layers"></i> This product has variants
+                        </label>
+                        <div class="form-text">
+                            Enable this if product has multiple options (size, color, weight, etc.)
+                        </div>
+                    </div>
+
+                    <div id="variantsContent" style="display: {{ $product->has_variants ? 'block' : 'none' }};">
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle"></i> <strong>Variants Active</strong><br>
+                            <small>This product uses variants for pricing and inventory.</small>
+                        </div>
+
+                        <!-- Add Variant Button -->
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-primary" onclick="openAddVariantModal()">
+                                <i class="bi bi-plus-circle"></i> Add New Variant
+                            </button>
+                        </div>
+
+                        <!-- Variants List -->
+                        <div id="variantsList">
+                            @if($product->variants->count() > 0)
+                                @foreach($product->variants as $variant)
+                                    @include('admin.products.partials.variant-card', ['variant' => $variant])
+                                @endforeach
+                            @else
+                                <div class="alert alert-warning" id="noVariantsAlert">
+                                    <i class="bi bi-exclamation-triangle"></i> No variants added yet. Click "Add New Variant" to get started.
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div id="noVariantsMessage" style="display: {{ $product->has_variants ? 'none' : 'block' }};">
+                        <div class="alert alert-secondary">
+                            <i class="bi bi-info-circle"></i> <strong>Simple Product Mode</strong><br>
+                            <small>This product uses basic pricing and inventory. Enable variants above if you need multiple options.</small>
+                        </div>
+                    </div>
+                </div>
+                <!-- Product Variants -->
+
                 <!-- SEO Settings -->
                 <div class="form-section">
                     <h5 class="section-title"><i class="bi bi-search"></i> SEO Settings</h5>
@@ -988,52 +1042,6 @@
                     @endif
                 </div>
 
-                <!-- Product Variants Toggle -->
-                <div class="form-section d-none">
-                    <h5 class="section-title"><i class="bi bi-grid-3x3-gap"></i> Product Variants</h5>
-
-                    <div class="form-check mb-3">
-                        <input type="checkbox" name="has_variants" id="hasVariants" class="form-check-input"
-                            {{ old('has_variants', $product->has_variants) ? 'checked' : '' }} disabled>
-                        <label class="form-check-label" for="hasVariants">
-                            <i class="bi bi-layers"></i> This product has variants
-                        </label>
-                        <div class="form-text text-muted">
-                            @if($product->has_variants)
-                                <i class="bi bi-check-circle text-success"></i> Variants are enabled for this product
-                            @else
-                                <i class="bi bi-x-circle text-muted"></i> No variants configured
-                            @endif
-                        </div>
-                    </div>
-
-                    @if($product->has_variants)
-                    <div class="alert alert-success">
-                        <i class="bi bi-info-circle"></i> <strong>Variants Active</strong><br>
-                        <small>This product uses variants for pricing and inventory. Manage variants below.</small>
-                    </div>
-
-                    <!-- Variants Management Section (Coming Soon) -->
-                    <div class="card border-primary">
-                        <div class="card-header bg-primary text-white">
-                            <i class="bi bi-grid-3x3-gap"></i> Product Variants
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted mb-3">
-                                <i class="bi bi-tools"></i> Variant management feature will be available here soon.
-                            </p>
-                            <button type="button" class="btn btn-outline-primary" disabled>
-                                <i class="bi bi-plus-circle"></i> Add Variant
-                            </button>
-                        </div>
-                    </div>
-                    @else
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> <strong>Note:</strong> Enable variants if this product has multiple options (size, color, weight, etc.).
-                        Contact administrator to enable variants for this product.
-                    </div>
-                    @endif
-                </div>
                 <!-- Quick Actions -->
                 <div class="form-section">
                     <h5 class="section-title"><i class="bi bi-lightning-fill"></i> Quick Actions</h5>
@@ -1153,6 +1161,152 @@
         </div>
     </div>
 </div>
+
+<!-- Add/Edit Variant Modal -->
+<div class="modal fade" id="variantModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #5B914C; color: white;">
+                <h5 class="modal-title" id="variantModalTitle">
+                    <i class="bi bi-plus-circle"></i> Add New Variant
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="variantForm">
+                @csrf
+                <input type="hidden" name="variant_id" id="variantId">
+                <input type="hidden" name="product_id" value="{{ $product->id }}">
+
+                <div class="modal-body">
+                    <div class="row">
+                        <!-- Variant Name & Value -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required-field">Variant Name</label>
+                            <input type="text" name="variant_name" id="variantName" class="form-control"
+                                   placeholder="e.g., Size, Color, Weight" required>
+                            <div class="invalid-feedback"></div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required-field">Variant Value</label>
+                            <input type="text" name="variant_value" id="variantValue" class="form-control"
+                                   placeholder="e.g., Large, Red, 500g" required>
+                            <div class="invalid-feedback"></div>
+                        </div>
+
+                        <!-- SKU -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required-field">SKU</label>
+                            <div class="input-group">
+                                <input type="text" name="sku" id="variantSku" class="form-control"
+                                       placeholder="Variant SKU" required>
+                                <button type="button" class="btn btn-outline-secondary" onclick="generateVariantSKU()">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                            </div>
+                            <div class="invalid-feedback"></div>
+                        </div>
+
+                        <!-- Price -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required-field">Price</label>
+                            <input type="number" name="price" id="variantPrice" class="form-control"
+                                   placeholder="0.00" step="0.01" min="0" required>
+                            <div class="invalid-feedback"></div>
+                        </div>
+
+                        <!-- Sale Price -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Sale Price</label>
+                            <input type="number" name="sale_price" id="variantSalePrice" class="form-control"
+                                   placeholder="0.00" step="0.01" min="0">
+                            <small class="text-muted">Leave empty if not on sale</small>
+                        </div>
+
+                        <!-- Weight -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Weight (kg)</label>
+                            <input type="number" name="weight" id="variantWeight" class="form-control"
+                                   placeholder="0.00" step="0.01" min="0">
+                        </div>
+
+                        <!-- Dimensions -->
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Dimensions (cm)</label>
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <input type="number" name="length" id="variantLength" class="form-control"
+                                           placeholder="Length" step="0.01" min="0">
+                                    <small class="text-muted d-block text-center">L</small>
+                                </div>
+                                <div class="col-4">
+                                    <input type="number" name="width" id="variantWidth" class="form-control"
+                                           placeholder="Width" step="0.01" min="0">
+                                    <small class="text-muted d-block text-center">W</small>
+                                </div>
+                                <div class="col-4">
+                                    <input type="number" name="height" id="variantHeight" class="form-control"
+                                           placeholder="Height" step="0.01" min="0">
+                                    <small class="text-muted d-block text-center">H</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stock Settings -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Initial Stock Quantity</label>
+                            <input type="number" name="stock_quantity" id="variantStockQuantity" class="form-control"
+                                   placeholder="0" min="0" value="0">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Low Stock Threshold</label>
+                            <input type="number" name="low_stock_threshold" id="variantLowStockThreshold" class="form-control"
+                                   placeholder="10" min="0" value="10">
+                        </div>
+
+                        <!-- Variant Image -->
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Variant Image</label>
+                            <input type="file" name="variant_image" id="variantImage" class="form-control" accept="image/*">
+                            <div id="variantImagePreview" class="mt-2"></div>
+                        </div>
+
+                        <!-- Status -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Status</label>
+                            <select name="status_key_code" id="variantStatus" class="form-select">
+                                <option value="VARIANT_ACTIVE" selected>Active</option>
+                                <option value="VARIANT_INACTIVE">Inactive</option>
+                                <option value="VARIANT_OUT_OF_STOCK">Out of Stock</option>
+                            </select>
+                        </div>
+
+                        <!-- Is Default -->
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" name="is_default" id="variantIsDefault" class="form-check-input">
+                                <label class="form-check-label" for="variantIsDefault">
+                                    <i class="bi bi-star"></i> Set as default variant
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> <span id="variantSubmitText">Save Variant</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @endsection
 @push('scripts')
 <!-- CKEditor -->
@@ -2233,5 +2387,344 @@ function get_currency_symbol(code) {
 $(document).ready(function() {
     updateTaxPreview();
 });
+</script>
+<script>
+// ==================== VARIANT MANAGEMENT ====================
+
+let variantModal;
+
+$(document).ready(function() {
+    variantModal = new bootstrap.Modal(document.getElementById('variantModal'));
+});
+
+// Toggle variants section
+function toggleVariantsSection() {
+    const hasVariants = $('#hasVariants').is(':checked');
+
+    if (hasVariants) {
+        $('#variantsContent').slideDown();
+        $('#noVariantsMessage').slideUp();
+    } else {
+        // Check if variants exist
+        if ($('.variant-card').length > 0) {
+            Swal.fire({
+                title: 'Warning!',
+                text: 'This product has existing variants. Disabling variants will not delete them, but they will be hidden.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#5B914C',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Continue',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $('#variantsContent').slideUp();
+                    $('#noVariantsMessage').slideDown();
+                } else {
+                    $('#hasVariants').prop('checked', true);
+                }
+            });
+        } else {
+            $('#variantsContent').slideUp();
+            $('#noVariantsMessage').slideDown();
+        }
+    }
+}
+
+// Open add variant modal
+function openAddVariantModal() {
+    // Reset form
+    $('#variantForm')[0].reset();
+    $('#variantId').val('');
+    $('#variantImagePreview').empty();
+
+    // Clear validation
+    $('.is-invalid').removeClass('is-invalid');
+    $('.invalid-feedback').hide();
+
+    // Update modal title
+    $('#variantModalTitle').html('<i class="bi bi-plus-circle"></i> Add New Variant');
+    $('#variantSubmitText').text('Save Variant');
+
+    // Show modal
+    variantModal.show();
+}
+
+// Generate variant SKU
+function generateVariantSKU() {
+    const sku = 'VAR-' + Math.random().toString(36).substring(2, 12).toUpperCase();
+    $('#variantSku').val(sku);
+}
+
+// Variant image preview
+$('#variantImage').on('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            $('#variantImagePreview').html(`
+                <img src="${e.target.result}" class="img-thumbnail" style="max-width: 200px;">
+            `);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Submit variant form
+$('#variantForm').on('submit', function(e) {
+    e.preventDefault();
+
+    const variantId = $('#variantId').val();
+    const isEdit = variantId !== '';
+    const url = isEdit
+        ? `/admin/products/{{ $product->id }}/variants/${variantId}`
+        : `/admin/products/{{ $product->id }}/variants`;
+
+    const formData = new FormData(this);
+    if (isEdit) {
+        formData.append('_method', 'PUT');
+    }
+
+    $.ajax({
+        url: url,
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        beforeSend: function() {
+            Swal.fire({
+                title: isEdit ? 'Updating Variant...' : 'Creating Variant...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+        },
+        success: function(response) {
+            Swal.close();
+
+            if (response.success) {
+                variantModal.hide();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: response.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
+                // Reload variants list
+                loadVariants();
+            }
+        },
+        error: function(xhr) {
+            Swal.close();
+
+            // Clear previous errors
+            $('.is-invalid').removeClass('is-invalid');
+            $('.invalid-feedback').hide();
+
+            if (xhr.status === 422) {
+                const errors = xhr.responseJSON.errors;
+
+                $.each(errors, function(key, messages) {
+                    const input = $(`[name="${key}"]`);
+                    input.addClass('is-invalid');
+                    input.siblings('.invalid-feedback').text(messages[0]).show();
+                });
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Validation Error',
+                    html: Object.values(errors).flat().map(err => `• ${err}`).join('<br>')
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'Failed to save variant'
+                });
+            }
+        }
+    });
+});
+
+// Edit variant
+function editVariant(variantId) {
+    $.ajax({
+        url: `/admin/products/{{ $product->id }}/variants/${variantId}`,
+        type: 'GET',
+        beforeSend: function() {
+            Swal.fire({
+                title: 'Loading...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+        },
+        success: function(response) {
+            Swal.close();
+
+            if (response.success) {
+                const variant = response.variant;
+
+                // Populate form
+                $('#variantId').val(variant.id);
+                $('#variantName').val(variant.variant_name);
+                $('#variantValue').val(variant.variant_value);
+                $('#variantSku').val(variant.sku);
+                $('#variantPrice').val(variant.price);
+                $('#variantSalePrice').val(variant.sale_price);
+                $('#variantWeight').val(variant.weight);
+                $('#variantLength').val(variant.length);
+                $('#variantWidth').val(variant.width);
+                $('#variantHeight').val(variant.height);
+                $('#variantStockQuantity').val(variant.stock_quantity);
+                $('#variantLowStockThreshold').val(variant.low_stock_threshold);
+                $('#variantStatus').val(variant.status_key_code);
+                $('#variantIsDefault').prop('checked', variant.is_default);
+
+                // Show current image
+                if (variant.image_path) {
+                    $('#variantImagePreview').html(`
+                        <img src="${variant.image_url}" class="img-thumbnail" style="max-width: 200px;">
+                        <p class="text-muted small mt-1">Current image (upload new to replace)</p>
+                    `);
+                }
+
+                // Update modal title
+                $('#variantModalTitle').html('<i class="bi bi-pencil"></i> Edit Variant');
+                $('#variantSubmitText').text('Update Variant');
+
+                // Show modal
+                variantModal.show();
+            }
+        },
+        error: function(xhr) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'Failed to load variant data'
+            });
+        }
+    });
+}
+
+// Set default variant
+function setDefaultVariant(variantId) {
+    Swal.fire({
+        title: 'Set as Default?',
+        text: 'This will be the default variant shown to customers',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#5B914C',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, set as default',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: `/admin/products/{{ $product->id }}/variants/${variantId}/set-default`,
+                type: 'POST',
+                data: {
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: response.message,
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+
+                        loadVariants();
+                    }
+                },
+                error: function(xhr) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: xhr.responseJSON?.message || 'Failed to set default variant'
+                    });
+                }
+            });
+        }
+    });
+}
+
+// Delete variant
+function deleteVariant(variantId) {
+    Swal.fire({
+        title: 'Delete Variant?',
+        text: 'This action cannot be undone!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: `/admin/products/{{ $product->id }}/variants/${variantId}`,
+                type: 'DELETE',
+                data: {
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Deleted!',
+                            text: response.message,
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+
+                        $(`#variant-${variantId}`).fadeOut(300, function() {
+                            $(this).remove();
+
+                            // Check if no variants left
+                            if ($('.variant-card').length === 0) {
+                                $('#variantsList').html(`
+                                    <div class="alert alert-warning" id="noVariantsAlert">
+                                        <i class="bi bi-exclamation-triangle"></i> No variants added yet. Click "Add New Variant" to get started.
+                                    </div>
+                                `);
+                            }
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: xhr.responseJSON?.message || 'Failed to delete variant'
+                    });
+                }
+            });
+        }
+    });
+}
+
+// Reload variants list
+function loadVariants() {
+    $.ajax({
+        url: `/admin/products/{{ $product->id }}/variants`,
+        type: 'GET',
+        success: function(response) {
+            if (response.success) {
+                $('#variantsList').html(response.html);
+
+                // Remove no variants alert if exists
+                $('#noVariantsAlert').remove();
+            }
+        }
+    });
+}
 </script>
 @endpush

@@ -115,4 +115,34 @@ Route::prefix('products')->name('products.')->group(function () {
     Route::middleware('admin.permission:products.delete')->group(function () {
         Route::delete('/{id}', [ProductsController::class, 'destroy'])->name('destroy')->where('id', '[0-9a-f-]+');
     });
+
+    // ==================== PRODUCT VARIANTS ROUTES ====================
+    Route::prefix('{product}')->where(['product' => '[0-9a-f-]+'])->group(function () {
+
+        // Variants - Read
+        Route::middleware('admin.permission:products.read')->group(function () {
+            Route::get('/variants', [ProductsController::class, 'getVariants'])->name('variants.index');
+            Route::get('/variants/{variant}', [ProductsController::class, 'getVariant'])->name('variants.show')
+                ->where('variant', '[0-9a-f-]+');
+        });
+
+        // Variants - Create
+        Route::middleware('admin.permission:products.create')->group(function () {
+            Route::post('/variants', [ProductsController::class, 'storeVariant'])->name('variants.store');
+        });
+
+        // Variants - Update
+        Route::middleware('admin.permission:products.update')->group(function () {
+            Route::put('/variants/{variant}', [ProductsController::class, 'updateVariant'])->name('variants.update')
+                ->where('variant', '[0-9a-f-]+');
+            Route::post('/variants/{variant}/set-default', [ProductsController::class, 'setDefaultVariant'])->name('variants.set-default')
+                ->where('variant', '[0-9a-f-]+');
+        });
+
+        // Variants - Delete
+        Route::middleware('admin.permission:products.delete')->group(function () {
+            Route::delete('/variants/{variant}', [ProductsController::class, 'deleteVariant'])->name('variants.destroy')
+                ->where('variant', '[0-9a-f-]+');
+        });
+    });
 });
