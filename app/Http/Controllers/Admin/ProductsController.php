@@ -470,7 +470,7 @@ class ProductsController extends Controller
             'length' => 'nullable|numeric|min:0',
             'width' => 'nullable|numeric|min:0',
             'height' => 'nullable|numeric|min:0',
-            'has_variants' => 'nullable|boolean',
+            'has_variants' => 'sometimes|accepted',
         ], [
             // Name validation messages
             'name.required' => 'Product name is required',
@@ -809,7 +809,7 @@ class ProductsController extends Controller
             'length' => 'nullable|numeric|min:0',
             'width' => 'nullable|numeric|min:0',
             'height' => 'nullable|numeric|min:0',
-            'has_variants' => 'nullable|boolean',
+            'has_variants' => 'sometimes|accepted',
         ], [
             // Name validation messages
             'name.required' => 'Product name is required',
