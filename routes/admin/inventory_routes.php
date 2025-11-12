@@ -34,10 +34,13 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
 
         // Low stock products
         Route::get('/low-stock', [InventoryController::class, 'lowStock'])->name('low-stock');
+        Route::get('/low-stock', [InventoryController::class, 'lowStock'])->name('low-stock');
+        Route::get('/low-stock/data', [InventoryController::class, 'getLowStockData'])->name('low-stock.data');
+        Route::get('/low-stock/statistics', [InventoryController::class, 'getLowStockStatistics'])->name('low-stock.statistics');
 
         // Out of stock products
         Route::get('/out-of-stock', [InventoryController::class, 'outOfStock'])->name('out-of-stock');
-
+        Route::get('/out-of-stock/data', [InventoryController::class, 'getOutOfStockData'])->name('out-of-stock.data');
         // Warehouse sync dashboard
         Route::get('/warehouse-sync', [InventoryController::class, 'warehouseSync'])->name('warehouse-sync');
         Route::get('/warehouse-sync/status', [InventoryController::class, 'getSyncStatus'])->name('warehouse-sync.status');

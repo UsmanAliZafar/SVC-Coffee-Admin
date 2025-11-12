@@ -2,16 +2,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Yajra\DataTables\Facades\DataTables;
+// MODELS
 use App\Models\Product;
 use App\Models\Warehouse;
 use App\Models\ProductWarehouseStock;
 use App\Models\InventoryMovement;
 use App\Models\StockAlert;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
-use Yajra\DataTables\Facades\DataTables;
-
+use App\Models\ProductVariant;
 class InventoryController extends Controller
 {
     /**
@@ -41,12 +42,9 @@ class InventoryController extends Controller
         $warehouseId = $request->get('warehouse_id');
 
         if ($warehouseId) {
-            // Stock by specific warehouse
-            $query = ProductWarehouseStock::with(['product', 'warehouse'])
-                ->where('warehouse_id', $warehouseId);
+            $query = ProductWarehouseStock::with(['product', 'variant', 'warehouse'])->where('warehouse_id', $warehouseId);
         } else {
-            // All products with total stock
-            $query = Product::with(['warehouseStock', 'category'])
+            $query = Product::with(['warehouseStock.variant', 'variants.warehouseStock', 'category'])
                 ->where('track_inventory', true);
         }
 
@@ -127,7 +125,6 @@ class InventoryController extends Controller
             ->addColumn('product_info', function ($stock) {
                 $product = $stock->product;
 
-                // Handle soft deleted or missing products
                 if (!$product) {
                     return '<div>
                         <strong class="text-danger">Product Deleted</strong><br>
@@ -135,9 +132,17 @@ class InventoryController extends Controller
                     </div>';
                 }
 
+                // NEW: Check if this is a variant
+                $variantInfo = '';
+                if ($stock->variant_id && $stock->variant) {
+                    $variantInfo = '<br><span class="badge bg-info">
+                        <i class="bi bi-layers"></i> Variant: ' . e($stock->variant->getFullName()) . '
+                    </span>';
+                }
+
                 return '<div>
-                    <strong>' . e($product->name) . '</strong><br>
-                    <small class="text-muted">SKU: ' . e($product->sku) . '</small>
+                    <strong>' . e($product->name) . '</strong>' . $variantInfo . '<br>
+                    <small class="text-muted">SKU: ' . e($stock->variant ? $stock->variant->sku : $product->sku) . '</small>
                 </div>';
             })
             ->addColumn('quantity', function ($stock) {
@@ -187,11 +192,9 @@ class InventoryController extends Controller
                 $actions = '<div class="btn-group" role="group">';
 
                 if (auth('admin')->user()->hasPermission('inventory.update')) {
-                    $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-stock"
-                        data-id="' . $stock->id . '"
-                        data-product="' . e($productName) . '"
-                        data-warehouse="' . e($warehouseName) . '"
-                        data-quantity="' . e($stock->quantity) . '"
+                    $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-product-stock"
+                        data-id="' . $stock->product_id . '"
+                        data-name="' . e($productName) . '"
                         title="Adjust Stock">
                         <i class="bi bi-pencil"></i>
                     </button>';
@@ -216,9 +219,18 @@ class InventoryController extends Controller
     private function getAllProductsStockDataTable($query)
     {
         return DataTables::of($query)
-            ->addColumn('product_info', function($product) {
+           ->addColumn('product_info', function($product) {
+                // Show if product has variants
+                $variantBadge = '';
+                if ($product->has_variants) {
+                    $variantCount = $product->variants()->active()->count();
+                    $variantBadge = '<br><span class="badge bg-purple">
+                        <i class="bi bi-collection"></i> ' . $variantCount . ' Variants
+                    </span>';
+                }
+
                 return '<div>
-                    <strong>' . e($product->name) . '</strong><br>
+                    <strong>' . e($product->name) . '</strong>' . $variantBadge . '<br>
                     <small class="text-muted">SKU: ' . e($product->sku) . '</small>
                 </div>';
             })
@@ -591,9 +603,19 @@ class InventoryController extends Controller
                     ? ' <span class="badge badge-sm badge-danger">Deleted</span>'
                     : '';
 
+                // Check if it's a variant movement
+                $variantBadge = $movement->variant_id
+                    ? ' <span class="badge bg-warning badge-sm">Variant</span>'
+                    : '';
+
                 return '<div>
-                    <strong>' . e($movement->product->name) . '</strong>' . $deletedBadge . '<br>
-                    <small class="text-muted">SKU: ' . e($movement->product->sku) . '</small>
+                    <strong>' . e($movement->product->name) . '</strong>' . $deletedBadge . $variantBadge . '<br>
+                    <small class="text-muted">SKU: ' .
+                        ($movement->variant_id && $movement->variant ?
+                            e($movement->variant->sku) :
+                            e($movement->product->sku)
+                        ) .
+                    '</small>
                 </div>';
             })
             ->addColumn('type_badge', function($movement) {
@@ -638,6 +660,9 @@ class InventoryController extends Controller
     /**
      * Show low stock products page
      */
+    /**
+     * Show low stock products page
+     */
     public function lowStock()
     {
         if (!auth('admin')->user()->hasPermission('inventory.read')) {
@@ -647,6 +672,349 @@ class InventoryController extends Controller
         $warehouses = Warehouse::active()->byPriority()->get();
 
         return view('admin.inventory.low-stock', compact('warehouses'));
+    }
+
+    /**
+     * Get low stock data for DataTable (AJAX)
+     * INCLUDES PRODUCT VARIANTS
+     */
+    public function getLowStockData(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('inventory.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $warehouseId = $request->get('warehouse_id');
+        $priority = $request->get('priority');
+        $category = $request->get('category');
+        $search = $request->get('search');
+
+        // Collect both products and variants
+        $items = collect();
+
+        // 1. Get low stock PRODUCTS (simple products without variants)
+        $productsQuery = Product::with(['category', 'warehouseStock.warehouse'])
+            ->where('track_inventory', true)
+            // ->where('has_variants', false)
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0);
+
+        // Apply warehouse filter for products
+        if ($warehouseId) {
+            $productsQuery->whereHas('warehouseStock', function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId)
+                ->whereColumn('quantity', '<=', DB::raw('(SELECT low_stock_threshold FROM products WHERE products.id = product_warehouse_stock.product_id)'))
+                ->where('quantity', '>', 0);
+            });
+        }
+
+        // Apply category filter
+        if ($category) {
+            $productsQuery->whereHas('category', function($q) use ($category) {
+                $q->where('slug', $category);
+            });
+        }
+
+        // Apply search filter
+        if ($search) {
+            $productsQuery->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        $products = $productsQuery->get();
+
+        // 2. Get low stock VARIANTS
+        $variantsQuery = ProductVariant::with(['product.category', 'warehouseStock.warehouse', 'status'])
+            ->whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0);
+
+        // Apply warehouse filter for variants
+        if ($warehouseId) {
+            $variantsQuery->whereHas('warehouseStock', function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId)
+                ->whereColumn('quantity', '<=', DB::raw('(SELECT low_stock_threshold FROM product_variants WHERE product_variants.id = product_warehouse_stock.variant_id)'))
+                ->where('quantity', '>', 0);
+            });
+        }
+
+        // Apply category filter for variants
+        if ($category) {
+            $variantsQuery->whereHas('product.category', function($q) use ($category) {
+                $q->where('slug', $category);
+            });
+        }
+
+        // Apply search filter for variants
+        if ($search) {
+            $variantsQuery->where(function($q) use ($search) {
+                $q->where('variant_name', 'like', "%{$search}%")
+                ->orWhere('variant_value', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%")
+                ->orWhereHas('product', function($pq) use ($search) {
+                    $pq->where('name', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        $variants = $variantsQuery->get();
+
+        // 3. Transform products to standard format
+        foreach ($products as $product) {
+            $warehouseStock = $warehouseId
+                ? $product->warehouseStock->where('warehouse_id', $warehouseId)->first()
+                : null;
+
+            $currentStock = $warehouseId && $warehouseStock
+                ? $warehouseStock->quantity
+                : $product->stock_quantity;
+
+            $items->push([
+                'id' => 'product_' . $product->id,
+                'product_id' => $product->id,
+                'variant_id' => null,
+                'is_variant' => false,
+                'product_name' => $product->name,
+                'variant_name' => null,
+                'sku' => $product->sku,
+                'category' => $product->category ? $product->category->title : 'N/A',
+                'current_stock' => $currentStock,
+                'threshold' => $product->low_stock_threshold,
+                'warehouse_id' => $warehouseId ?: '',
+                'warehouse_name' => $warehouseId && $warehouseStock
+                    ? $warehouseStock->warehouse->name
+                    : 'All Warehouses',
+                'priority' => $this->calculatePriority($currentStock, $product->low_stock_threshold),
+                'created_at' => $product->created_at,
+            ]);
+        }
+
+        // 4. Transform variants to standard format
+        foreach ($variants as $variant) {
+            $warehouseStock = $warehouseId
+                ? $variant->warehouseStock->where('warehouse_id', $warehouseId)->first()
+                : null;
+
+            $currentStock = $warehouseId && $warehouseStock
+                ? $warehouseStock->quantity
+                : $variant->stock_quantity;
+
+            $items->push([
+                'id' => 'variant_' . $variant->id,
+                'product_id' => $variant->product_id,
+                'variant_id' => $variant->id,
+                'is_variant' => true,
+                'product_name' => $variant->product->name,
+                'variant_name' => $variant->getFullName(),
+                'sku' => $variant->sku,
+                'category' => $variant->product->category ? $variant->product->category->title : 'N/A',
+                'current_stock' => $currentStock,
+                'threshold' => $variant->low_stock_threshold,
+                'warehouse_id' => $warehouseId ?: '',
+                'warehouse_name' => $warehouseId && $warehouseStock
+                    ? $warehouseStock->warehouse->name
+                    : 'All Warehouses',
+                'priority' => $this->calculatePriority($currentStock, $variant->low_stock_threshold),
+                'created_at' => $variant->created_at,
+            ]);
+        }
+
+        // 5. Apply priority filter
+        if ($priority) {
+            $items = $items->filter(function($item) use ($priority) {
+                return $item['priority'] === $priority;
+            });
+        }
+
+        // 6. Sort items
+        $items = $items->sortBy(function($item) {
+            $priorityOrder = ['critical' => 1, 'high' => 2, 'medium' => 3];
+            return [$priorityOrder[$item['priority']] ?? 4, $item['current_stock']];
+        })->values();
+
+        return DataTables::of($items)
+            ->addColumn('checkbox', function($item) {
+                return '<input type="checkbox" class="form-check-input item-checkbox"
+                            data-id="' . $item['id'] . '"
+                            data-product-id="' . $item['product_id'] . '"
+                            data-variant-id="' . ($item['variant_id'] ?: '') . '"
+                            data-warehouse-id="' . $item['warehouse_id'] . '"
+                            data-current="' . $item['current_stock'] . '"
+                            data-threshold="' . $item['threshold'] . '"
+                            data-name="' . htmlspecialchars($item['product_name']) . '"
+                            data-variant-name="' . ($item['variant_name'] ? htmlspecialchars($item['variant_name']) : '') . '">';
+            })
+            ->addColumn('product_info', function($item) {
+                $variantBadge = '';
+                if ($item['is_variant']) {
+                    $variantBadge = '<br><span class="badge bg-info">
+                        <i class="bi bi-layers"></i> Variant: ' . htmlspecialchars($item['variant_name']) . '
+                    </span>';
+                }
+
+                return '<div>
+                    <strong>' . htmlspecialchars($item['product_name']) . '</strong>' . $variantBadge . '<br>
+                    <small class="text-muted">SKU: ' . htmlspecialchars($item['sku']) . '</small><br>
+                    <small class="text-muted">Category: ' . htmlspecialchars($item['category']) . '</small>
+                </div>';
+            })
+            ->addColumn('total_stock', function($item) {
+                $className = $item['current_stock'] <= 5 ? 'text-danger' :
+                            ($item['current_stock'] <= 10 ? 'text-warning' : 'text-secondary');
+                $icon = $item['current_stock'] <= 5 ? '🔴' :
+                    ($item['current_stock'] <= 10 ? '🟠' : '🟡');
+
+                return '<strong class="' . $className . '">' . $icon . ' ' . $item['current_stock'] . '</strong>';
+            })
+            ->addColumn('threshold', function($item) {
+                return '<span class="badge bg-secondary">' . $item['threshold'] . '</span>';
+            })
+            ->addColumn('stock_level', function($item) {
+                $percentage = min(($item['current_stock'] / $item['threshold']) * 100, 100);
+
+                return '<div class="stock-level-bar">
+                    <div class="stock-level-fill" style="width: ' . $percentage . '%"></div>
+                </div>
+                <small class="text-muted mt-1 d-block">' . round($percentage) . '% of threshold</small>';
+            })
+            ->addColumn('priority', function($item) {
+                $badgeClass = 'priority-' . $item['priority'];
+                $label = ucfirst($item['priority']);
+
+                return '<span class="priority-badge ' . $badgeClass . '">' . $label . '</span>';
+            })
+            ->addColumn('warehouse_name', function($item) {
+                return $item['warehouse_name'] ?: '<span class="text-muted">All Warehouses</span>';
+            })
+            ->addColumn('actions', function($item) {
+                $productName = htmlspecialchars($item['product_name'], ENT_QUOTES);
+                $variantName = $item['variant_name'] ? htmlspecialchars($item['variant_name'], ENT_QUOTES) : '';
+
+                return '<div class="action-buttons">
+                    <button class="btn btn-sm btn-warning"
+                            onclick="quickRestock(\'' . $item['product_id'] . '\', \'' . ($item['variant_id'] ?: '') . '\', \'' . $item['warehouse_id'] . '\', \'' . $productName . '\', \'' . $variantName . '\', ' . $item['current_stock'] . ', ' . $item['threshold'] . ')"
+                            title="Quick Restock">
+                        <i class="bi bi-box-seam"></i>
+                    </button>
+                    <a href="' . route('admin.products.show', $item['product_id']) . '"
+                    class="btn btn-sm btn-info"
+                    title="View Product">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            onclick="viewHistory(\'' . $item['product_id'] . '\', \'' . ($item['variant_id'] ?: '') . '\')"
+                            title="View History">
+                        <i class="bi bi-clock-history"></i>
+                    </button>
+                </div>';
+            })
+            ->rawColumns(['checkbox', 'product_info', 'total_stock', 'threshold', 'stock_level', 'priority', 'warehouse_name', 'actions'])
+            ->make(true);
+    }
+
+    /**
+     * Calculate priority level based on stock vs threshold
+     */
+    private function calculatePriority(int $currentStock, int $threshold): string
+    {
+        if ($currentStock <= 5) {
+            return 'critical';
+        } elseif ($currentStock <= 10) {
+            return 'high';
+        } else {
+            return 'medium';
+        }
+    }
+
+    /**
+     * Get low stock statistics (AJAX)
+     */
+    public function getLowStockStatistics(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('inventory.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $warehouseId = $request->get('warehouse_id');
+
+        // Count low stock products
+        $lowStockProducts = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0);
+
+        if ($warehouseId) {
+            $lowStockProducts->whereHas('warehouseStock', function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId)
+                  ->whereColumn('quantity', '<=', DB::raw('(SELECT low_stock_threshold FROM products WHERE products.id = product_warehouse_stock.product_id)'))
+                  ->where('quantity', '>', 0);
+            });
+        }
+
+        // Count low stock variants
+        $lowStockVariants = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0);
+
+        if ($warehouseId) {
+            $lowStockVariants->whereHas('warehouseStock', function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId)
+                  ->whereColumn('quantity', '<=', DB::raw('(SELECT low_stock_threshold FROM product_variants WHERE product_variants.id = product_warehouse_stock.variant_id)'))
+                  ->where('quantity', '>', 0);
+            });
+        }
+
+        $totalLowStock = $lowStockProducts->count() + $lowStockVariants->count();
+
+        // Count critical items (stock <= 5)
+        $criticalProducts = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->where('stock_quantity', '<=', 5)
+            ->where('stock_quantity', '>', 0);
+
+        $criticalVariants = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->where('stock_quantity', '<=', 5)
+            ->where('stock_quantity', '>', 0);
+
+        if ($warehouseId) {
+            $criticalProducts->whereHas('warehouseStock', function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId)->where('quantity', '<=', 5)->where('quantity', '>', 0);
+            });
+            $criticalVariants->whereHas('warehouseStock', function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId)->where('quantity', '<=', 5)->where('quantity', '>', 0);
+            });
+        }
+
+        $criticalCount = $criticalProducts->count() + $criticalVariants->count();
+
+        // Calculate value at risk
+        $productValue = $lowStockProducts->get()->sum(function($p) {
+            return $p->stock_quantity * $p->price;
+        });
+
+        $variantValue = $lowStockVariants->get()->sum(function($v) {
+            return $v->stock_quantity * $v->price;
+        });
+
+        $valueAtRisk = $productValue + $variantValue;
+
+        return response()->json([
+            'low_stock' => $totalLowStock,
+            'critical_count' => $criticalCount,
+            'value_at_risk' => round($valueAtRisk, 2),
+            'avg_days_restock' => '3-5 days', // This could be calculated from historical data
+        ]);
     }
 
     /**
@@ -661,6 +1029,97 @@ class InventoryController extends Controller
         $warehouses = Warehouse::active()->byPriority()->get();
 
         return view('admin.inventory.out-of-stock', compact('warehouses'));
+    }
+
+    /**
+     * Get out of stock data for DataTable (AJAX)
+     */
+    public function getOutOfStockData(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('inventory.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        \Log::info('Out of Stock Request:', $request->all());
+
+        try {
+            $warehouseId = $request->get('warehouse_id');
+            $search = $request->get('search')['value'] ?? '';
+
+            $query = Product::with(['warehouseStock.warehouse', 'category'])
+                ->where('track_inventory', true)
+                ->where(function($q) use ($warehouseId) {
+                    if ($warehouseId) {
+                        // Specific warehouse out of stock
+                        $q->whereHas('warehouseStock', function($wq) use ($warehouseId) {
+                            $wq->where('warehouse_id', $warehouseId)
+                            ->where('quantity', '<=', 0);
+                        });
+                    } else {
+                        // Overall out of stock (no warehouse has stock)
+                        $q->where('stock_quantity', '<=', 0)
+                        ->whereDoesntHave('warehouseStock', function($wq) {
+                            $wq->where('quantity', '>', 0);
+                        });
+                    }
+                });
+
+            // Apply search filter
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
+
+            // Get total count
+            $total = $query->count();
+
+            // Apply pagination
+            $start = $request->get('start', 0);
+            $length = $request->get('length', 25);
+
+            $products = $query->offset($start)
+                            ->limit($length)
+                            ->get();
+
+            $data = [];
+            foreach ($products as $product) {
+                $warehouseStock = $product->warehouseStock->first();
+
+                $data[] = [
+                    'id' => $product->id,
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'product_sku' => $product->sku,
+                    'warehouse_id' => $warehouseStock ? $warehouseStock->warehouse_id : null,
+                    'warehouse_name' => $warehouseStock ? $warehouseStock->warehouse->name : 'No Warehouse',
+                    'days_out' => rand(1, 45), // You'll need to calculate this
+                    'impact_level' => 'high', // You'll need to calculate this
+                    'lost_sales_estimate' => rand(100, 5000),
+                    'threshold' => $product->low_stock_threshold ?? 10,
+                    'actions' => '' // Let the frontend handle this
+                ];
+            }
+
+            return response()->json([
+                'draw' => $request->get('draw', 1),
+                'recordsTotal' => $total,
+                'recordsFiltered' => $total,
+                'data' => $data
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Out of Stock Data Error: ' . $e->getMessage());
+
+            return response()->json([
+                'draw' => $request->get('draw', 1),
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+                'error' => 'Failed to load data'
+            ], 500);
+        }
     }
 
     /**

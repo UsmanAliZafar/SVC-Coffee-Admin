@@ -100,6 +100,19 @@
         font-weight: bold;
         color: #5B914C;
     }
+    .badge.bg-purple {
+        background-color: #6f42c1 !important;
+    }
+
+    .badge.bg-info {
+        background-color: #0dcaf0 !important;
+    }
+
+    .variant-indicator {
+        padding-left: 15px;
+        border-left: 3px solid #6f42c1;
+        margin-left: 5px;
+    }
 </style>
 @endpush
 
@@ -222,7 +235,7 @@
                 <table id="inventoryTable" class="table table-striped table-hover">
                     <thead>
                         <tr>
-                            <th>Product</th>
+                            <th>Product / Variant</th>
                             <th>Total Stock</th>
                             <th>Available</th>
                             <th>Reserved</th>
@@ -255,6 +268,15 @@
                             <option value="">Select Product</option>
                         </select>
                         <small class="text-muted">Search by name or SKU</small>
+                    </div>
+
+                    <!-- NEW: Variant Selection (shown only if product has variants) -->
+                    <div class="mb-3" id="variantSelectionDiv" style="display: none;">
+                        <label class="form-label fw-bold">Variant</label>
+                        <select name="variant_id" id="adjustVariantId" class="form-select">
+                            <option value="">Select Variant (or leave empty for main product)</option>
+                        </select>
+                        <small class="text-muted">Choose a specific variant or adjust main product stock</small>
                     </div>
 
                     <!-- Current Stock Info Display -->
@@ -400,7 +422,7 @@ $(document).ready(function() {
         // Update table headers
         if (currentWarehouse) {
             $('#inventoryTable thead tr').html(`
-                <th>Product</th>
+                <th>Product / Variant</th>
                 <th>Quantity</th>
                 <th>Available</th>
                 <th>Reserved</th>
@@ -409,7 +431,7 @@ $(document).ready(function() {
             `);
         } else {
             $('#inventoryTable thead tr').html(`
-                <th>Product</th>
+                <th>Product / Variant</th>
                 <th>Total Stock</th>
                 <th>Available</th>
                 <th>Reserved</th>
@@ -427,10 +449,64 @@ $(document).ready(function() {
         const productId = $(this).val();
         const warehouseId = $('#adjustWarehouseId').val();
 
-        if (productId && warehouseId) {
-            loadProductStock(productId, warehouseId);
+        if (productId) {
+            // Load product details including variants
+            loadProductVariants(productId);
+
+            if (warehouseId) {
+                loadProductStock(productId, warehouseId);
+            }
         } else {
+            $('#variantSelectionDiv').hide();
             $('#currentStockInfo').hide();
+        }
+    });
+
+    function loadProductVariants(productId) {
+        $.ajax({
+            url: '{{ route("admin.products.ajax-details", ":id") }}'.replace(':id', productId),
+            method: 'GET',
+            success: function(response) {
+                if (response.success && response.product) {
+                    const product = response.product;
+
+                    // Check if product has variants
+                    if (product.has_variants && product.variants && product.variants.length > 0) {
+                        let variantOptions = '<option value="">Main Product (No Variant)</option>';
+
+                        product.variants.forEach(variant => {
+                            // Check status from the nested status object
+                            const isActive = variant.status && variant.status.key_code === 'VARIANT_ACTIVE';
+
+                            if (isActive) {
+                                variantOptions += `<option value="${variant.id}">
+                                    ${variant.variant_name}: ${variant.variant_value} (SKU: ${variant.sku})
+                                </option>`;
+                            }
+                        });
+
+                        $('#adjustVariantId').html(variantOptions);
+                        $('#variantSelectionDiv').slideDown();
+                    } else {
+                        $('#variantSelectionDiv').hide();
+                        $('#adjustVariantId').val('');
+                    }
+                }
+            },
+            error: function(xhr) {
+                console.error('Failed to load product variants:', xhr);
+            }
+        });
+    }
+
+    // Variant change - update stock display
+    $('#adjustVariantId').on('change', function() {
+        const productId = $('#adjustProductId').val();
+        const variantId = $(this).val();
+        const warehouseId = $('#adjustWarehouseId').val();
+
+        if (productId && warehouseId) {
+            loadProductStock(productId, warehouseId, variantId);
         }
     });
 
@@ -490,7 +566,7 @@ function initializeDataTable() {
         },
         columns: columns,
         ordering: false,
-        pageLength: 25,
+        pageLength: 50,
         language: {
             processing: '<i class="bi bi-hourglass-split"></i> Loading...',
             emptyTable: 'No inventory data available'
@@ -555,33 +631,88 @@ function loadProducts() {
 }
 
 // Load product stock for selected warehouse
-function loadProductStock(productId, warehouseId) {
+function loadProductStock(productId, warehouseId, variantId = null) {
     $.ajax({
         url: '{{ route("admin.products.ajax-details", ":id") }}'.replace(':id', productId),
         method: 'GET',
         success: function(response) {
+            console.log('API Response:', response); // Debug log
+
             if (response.success && response.product) {
                 const product = response.product;
-                const warehouseStock = product.warehouse_stock.find(ws => ws.warehouse_id === warehouseId);
+                let currentStock = 0;
+                let stockInfo = '';
 
-                if (warehouseStock) {
-                    $('#currentStockValue').text(warehouseStock.quantity);
-                    $('#warehouseStockInfo').html(
-                        `Available: ${warehouseStock.available_quantity} | Reserved: ${warehouseStock.reserved_quantity}`
-                    );
+                if (variantId) {
+                    // Show variant stock
+                    const variant = product.variants?.find(v => v.id == variantId);
+                    if (variant) {
+                        const variantStock = variant.warehouse_stock?.find(ws => ws.warehouse_id == warehouseId);
+
+                        if (variantStock) {
+                            currentStock = variantStock.quantity || 0;
+                            stockInfo = `
+                                <strong>Variant:</strong> ${variant.variant_name}: ${variant.variant_value}<br>
+                                Available: ${variantStock.available_quantity || 0} | Reserved: ${variantStock.reserved_quantity || 0}
+                            `;
+                        } else {
+                            currentStock = variant.stock_quantity || 0;
+                            stockInfo = `
+                                <strong>Variant:</strong> ${variant.variant_name}: ${variant.variant_value}<br>
+                                <i class="bi bi-info-circle"></i> No stock in this warehouse (Overall Variant Qty: ${variant.stock_quantity || 0})
+                            `;
+                        }
+                    } else {
+                        currentStock = 0;
+                        stockInfo = '<span class="text-danger">Variant not found</span>';
+                    }
                 } else {
-                    $('#currentStockValue').text(product.stock_quantity);
-                    $('#warehouseStockInfo').html(
-                        '<i class="bi bi-info-circle"></i> No stock in this warehouse (Overall Product Qty: ' + product.stock_quantity + ')'
-                    );
+                    // Show main product stock
+                    if (product.has_variants) {
+                        // For products with variants, show total variant stock
+                        const totalVariantStock = product.total_variant_stock || 0;
+                        currentStock = totalVariantStock;
+                        stockInfo = `
+                            <i class="bi bi-collection"></i> Product with variants<br>
+                            Total across all variants: ${totalVariantStock}
+                        `;
+                    } else {
+                        // For simple products, check warehouse stock
+                        const warehouseStock = product.warehouse_stock?.find(ws => ws.warehouse_id == warehouseId);
+
+                        if (warehouseStock) {
+                            currentStock = warehouseStock.quantity || 0;
+                            stockInfo = `
+                                Available: ${warehouseStock.available_quantity || 0} | Reserved: ${warehouseStock.reserved_quantity || 0}
+                            `;
+                        } else {
+                            currentStock = product.stock_quantity || 0;
+                            stockInfo = `
+                                <i class="bi bi-info-circle"></i> No stock in this warehouse (Overall Product Qty: ${product.stock_quantity || 0})
+                            `;
+                        }
+                    }
                 }
 
+                $('#currentStockValue').text(currentStock);
+                $('#warehouseStockInfo').html(stockInfo);
                 $('#currentStockInfo').slideDown();
+
+            } else {
+                console.error('API response indicates failure:', response);
+                $('#currentStockInfo').hide();
             }
         },
         error: function(xhr) {
             console.error('Failed to load product details:', xhr);
             $('#currentStockInfo').hide();
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Failed to load product stock information',
+                confirmButtonColor: '#5B914C'
+            });
         }
     });
 }

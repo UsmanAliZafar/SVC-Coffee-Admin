@@ -524,7 +524,7 @@ $(document).ready(function() {
             { data: 'actions', name: 'actions', orderable: false, searchable: false }
         ],
         order: [[2, 'asc']],
-        pageLength: 25,
+        pageLength: 50,
         responsive: true,
         language: {
             processing: `

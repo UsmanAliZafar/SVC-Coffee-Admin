@@ -274,7 +274,7 @@
         <div class="col-md-3">
             <div class="stat-card">
                 <div class="stat-label">Estimated Lost Sales</div>
-                <div class="stat-value" id="statLostSales">$0</div>
+                <div class="stat-value" id="statLostSales">{{ store_currency_symbol() }} 0</div>
             </div>
         </div>
         <div class="col-md-3">
@@ -605,142 +605,60 @@ $(document).ready(function() {
 });
 
 // Initialize DataTable
+// Initialize DataTable - FIXED VERSION
 function initializeDataTable() {
     outOfStockTable = $('#outOfStockTable').DataTable({
         processing: true,
         serverSide: true,
+        columns: columns,
         ajax: {
-            url: '{{ route("admin.inventory.data") }}',
+            url: '{{ route("admin.inventory.out-of-stock.data") }}', // SPECIFIC ROUTE
             data: function(d) {
-                d.warehouse_id = currentWarehouse;
-                d.stock_status = 'out_of_stock';
-                d.impact = $('#filterImpact').val();
-                d.days_out = $('#filterDaysOut').val();
-                d.category = $('#filterCategory').val();
-                d.search = $('#filterSearch').val();
+                return {
+                    warehouse_id: currentWarehouse,
+                    impact: $('#filterImpact').val(),
+                    days_out: $('#filterDaysOut').val(),
+                    category: $('#filterCategory').val(),
+                    search: $('#filterSearch').val(),
+                    // DataTables parameters
+                    start: d.start,
+                    length: d.length,
+                    search: { value: d.search.value },
+                    order: d.order,
+                    columns: d.columns
+                };
             }
         },
         columns: [
-            {
-                data: 'id',
-                orderable: false,
-                searchable: false,
-                render: function(data, type, row) {
-                    return `<input type="checkbox" class="form-check-input item-checkbox"
-                                   data-id="${data}"
-                                   data-product-id="${row.product_id}"
-                                   data-warehouse-id="${row.warehouse_id}"
-                                   data-threshold="${row.threshold}"
-                                   data-name="${row.product_name}"
-                                   data-sku="${row.product_sku}">`;
-                }
-            },
-            {
-                data: 'product_info',
-                name: 'product_info',
-                orderable: false,
-                render: function(data, type, row) {
-                    return `
-                        <div>
-                            <strong>${row.product_name}</strong><br>
-                            <small class="text-muted">SKU: ${row.product_sku}</small>
-                        </div>
-                    `;
-                }
-            },
-            {
-                data: 'status',
-                orderable: false,
-                render: function() {
-                    return '<span class="out-of-stock-badge">OUT OF STOCK</span>';
-                }
-            },
-            {
-                data: 'days_out',
-                orderable: false,  // ✅ ADD THIS LINE
-                render: function(data) {
-                    return `<span class="days-out-badge">${data || 0} days</span>`;
-                }
-            },
-            {
-                data: 'impact',
-                render: function(data) {
-                    let className = 'impact-low';
-                    let label = 'Low';
-
-                    if (data === 'high') {
-                        className = 'impact-high';
-                        label = 'High';
-                    } else if (data === 'medium') {
-                        className = 'impact-medium';
-                        label = 'Medium';
-                    }
-
-                    return `<span class="impact-level ${className}">${label}</span>`;
-                }
-            },
-            {
-                data: 'urgency',
-                orderable: false,
-                render: function(data, type, row) {
-                    let dots = 3;
-                    if (row.days_out > 30) dots = 3;
-                    else if (row.days_out > 14) dots = 2;
-                    else dots = 1;
-
-                    let html = '<div class="restock-urgency">';
-                    for (let i = 0; i < 3; i++) {
-                        html += `<span class="urgency-dot ${i < dots ? 'active' : 'inactive'}"></span>`;
-                    }
-                    html += '</div>';
-                    return html;
-                }
-            },
+            { data: 'id', orderable: false, searchable: false },
+            { data: 'product_info', name: 'product_info', orderable: false },
+            { data: 'total_stock', name: 'total_stock' },
+            { data: 'threshold', name: 'threshold' },
+            { data: 'priority', name: 'priority' },
             { data: 'warehouse_name', name: 'warehouse_name' },
-            {
-                data: 'lost_sales',
-                render: function(data) {
-                    return `<div class="lost-sales-estimate">
-                        <i class="bi bi-currency-dollar"></i> $${data.toLocaleString()}
-                    </div>`;
-                }
-            },
-            {
-                data: 'actions',
-                orderable: false,
-                searchable: false,
-                render: function(data, type, row) {
-                    return `
-                        <div class="action-buttons">
-                            <button class="btn btn-sm btn-danger"
-                                    onclick="urgentRestock('${row.product_id}', '${row.warehouse_id}', '${row.product_name}', '${row.product_sku}', ${row.days_out}, ${row.threshold})"
-                                    title="Urgent Restock">
-                                <i class="bi bi-box-seam"></i>
-                            </button>
-                            <a href="/admin/products/${row.product_id}"
-                               class="btn btn-sm btn-info"
-                               title="View Product">
-                                <i class="bi bi-eye"></i>
-                            </a>
-                            <button class="btn btn-sm btn-secondary"
-                                    onclick="viewHistory('${row.product_id}')"
-                                    title="Stock History">
-                                <i class="bi bi-clock-history"></i>
-                            </button>
-                        </div>
-                    `;
-                }
-            }
         ],
         order: [[3, 'desc']], // Sort by days out
-        orderable: false,
         pageLength: 25,
-        rowCallback: function(row, data) {
-            $(row).addClass('product-row-danger');
-        },
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
         language: {
-            processing: '<i class="bi bi-hourglass-split"></i> Loading...',
-            emptyTable: '<div class="empty-stock-illustration"><i class="bi bi-check-circle"></i><h5>No Out of Stock Items</h5><p>Great! All products are currently in stock.</p></div>'
+            processing: '<i class="bi bi-hourglass-split"></i> Loading out of stock items...',
+            emptyTable: '<div class="empty-stock-illustration"><i class="bi bi-check-circle"></i><h5>No Out of Stock Items</h5><p>Great! All products are currently in stock.</p></div>',
+            zeroRecords: '<div class="empty-stock-illustration"><i class="bi bi-search"></i><h5>No Matching Items</h5><p>No out of stock items match your filters.</p></div>'
+        },
+        drawCallback: function() {
+            // Update selected items after table redraw
+            updateSelectedItems();
+        },
+        error: function(xhr, error, thrown) {
+            console.error('DataTable error:', error, thrown);
+            // Show error message
+            let errorHtml = '<div class="empty-stock-illustration text-danger">';
+            errorHtml += '<i class="bi bi-exclamation-triangle"></i>';
+            errorHtml += '<h5>Error Loading Data</h5>';
+            errorHtml += '<p>Failed to load out of stock items. Please try again.</p>';
+            errorHtml += '</div>';
+
+            $('.dataTables_empty').html(errorHtml);
         }
     });
 }
@@ -755,7 +673,7 @@ function loadStatistics() {
         },
         success: function(stats) {
             $('#statOutOfStockCount').text(stats.out_of_stock_count || 0);
-            $('#statLostSales').text('$' + (stats.estimated_lost_sales || 0).toLocaleString());
+            $('#statLostSales').text('{{ store_currency_symbol() }}' + (stats.estimated_lost_sales || 0).toLocaleString());
             $('#statAvgDaysOut').text(stats.avg_days_out || 0);
             $('#statPendingRestocks').text(stats.pending_restocks || 0);
         }

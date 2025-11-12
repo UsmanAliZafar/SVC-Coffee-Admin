@@ -2651,10 +2651,14 @@ class ProductsController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $product = Product::with(['warehouseStock.warehouse', 'category'])
-                         ->findOrFail($id);
+        $product = Product::with([
+            'warehouseStock.warehouse',
+            'category',
+            'variants.warehouseStock.warehouse',
+            'variants.status'
+        ])->findOrFail($id);
 
-        return response()->json([
+        $response = [
             'success' => true,
             'product' => [
                 'id' => $product->id,
@@ -2663,12 +2667,55 @@ class ProductsController extends Controller
                 'stock_quantity' => $product->stock_quantity,
                 'low_stock_threshold' => $product->low_stock_threshold,
                 'track_inventory' => $product->track_inventory,
+                'has_variants' => $product->has_variants,
                 'price' => $product->price,
                 'category' => $product->category ? [
                     'id' => $product->category->id,
-                    'name' => $product->category->name
+                    'title' => $product->category->title
                 ] : null,
-                'warehouse_stock' => $product->warehouseStock->map(function($stock) {
+            ]
+        ];
+
+        // If product has variants, include variant details with their warehouse stock
+        if ($product->has_variants && $product->variants->count() > 0) {
+            $response['product']['variants'] = $product->variants->map(function($variant) {
+                return [
+                    'id' => $variant->id,
+                    'variant_name' => $variant->variant_name,
+                    'variant_value' => $variant->variant_value,
+                    'full_name' => $variant->getFullName(),
+                    'sku' => $variant->sku,
+                    'price' => $variant->price,
+                    'sale_price' => $variant->sale_price,
+                    'final_price' => $variant->getFinalPrice(),
+                    'stock_quantity' => $variant->stock_quantity,
+                    'low_stock_threshold' => $variant->low_stock_threshold,
+                    'is_default' => $variant->is_default,
+                    'status' => $variant->status ? [
+                        'key_code' => $variant->status_key_code,
+                        'name' => $variant->status->name
+                    ] : null,
+                    'image_url' => $variant->getImageUrl(),
+                    'warehouse_stock' => $variant->warehouseStock->map(function($stock) {
+                        return [
+                            'warehouse_id' => $stock->warehouse_id,
+                            'warehouse_name' => $stock->warehouse->name,
+                            'quantity' => $stock->quantity,
+                            'available_quantity' => $stock->available_quantity,
+                            'reserved_quantity' => $stock->reserved_quantity,
+                            'location' => $stock->location,
+                        ];
+                    }),
+                ];
+            });
+
+            // Total stock across all variants
+            $response['product']['total_variant_stock'] = $product->variants->sum('stock_quantity') + $product->stock_quantity;
+        } else {
+            // Simple product - include warehouse stock directly
+            $response['product']['warehouse_stock'] = $product->warehouseStock
+                ->whereNull('variant_id')  // Only simple product stock
+                ->map(function($stock) {
                     return [
                         'warehouse_id' => $stock->warehouse_id,
                         'warehouse_name' => $stock->warehouse->name,
@@ -2677,9 +2724,10 @@ class ProductsController extends Controller
                         'reserved_quantity' => $stock->reserved_quantity,
                         'location' => $stock->location,
                     ];
-                }),
-            ]
-        ]);
+                });
+        }
+
+        return response()->json($response);
     }
 
     // varients
