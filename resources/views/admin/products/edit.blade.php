@@ -368,6 +368,45 @@
     .tag-suggestion-item.tag-create-new i {
         color: #4a7a3d;
     }
+
+    /* Dimensions Input Styling */
+    .row.g-2 input {
+        text-align: center;
+        font-weight: 600;
+    }
+
+    .row.g-2 small {
+        display: block;
+        text-align: center;
+        margin-top: 4px;
+        font-weight: 600;
+        color: #5B914C;
+    }
+
+    /* Shipping Info Display */
+    .alert-info p {
+        margin-bottom: 0.5rem;
+    }
+
+    .alert-info p:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Disabled Checkbox Styling */
+    input[type="checkbox"]:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    /* Variant Section Styling */
+    .card.border-primary {
+        border-width: 2px;
+    }
+
+    .card-header.bg-primary {
+        background-color: #5B914C !important;
+        border-bottom: 2px solid #4a7a3d;
+    }
 </style>
 @endpush
 
@@ -894,7 +933,107 @@
                     </div>
                     @endif
                 </div>
+                <!-- Shipping Dimensions & Weight -->
+                <div class="form-section">
+                    <h5 class="section-title"><i class="bi bi-box"></i> Shipping Information</h5>
 
+                    <div class="mb-3">
+                        <label class="form-label">Weight (kg)</label>
+                        <div class="input-group">
+                            <input type="number" name="weight" class="form-control"
+                                value="{{ old('weight', $product->weight) }}"
+                                placeholder="0.00" step="0.01" min="0">
+                            <span class="input-group-text">kg</span>
+                        </div>
+                        <div class="form-text">Product weight for shipping calculation</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Dimensions (cm)</label>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <input type="number" name="length" class="form-control"
+                                    value="{{ old('length', $product->length) }}"
+                                    placeholder="Length" step="0.01" min="0">
+                                <small class="text-muted">L</small>
+                            </div>
+                            <div class="col-4">
+                                <input type="number" name="width" class="form-control"
+                                    value="{{ old('width', $product->width) }}"
+                                    placeholder="Width" step="0.01" min="0">
+                                <small class="text-muted">W</small>
+                            </div>
+                            <div class="col-4">
+                                <input type="number" name="height" class="form-control"
+                                    value="{{ old('height', $product->height) }}"
+                                    placeholder="Height" step="0.01" min="0">
+                                <small class="text-muted">H</small>
+                            </div>
+                        </div>
+                        <div class="form-text">Product dimensions: Length × Width × Height</div>
+                    </div>
+
+                    @if($product->weight || ($product->length && $product->width && $product->height))
+                    <div class="alert alert-info">
+                        <strong><i class="bi bi-info-circle"></i> Current Shipping Info:</strong>
+                        <div class="mt-2 small">
+                            @if($product->weight)
+                            <p class="mb-1"><strong>Weight:</strong> {{ $product->weight }} kg</p>
+                            @endif
+                            @if($product->length && $product->width && $product->height)
+                            <p class="mb-0"><strong>Dimensions:</strong> {{ $product->length }} × {{ $product->width }} × {{ $product->height }} cm</p>
+                            @endif
+                        </div>
+                    </div>
+                    @endif
+                </div>
+
+                <!-- Product Variants Toggle -->
+                <div class="form-section d-none">
+                    <h5 class="section-title"><i class="bi bi-grid-3x3-gap"></i> Product Variants</h5>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="has_variants" id="hasVariants" class="form-check-input"
+                            {{ old('has_variants', $product->has_variants) ? 'checked' : '' }} disabled>
+                        <label class="form-check-label" for="hasVariants">
+                            <i class="bi bi-layers"></i> This product has variants
+                        </label>
+                        <div class="form-text text-muted">
+                            @if($product->has_variants)
+                                <i class="bi bi-check-circle text-success"></i> Variants are enabled for this product
+                            @else
+                                <i class="bi bi-x-circle text-muted"></i> No variants configured
+                            @endif
+                        </div>
+                    </div>
+
+                    @if($product->has_variants)
+                    <div class="alert alert-success">
+                        <i class="bi bi-info-circle"></i> <strong>Variants Active</strong><br>
+                        <small>This product uses variants for pricing and inventory. Manage variants below.</small>
+                    </div>
+
+                    <!-- Variants Management Section (Coming Soon) -->
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-grid-3x3-gap"></i> Product Variants
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">
+                                <i class="bi bi-tools"></i> Variant management feature will be available here soon.
+                            </p>
+                            <button type="button" class="btn btn-outline-primary" disabled>
+                                <i class="bi bi-plus-circle"></i> Add Variant
+                            </button>
+                        </div>
+                    </div>
+                    @else
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> <strong>Note:</strong> Enable variants if this product has multiple options (size, color, weight, etc.).
+                        Contact administrator to enable variants for this product.
+                    </div>
+                    @endif
+                </div>
                 <!-- Quick Actions -->
                 <div class="form-section">
                     <h5 class="section-title"><i class="bi bi-lightning-fill"></i> Quick Actions</h5>

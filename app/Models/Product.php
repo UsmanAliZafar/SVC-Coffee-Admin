@@ -83,6 +83,11 @@ class Product extends Model
         'track_inventory',
         'stock_quantity',
         'low_stock_threshold',
+        'weight',
+        'length',
+        'width',
+        'height',
+        'has_variants',
         'published_at',
         'created_by',
         'updated_by',
@@ -117,6 +122,11 @@ class Product extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'weight' => 'decimal:2',
+        'length' => 'decimal:2',
+        'width' => 'decimal:2',
+        'height' => 'decimal:2',
+        'has_variants' => 'boolean',
     ];
 
     /**
@@ -1521,6 +1531,28 @@ class Product extends Model
                 );
             }
         }
+    }
+
+    public function needsVariants(): bool
+    {
+        return $this->has_variants;
+    }
+
+    public function getPrice()
+    {
+        if ($this->needsVariants()) {
+            return $this->variants()->default()->first()?->getFinalPrice()
+                ?? $this->variants()->active()->first()?->getFinalPrice();
+        }
+        return $this->sale_price ?? $this->price;
+    }
+
+    public function getStock()
+    {
+        if ($this->needsVariants()) {
+            return $this->variants()->sum(fn($v) => $v->getTotalStock());
+        }
+        return $this->stock_quantity;
     }
 
 }

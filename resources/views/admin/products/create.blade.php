@@ -307,6 +307,18 @@
     .tag-suggestion-item.tag-create-new i {
         color: #4a7a3d;
     }
+    /* Dimensions Input Styling */
+    .row.g-2 input {
+        text-align: center;
+    }
+
+    .row.g-2 small {
+        display: block;
+        text-align: center;
+        margin-top: 4px;
+        font-weight: 600;
+        color: #5B914C;
+    }
 </style>
 @endpush
 
@@ -531,7 +543,7 @@
 
                 <!-- Pricing -->
                 <div class="form-section">
-                    <h5 class="section-title"><i class="bi bi-currency-dollar"></i> Pricing</h5>
+                    <h5 class="section-title">Pricing ({{ store_currency_symbol() }})</h5>
 
                     <div class="mb-3">
                         <label class="form-label">Currency</label>
@@ -543,20 +555,20 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label required-field">Regular Price</label>
+                        <label class="form-label required-field">Regular Price ({{ store_currency_symbol() }})</label>
                         <input type="number" name="price" class="form-control" placeholder="0.00" step="0.01" min="0" required>
                         <div class="invalid-feedback"></div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Sale Price</label>
+                        <label class="form-label">Sale Price ({{ store_currency_symbol() }})</label>
                         <input type="number" name="sale_price" class="form-control" placeholder="0.00" step="0.01" min="0">
                         <div class="form-text">Leave empty if not on sale</div>
                         <div class="invalid-feedback"></div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Cost Price</label>
+                        <label class="form-label">Cost Price ({{ store_currency_symbol() }})</label>
                         <input type="number" name="cost_price" class="form-control" placeholder="0.00" step="0.01" min="0">
                         <div class="form-text">Your cost (for profit calculation)</div>
                     </div>
@@ -623,6 +635,56 @@
                         <label class="form-label">Low Stock Threshold</label>
                         <input type="number" name="low_stock_threshold" class="form-control" placeholder="10" min="0" value="10">
                         <div class="form-text">Alert when stock reaches this level</div>
+                    </div>
+                </div>
+
+                <!-- Shipping Dimensions & Weight -->
+                <div class="form-section">
+                    <h5 class="section-title"><i class="bi bi-box"></i> Shipping Information</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label">Weight (kg)</label>
+                        <div class="input-group">
+                            <input type="number" name="weight" class="form-control" placeholder="0.00" step="0.01" min="0">
+                            <span class="input-group-text">kg</span>
+                        </div>
+                        <div class="form-text">Product weight for shipping calculation</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Dimensions (cm)</label>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <input type="number" name="length" class="form-control" placeholder="Length" step="0.01" min="0">
+                                <small class="text-muted">L</small>
+                            </div>
+                            <div class="col-4">
+                                <input type="number" name="width" class="form-control" placeholder="Width" step="0.01" min="0">
+                                <small class="text-muted">W</small>
+                            </div>
+                            <div class="col-4">
+                                <input type="number" name="height" class="form-control" placeholder="Height" step="0.01" min="0">
+                                <small class="text-muted">H</small>
+                            </div>
+                        </div>
+                        <div class="form-text">Product dimensions for shipping calculation</div>
+                    </div>
+                </div>
+
+                <!-- Product Variants Toggle -->
+                <div class="form-section d-none">
+                    <h5 class="section-title"><i class="bi bi-grid-3x3-gap"></i> Product Variants</h5>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="has_variants" id="hasVariants" class="form-check-input">
+                        <label class="form-check-label" for="hasVariants">
+                            <i class="bi bi-layers"></i> This product has variants
+                        </label>
+                        <div class="form-text">Enable this if product has multiple options (size, color, etc.)</div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> <strong>Note:</strong> After creating the product, you'll be able to add variants on the edit page.
                     </div>
                 </div>
 

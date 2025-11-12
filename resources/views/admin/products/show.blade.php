@@ -273,6 +273,34 @@
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
+
+    /* Shipping Information Styling */
+    .info-section .info-value i {
+        color: #5B914C;
+        margin-right: 5px;
+    }
+
+    /* Volumetric Info */
+    .info-value small {
+        font-size: 0.85rem;
+    }
+
+    /* Stat Card Icon Enhancement */
+    .stat-card .stat-label i {
+        font-size: 0.9rem;
+        margin-right: 4px;
+    }
+
+    /* Variant Badge Styling */
+    .badge.bg-success i,
+    .badge.bg-secondary i {
+        margin-right: 4px;
+    }
+
+    /* Compact Dimension Display in Stats */
+    .stat-value {
+        word-break: break-word;
+    }
 </style>
 @endpush
 
@@ -667,6 +695,35 @@
                     </div>
                     @endif
 
+                    @if($product->weight)
+                    <div class="col-6">
+                        <div class="stat-card">
+                            <div class="stat-label"><i class="bi bi-box"></i> Weight</div>
+                            <div class="stat-value text-primary">{{ $product->weight }} kg</div>
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($product->length && $product->width && $product->height)
+                    <div class="col-6">
+                        <div class="stat-card">
+                            <div class="stat-label"><i class="bi bi-rulers"></i> Dimensions</div>
+                            <div class="stat-value text-info" style="font-size: 0.9rem;">
+                                {{ $product->length }}×{{ $product->width }}×{{ $product->height }}
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($product->has_variants)
+                    <div class="col-6">
+                        <div class="stat-card">
+                            <div class="stat-label"><i class="bi bi-grid-3x3-gap"></i> Variants</div>
+                            <div class="stat-value text-success">{{ $product->variants()->count() }}</div>
+                        </div>
+                    </div>
+                    @endif
+
                     @if($product->isOnSale())
                     <div class="col-6">
                         <div class="stat-card">
@@ -678,15 +735,6 @@
                         <div class="stat-card">
                             <div class="stat-label">You Save</div>
                             <div class="stat-value text-success">{{ $product->curency }} {{ number_format($product->getDiscountAmount(), 2) }}</div>
-                        </div>
-                    </div>
-                    @endif
-
-                    @if($product->variants->count() > 0)
-                    <div class="col-6">
-                        <div class="stat-card">
-                            <div class="stat-label">Variants</div>
-                            <div class="stat-value">{{ $product->variants->count() }}</div>
                         </div>
                     </div>
                     @endif
@@ -778,6 +826,92 @@
                     <div class="info-label">Sort Order</div>
                     <div class="info-value">{{ $product->sort_order ?? 0 }}</div>
                 </div>
+            </div>
+
+            <!-- Shipping Information -->
+            @if($product->weight || ($product->length && $product->width && $product->height))
+            <div class="info-section">
+                <h5 class="section-title">
+                    <i class="bi bi-truck"></i> Shipping Information
+                </h5>
+
+                @if($product->weight)
+                <div class="mb-3">
+                    <div class="info-label">Weight</div>
+                    <div class="info-value">
+                        <i class="bi bi-box"></i> {{ $product->weight }} kg
+                    </div>
+                </div>
+                @endif
+
+                @if($product->length && $product->width && $product->height)
+                <div class="mb-3">
+                    <div class="info-label">Dimensions (L × W × H)</div>
+                    <div class="info-value">
+                        <i class="bi bi-rulers"></i> {{ $product->length }} × {{ $product->width }} × {{ $product->height }} cm
+                    </div>
+                </div>
+
+                @php
+                    $volume = $product->length * $product->width * $product->height;
+                @endphp
+                <div class="mb-0">
+                    <div class="info-label">Volumetric</div>
+                    <div class="info-value text-muted">
+                        <small>{{ number_format($volume, 2) }} cm³</small>
+                    </div>
+                </div>
+                @endif
+
+                @if(!$product->weight && !($product->length && $product->width && $product->height))
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle"></i> No shipping dimensions configured
+                </div>
+                @endif
+            </div>
+            @endif
+
+            <!-- Product Variants Status -->
+            <div class="info-section">
+                <h5 class="section-title">
+                    <i class="bi bi-grid-3x3-gap"></i> Variants Configuration
+                </h5>
+
+                <div class="mb-3">
+                    <div class="info-label">Variant Status</div>
+                    <div class="info-value">
+                        @if($product->has_variants)
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> Variants Enabled
+                            </span>
+                        @else
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-x-circle"></i> No Variants
+                            </span>
+                        @endif
+                    </div>
+                </div>
+
+                @if($product->has_variants)
+                <div class="mb-0">
+                    <div class="info-label">Total Variants</div>
+                    <div class="info-value">
+                        <strong>{{ $product->variants()->count() }}</strong> variant(s) configured
+                    </div>
+                </div>
+
+                @if($product->variants()->count() > 0)
+                <div class="mt-3">
+                    <a href="{{ route('admin.products.edit', $product->id) }}#variants-section" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-pencil"></i> Manage Variants
+                    </a>
+                </div>
+                @endif
+                @else
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle"></i> This product uses simple pricing and inventory
+                </div>
+                @endif
             </div>
 
             <!-- Product Tags -->

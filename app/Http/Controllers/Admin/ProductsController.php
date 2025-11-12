@@ -420,6 +420,12 @@ class ProductsController extends Controller
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
             'features' => 'nullable|json',
+            //
+            'weight' => 'nullable|numeric|min:0',
+            'length' => 'nullable|numeric|min:0',
+            'width' => 'nullable|numeric|min:0',
+            'height' => 'nullable|numeric|min:0',
+            'has_variants' => 'nullable|boolean',
         ], [
             // Name validation messages
             'name.required' => 'Product name is required',
@@ -497,6 +503,16 @@ class ProductsController extends Controller
 
             // Features validation messages
             'features.json' => 'Features must be in valid JSON format',
+            // Weight validation messages
+            'weight.numeric' => 'Weight must be a valid number',
+            'weight.min' => 'Weight cannot be negative',
+            'length.numeric' => 'Length must be a valid number',
+            'length.min' => 'Length cannot be negative',
+            'width.numeric' => 'Width must be a valid number',
+            'width.min' => 'Width cannot be negative',
+            'height.numeric' => 'Height must be a valid number',
+            'height.min' => 'Height cannot be negative',
+            'has_variants.boolean' => 'Has variants field must be true or false',
         ]);
 
         if ($validator->fails()) {
@@ -519,6 +535,7 @@ class ProductsController extends Controller
                 'low_stock_threshold',
                 'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
                 'is_taxable', 'tax_type', 'tax_percentage', 'tax_class',
+                'weight', 'length', 'width', 'height', 'has_variants',
             ]);
 
             // Handle main image upload
@@ -535,6 +552,7 @@ class ProductsController extends Controller
             $productData['is_available'] = $request->has('is_available') ?? true;
             $productData['track_inventory'] = $request->has('track_inventory') ?? true;
             $productData['is_taxable'] = $request->has('is_taxable');
+            $productData['has_variants'] = $request->has('has_variants') ?? false;
 
             if (!isset($productData['tax_type'])) {
                 $productData['tax_type'] = 'exclusive';
@@ -742,6 +760,11 @@ class ProductsController extends Controller
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'tax_class' => 'nullable|string|max:100',
             'features' => 'nullable|json',
+            'weight' => 'nullable|numeric|min:0',
+            'length' => 'nullable|numeric|min:0',
+            'width' => 'nullable|numeric|min:0',
+            'height' => 'nullable|numeric|min:0',
+            'has_variants' => 'nullable|boolean',
         ], [
             // Name validation messages
             'name.required' => 'Product name is required',
@@ -814,6 +837,16 @@ class ProductsController extends Controller
 
             // Features validation messages
             'features.json' => 'Features must be in valid JSON format',
+
+            'weight.numeric' => 'Weight must be a valid number',
+            'weight.min' => 'Weight cannot be negative',
+            'length.numeric' => 'Length must be a valid number',
+            'length.min' => 'Length cannot be negative',
+            'width.numeric' => 'Width must be a valid number',
+            'width.min' => 'Width cannot be negative',
+            'height.numeric' => 'Height must be a valid number',
+            'height.min' => 'Height cannot be negative',
+            'has_variants.boolean' => 'Has variants field must be true or false',
         ]);
 
         if ($validator->fails()) {
@@ -834,7 +867,8 @@ class ProductsController extends Controller
                 'price', 'sale_price', 'cost_price', 'status_key_code',
                 'is_featured', 'show_on_home', 'is_available', 'track_inventory',
                 'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
-                'is_taxable', 'tax_type', 'tax_percentage', 'tax_class'
+                'is_taxable', 'tax_type', 'tax_percentage', 'tax_class',
+                'weight', 'length', 'width', 'height', 'has_variants'
             ]);
 
             // Handle main image upload
@@ -856,6 +890,7 @@ class ProductsController extends Controller
             $productData['is_available'] = $request->has('is_available');
             $productData['track_inventory'] = $request->has('track_inventory');
             $productData['is_taxable'] = $request->has('is_taxable');
+            $productData['has_variants'] = $request->has('has_variants') ?? false;
             // Set updated_by
             $productData['updated_by'] = auth('admin')->id();
             // Attach features if provided
