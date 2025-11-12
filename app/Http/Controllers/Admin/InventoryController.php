@@ -1033,6 +1033,7 @@ class InventoryController extends Controller
 
     /**
      * Get out of stock data for DataTable (AJAX)
+     * IMPROVED VERSION - Includes Products and Variants
      */
     public function getOutOfStockData(Request $request)
     {
@@ -1040,77 +1041,291 @@ class InventoryController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        \Log::info('Out of Stock Request:', $request->all());
-
         try {
             $warehouseId = $request->get('warehouse_id');
-            $search = $request->get('search')['value'] ?? '';
+            $impact = $request->get('impact');
+            $daysOut = $request->get('days_out');
+            $category = $request->get('category');
+            $search = $request->get('search');
 
-            $query = Product::with(['warehouseStock.warehouse', 'category'])
+            // Collect both products and variants
+            $items = collect();
+
+            // 1. Get out of stock PRODUCTS (simple products without variants)
+            $productsQuery = Product::with(['category', 'warehouseStock.warehouse'])
                 ->where('track_inventory', true)
-                ->where(function($q) use ($warehouseId) {
-                    if ($warehouseId) {
-                        // Specific warehouse out of stock
-                        $q->whereHas('warehouseStock', function($wq) use ($warehouseId) {
-                            $wq->where('warehouse_id', $warehouseId)
-                            ->where('quantity', '<=', 0);
-                        });
-                    } else {
-                        // Overall out of stock (no warehouse has stock)
-                        $q->where('stock_quantity', '<=', 0)
-                        ->whereDoesntHave('warehouseStock', function($wq) {
-                            $wq->where('quantity', '>', 0);
-                        });
-                    }
+                ->where('has_variants', false);
+
+            if ($warehouseId) {
+                // Specific warehouse out of stock
+                $productsQuery->whereHas('warehouseStock', function($q) use ($warehouseId) {
+                    $q->where('warehouse_id', $warehouseId)
+                    ->where('quantity', '<=', 0);
                 });
+            } else {
+                // Overall out of stock (no warehouse has stock)
+                $productsQuery->where('stock_quantity', '<=', 0)
+                    ->whereDoesntHave('warehouseStock', function($q) {
+                        $q->where('quantity', '>', 0);
+                    });
+            }
+
+            // Apply category filter
+            if ($category) {
+                $productsQuery->whereHas('category', function($q) use ($category) {
+                    $q->where('slug', $category);
+                });
+            }
 
             // Apply search filter
-            if (!empty($search)) {
-                $query->where(function($q) use ($search) {
+            if ($search) {
+                $productsQuery->where(function($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                     ->orWhere('sku', 'like', "%{$search}%");
                 });
             }
 
-            // Get total count
-            $total = $query->count();
+            $products = $productsQuery->get();
 
-            // Apply pagination
-            $start = $request->get('start', 0);
-            $length = $request->get('length', 25);
+            // 2. Get out of stock VARIANTS
+            $variantsQuery = ProductVariant::with(['product.category', 'warehouseStock.warehouse', 'status'])
+                ->whereHas('product', function($q) {
+                    $q->where('track_inventory', true);
+                })
+                ->where('status_key_code', 'VARIANT_ACTIVE');
 
-            $products = $query->offset($start)
-                            ->limit($length)
-                            ->get();
-
-            $data = [];
-            foreach ($products as $product) {
-                $warehouseStock = $product->warehouseStock->first();
-
-                $data[] = [
-                    'id' => $product->id,
-                    'product_id' => $product->id,
-                    'product_name' => $product->name,
-                    'product_sku' => $product->sku,
-                    'warehouse_id' => $warehouseStock ? $warehouseStock->warehouse_id : null,
-                    'warehouse_name' => $warehouseStock ? $warehouseStock->warehouse->name : 'No Warehouse',
-                    'days_out' => rand(1, 45), // You'll need to calculate this
-                    'impact_level' => 'high', // You'll need to calculate this
-                    'lost_sales_estimate' => rand(100, 5000),
-                    'threshold' => $product->low_stock_threshold ?? 10,
-                    'actions' => '' // Let the frontend handle this
-                ];
+            if ($warehouseId) {
+                // Specific warehouse out of stock
+                $variantsQuery->whereHas('warehouseStock', function($q) use ($warehouseId) {
+                    $q->where('warehouse_id', $warehouseId)
+                    ->where('quantity', '<=', 0);
+                });
+            } else {
+                // Overall out of stock
+                $variantsQuery->where('stock_quantity', '<=', 0)
+                    ->whereDoesntHave('warehouseStock', function($q) {
+                        $q->where('quantity', '>', 0);
+                    });
             }
 
-            return response()->json([
-                'draw' => $request->get('draw', 1),
-                'recordsTotal' => $total,
-                'recordsFiltered' => $total,
-                'data' => $data
-            ]);
+            // Apply category filter for variants
+            if ($category) {
+                $variantsQuery->whereHas('product.category', function($q) use ($category) {
+                    $q->where('slug', $category);
+                });
+            }
+
+            // Apply search filter for variants
+            if ($search) {
+                $variantsQuery->where(function($q) use ($search) {
+                    $q->where('variant_name', 'like', "%{$search}%")
+                    ->orWhere('variant_value', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%")
+                    ->orWhereHas('product', function($pq) use ($search) {
+                        $pq->where('name', 'like', "%{$search}%");
+                    });
+                });
+            }
+
+            $variants = $variantsQuery->get();
+
+            // 3. Transform products to standard format
+            foreach ($products as $product) {
+                $warehouseStock = $warehouseId
+                    ? $product->warehouseStock->where('warehouse_id', $warehouseId)->first()
+                    : $product->warehouseStock->first();
+
+                // Calculate days out of stock
+                $daysOutOfStock = $this->calculateDaysOutOfStock($product, $warehouseStock);
+
+                // Calculate impact level
+                $impactLevel = $this->calculateImpactLevel($product, $daysOutOfStock);
+
+                // Estimate lost sales
+                $lostSalesEstimate = $this->estimateLostSales($product, $daysOutOfStock);
+
+                $items->push([
+                    'id' => 'product_' . $product->id,
+                    'product_id' => $product->id,
+                    'variant_id' => null,
+                    'is_variant' => false,
+                    'product_name' => $product->name,
+                    'variant_name' => null,
+                    'sku' => $product->sku,
+                    'category' => $product->category ? $product->category->title : 'N/A',
+                    'warehouse_id' => $warehouseId ?: '',
+                    'warehouse_name' => $warehouseId && $warehouseStock
+                        ? $warehouseStock->warehouse->name
+                        : 'All Warehouses',
+                    'days_out' => $daysOutOfStock,
+                    'impact_level' => $impactLevel,
+                    'lost_sales_estimate' => $lostSalesEstimate,
+                    'threshold' => $product->low_stock_threshold ?? 10,
+                    'urgency' => $this->calculateUrgency($daysOutOfStock, $impactLevel),
+                    'created_at' => $product->created_at,
+                ]);
+            }
+
+            // 4. Transform variants to standard format
+            foreach ($variants as $variant) {
+                $warehouseStock = $warehouseId
+                    ? $variant->warehouseStock->where('warehouse_id', $warehouseId)->first()
+                    : $variant->warehouseStock->first();
+
+                // Calculate days out of stock
+                $daysOutOfStock = $this->calculateDaysOutOfStock($variant, $warehouseStock);
+
+                // Calculate impact level
+                $impactLevel = $this->calculateImpactLevel($variant, $daysOutOfStock);
+
+                // Estimate lost sales
+                $lostSalesEstimate = $this->estimateLostSales($variant, $daysOutOfStock);
+
+                $items->push([
+                    'id' => 'variant_' . $variant->id,
+                    'product_id' => $variant->product_id,
+                    'variant_id' => $variant->id,
+                    'is_variant' => true,
+                    'product_name' => $variant->product->name,
+                    'variant_name' => $variant->getFullName(),
+                    'sku' => $variant->sku,
+                    'category' => $variant->product->category ? $variant->product->category->title : 'N/A',
+                    'warehouse_id' => $warehouseId ?: '',
+                    'warehouse_name' => $warehouseId && $warehouseStock
+                        ? $warehouseStock->warehouse->name
+                        : 'All Warehouses',
+                    'days_out' => $daysOutOfStock,
+                    'impact_level' => $impactLevel,
+                    'lost_sales_estimate' => $lostSalesEstimate,
+                    'threshold' => $variant->low_stock_threshold ?? 10,
+                    'urgency' => $this->calculateUrgency($daysOutOfStock, $impactLevel),
+                    'created_at' => $variant->created_at,
+                ]);
+            }
+
+            // 5. Apply impact filter
+            if ($impact) {
+                $items = $items->filter(function($item) use ($impact) {
+                    return $item['impact_level'] === $impact;
+                });
+            }
+
+            // 6. Apply days out filter
+            if ($daysOut) {
+                $items = $items->filter(function($item) use ($daysOut) {
+                    switch($daysOut) {
+                        case '1-7':
+                            return $item['days_out'] >= 1 && $item['days_out'] <= 7;
+                        case '8-30':
+                            return $item['days_out'] >= 8 && $item['days_out'] <= 30;
+                        case '30+':
+                            return $item['days_out'] > 30;
+                    }
+                    return true;
+                });
+            }
+
+            // 7. Sort items by urgency (days out, impact level)
+            $items = $items->sortByDesc(function($item) {
+                $urgencyScore = $item['days_out'] * 10;
+                if ($item['impact_level'] === 'high') $urgencyScore += 100;
+                elseif ($item['impact_level'] === 'medium') $urgencyScore += 50;
+                return $urgencyScore;
+            })->values();
+
+            return DataTables::of($items)
+                ->addColumn('checkbox', function($item) {
+                    return '<input type="checkbox" class="form-check-input item-checkbox"
+                                data-id="' . $item['id'] . '"
+                                data-product-id="' . $item['product_id'] . '"
+                                data-variant-id="' . ($item['variant_id'] ?: '') . '"
+                                data-warehouse-id="' . $item['warehouse_id'] . '"
+                                data-threshold="' . $item['threshold'] . '"
+                                data-name="' . htmlspecialchars($item['product_name']) . '"
+                                data-variant-name="' . ($item['variant_name'] ? htmlspecialchars($item['variant_name']) : '') . '"
+                                data-sku="' . htmlspecialchars($item['sku']) . '">';
+                })
+                ->addColumn('product_info', function($item) {
+                    $variantBadge = '';
+                    if ($item['is_variant']) {
+                        $variantBadge = '<br><span class="badge bg-info">
+                            <i class="bi bi-layers"></i> Variant: ' . htmlspecialchars($item['variant_name']) . '
+                        </span>';
+                    }
+
+                    return '<div>
+                        <strong>' . htmlspecialchars($item['product_name']) . '</strong>' . $variantBadge . '<br>
+                        <small class="text-muted">SKU: ' . htmlspecialchars($item['sku']) . '</small><br>
+                        <small class="text-muted">Category: ' . htmlspecialchars($item['category']) . '</small>
+                    </div>';
+                })
+                ->addColumn('status_badge', function($item) {
+                    return '<span class="out-of-stock-badge">OUT OF STOCK</span>';
+                })
+                ->addColumn('days_out_badge', function($item) {
+                    $class = $item['days_out'] > 30 ? 'bg-danger' :
+                            ($item['days_out'] > 7 ? 'bg-warning' : 'bg-secondary');
+
+                    return '<span class="badge ' . $class . ' days-out-badge">
+                        <i class="bi bi-calendar-x"></i> ' . $item['days_out'] . ' days
+                    </span>';
+                })
+                ->addColumn('impact_badge', function($item) {
+                    $badgeClass = 'impact-' . $item['impact_level'];
+                    $label = ucfirst($item['impact_level']) . ' Impact';
+
+                    return '<span class="impact-level ' . $badgeClass . '">' . $label . '</span>';
+                })
+                ->addColumn('urgency_indicator', function($item) {
+                    $activeDots = min(5, ceil($item['urgency'] / 20));
+
+                    $html = '<div class="restock-urgency" title="Urgency: ' . $item['urgency'] . '%">';
+                    for ($i = 1; $i <= 5; $i++) {
+                        $class = $i <= $activeDots ? 'active' : 'inactive';
+                        $html .= '<span class="urgency-dot ' . $class . '"></span>';
+                    }
+                    $html .= '</div>';
+
+                    return $html;
+                })
+                ->addColumn('warehouse_name', function($item) {
+                    return $item['warehouse_name'] ?: '<span class="text-muted">All Warehouses</span>';
+                })
+                ->addColumn('lost_sales_display', function($item) {
+                    return '<div class="lost-sales-estimate">
+                        <i class="bi bi-currency-dollar text-warning"></i>
+                        <strong>' . store_currency_symbol() . number_format($item['lost_sales_estimate'], 2) . '</strong>
+                    </div>';
+                })
+                ->addColumn('actions', function($item) {
+                    $productName = htmlspecialchars($item['product_name'], ENT_QUOTES);
+                    $variantName = $item['variant_name'] ? htmlspecialchars($item['variant_name'], ENT_QUOTES) : '';
+                    $sku = htmlspecialchars($item['sku'], ENT_QUOTES);
+
+                    return '<div class="action-buttons">
+                        <button class="btn btn-sm btn-danger"
+                                onclick="urgentRestock(\'' . $item['product_id'] . '\', \'' . ($item['variant_id'] ?: '') . '\', \'' . $item['warehouse_id'] . '\', \'' . $productName . '\', \'' . $variantName . '\', \'' . $sku . '\', ' . $item['days_out'] . ', ' . $item['threshold'] . ')"
+                                title="Urgent Restock">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        </button>
+                        <a href="' . route('admin.products.show', $item['product_id']) . '"
+                        class="btn btn-sm btn-info"
+                        title="View Product">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                onclick="viewHistory(\'' . $item['product_id'] . '\', \'' . ($item['variant_id'] ?: '') . '\')"
+                                title="View History">
+                            <i class="bi bi-clock-history"></i>
+                        </button>
+                    </div>';
+                })
+                ->rawColumns(['checkbox', 'product_info', 'status_badge', 'days_out_badge', 'impact_badge', 'urgency_indicator', 'warehouse_name', 'lost_sales_display', 'actions'])
+                ->make(true);
 
         } catch (\Exception $e) {
             \Log::error('Out of Stock Data Error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
 
             return response()->json([
                 'draw' => $request->get('draw', 1),
@@ -1120,6 +1335,78 @@ class InventoryController extends Controller
                 'error' => 'Failed to load data'
             ], 500);
         }
+    }
+
+    /**
+     * Calculate days out of stock
+     */
+    private function calculateDaysOutOfStock($item, $warehouseStock = null)
+    {
+        // Check inventory movements for last stock-out date
+        $lastStockOut = InventoryMovement::where('product_id', $item->id)
+            ->where(function($q) use ($item) {
+                if (method_exists($item, 'product_id')) {
+                    // It's a variant
+                    $q->where('variant_id', $item->id);
+                }
+            })
+            ->where('new_quantity', '<=', 0)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($lastStockOut) {
+            return now()->diffInDays($lastStockOut->created_at);
+        }
+
+        // Fallback: estimate based on updated_at
+        return now()->diffInDays($item->updated_at);
+    }
+
+    /**
+     * Calculate impact level based on product popularity and days out
+     */
+    private function calculateImpactLevel($item, $daysOut)
+    {
+        // You can enhance this with actual sales data
+        $threshold = $item->low_stock_threshold ?? 10;
+
+        if ($daysOut > 30 || $threshold > 50) {
+            return 'high';
+        } elseif ($daysOut > 14 || $threshold > 20) {
+            return 'medium';
+        }
+
+        return 'low';
+    }
+
+    /**
+     * Estimate lost sales
+     */
+    private function estimateLostSales($item, $daysOut)
+    {
+        // Simple estimation: average daily sales * days out * price
+        // You should replace this with actual sales data
+        $price = $item->price ?? 0;
+        $avgDailySales = ($item->low_stock_threshold ?? 10) / 30; // Rough estimate
+
+        return round($avgDailySales * $daysOut * $price, 2);
+    }
+
+    /**
+     * Calculate urgency percentage (0-100)
+     */
+    private function calculateUrgency($daysOut, $impactLevel)
+    {
+        $urgency = min(100, ($daysOut / 30) * 100); // Base on days
+
+        // Adjust based on impact
+        if ($impactLevel === 'high') {
+            $urgency = min(100, $urgency * 1.5);
+        } elseif ($impactLevel === 'medium') {
+            $urgency = min(100, $urgency * 1.2);
+        }
+
+        return round($urgency);
     }
 
     /**

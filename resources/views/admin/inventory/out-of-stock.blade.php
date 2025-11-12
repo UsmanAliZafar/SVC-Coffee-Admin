@@ -598,21 +598,38 @@ $(document).ready(function() {
         updateSelectedItems();
     });
 
-    // Individual checkbox
+    // Individual checkbox change
     $(document).on('change', '.item-checkbox', function() {
         updateSelectedItems();
     });
+
+    // Filter changes
+    $('#filterImpact, #filterDaysOut, #filterCategory').on('change', function() {
+        applyFilters();
+    });
+
+    // Search with debounce
+    let searchTimeout;
+    $('#filterSearch').on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            applyFilters();
+        }, 500);
+    });
+
+    // Show notification badge on load
+    showNotificationBadge();
 });
 
-// Initialize DataTable
-// Initialize DataTable - FIXED VERSION
+/**
+ * Initialize DataTable
+ */
 function initializeDataTable() {
     outOfStockTable = $('#outOfStockTable').DataTable({
         processing: true,
         serverSide: true,
-        columns: columns,
         ajax: {
-            url: '{{ route("admin.inventory.out-of-stock.data") }}', // SPECIFIC ROUTE
+            url: '{{ route("admin.inventory.out-of-stock.data") }}',
             data: function(d) {
                 return {
                     warehouse_id: currentWarehouse,
@@ -620,50 +637,98 @@ function initializeDataTable() {
                     days_out: $('#filterDaysOut').val(),
                     category: $('#filterCategory').val(),
                     search: $('#filterSearch').val(),
-                    // DataTables parameters
                     start: d.start,
                     length: d.length,
-                    search: { value: d.search.value },
-                    order: d.order,
-                    columns: d.columns
+                    draw: d.draw
                 };
+            },
+            error: function(xhr, error, thrown) {
+                console.error('DataTable Ajax Error:', error, thrown);
+                console.error('Response:', xhr.responseText);
             }
         },
         columns: [
-            { data: 'id', orderable: false, searchable: false },
-            { data: 'product_info', name: 'product_info', orderable: false },
-            { data: 'total_stock', name: 'total_stock' },
-            { data: 'threshold', name: 'threshold' },
-            { data: 'priority', name: 'priority' },
-            { data: 'warehouse_name', name: 'warehouse_name' },
+            {
+                data: 'checkbox',
+                orderable: false,
+                searchable: false,
+                width: '5%'
+            },
+            {
+                data: 'product_info',
+                name: 'product_name',
+                orderable: true
+            },
+            {
+                data: 'status_badge',
+                orderable: false,
+                searchable: false,
+                width: '10%'
+            },
+            {
+                data: 'days_out_badge',
+                name: 'days_out',
+                orderable: true,
+                width: '10%'
+            },
+            {
+                data: 'impact_badge',
+                name: 'impact_level',
+                orderable: true,
+                width: '10%'
+            },
+            {
+                data: 'urgency_indicator',
+                orderable: false,
+                searchable: false,
+                width: '8%'
+            },
+            {
+                data: 'warehouse_name',
+                orderable: false,
+                width: '12%'
+            },
+            {
+                data: 'lost_sales_display',
+                name: 'lost_sales_estimate',
+                orderable: true,
+                width: '12%'
+            },
+            {
+                data: 'actions',
+                orderable: false,
+                searchable: false,
+                width: '10%'
+            }
         ],
-        order: [[3, 'desc']], // Sort by days out
+        order: [[3, 'desc']], // Sort by days out (descending)
         pageLength: 25,
         lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
         language: {
-            processing: '<i class="bi bi-hourglass-split"></i> Loading out of stock items...',
+            processing: '<div class="spinner-border text-danger" role="status"><span class="visually-hidden">Loading...</span></div>',
             emptyTable: '<div class="empty-stock-illustration"><i class="bi bi-check-circle"></i><h5>No Out of Stock Items</h5><p>Great! All products are currently in stock.</p></div>',
-            zeroRecords: '<div class="empty-stock-illustration"><i class="bi bi-search"></i><h5>No Matching Items</h5><p>No out of stock items match your filters.</p></div>'
+            zeroRecords: '<div class="empty-stock-illustration"><i class="bi bi-search"></i><h5>No Matching Items</h5><p>No out of stock items match your filters.</p></div>',
+            loadingRecords: '<div class="spinner-border text-danger" role="status"><span class="visually-hidden">Loading...</span></div>',
+            info: 'Showing _START_ to _END_ of _TOTAL_ out of stock items',
+            infoEmpty: 'No out of stock items',
+            infoFiltered: '(filtered from _MAX_ total items)'
         },
         drawCallback: function() {
-            // Update selected items after table redraw
             updateSelectedItems();
-        },
-        error: function(xhr, error, thrown) {
-            console.error('DataTable error:', error, thrown);
-            // Show error message
-            let errorHtml = '<div class="empty-stock-illustration text-danger">';
-            errorHtml += '<i class="bi bi-exclamation-triangle"></i>';
-            errorHtml += '<h5>Error Loading Data</h5>';
-            errorHtml += '<p>Failed to load out of stock items. Please try again.</p>';
-            errorHtml += '</div>';
+            $('[data-bs-toggle="tooltip"]').tooltip();
 
-            $('.dataTables_empty').html(errorHtml);
+            // Add danger class to rows
+            $('#outOfStockTable tbody tr').addClass('product-row-danger');
+        },
+        createdRow: function(row, data, dataIndex) {
+            $(row).addClass('product-row-danger');
         }
     });
 }
 
-// Load statistics
+/**
+ * Load statistics
+ */
 function loadStatistics() {
     $.ajax({
         url: '{{ route("admin.inventory.statistics") }}',
@@ -672,39 +737,85 @@ function loadStatistics() {
             out_of_stock_only: true
         },
         success: function(stats) {
-            $('#statOutOfStockCount').text(stats.out_of_stock_count || 0);
+            $('#statOutOfStockCount').text(stats.out_of_stock || 0);
             $('#statLostSales').text('{{ store_currency_symbol() }}' + (stats.estimated_lost_sales || 0).toLocaleString());
             $('#statAvgDaysOut').text(stats.avg_days_out || 0);
             $('#statPendingRestocks').text(stats.pending_restocks || 0);
+
+            showNotificationBadge();
+        },
+        error: function(xhr) {
+            console.error('Failed to load statistics:', xhr);
         }
     });
 }
 
-// Apply filters
+/**
+ * Apply filters
+ */
 function applyFilters() {
     outOfStockTable.ajax.reload();
 }
 
-// Reset filters
+/**
+ * Reset filters
+ */
 function resetFilters() {
     $('#filterImpact').val('');
     $('#filterDaysOut').val('');
     $('#filterCategory').val('');
     $('#filterSearch').val('');
-    outOfStockTable.ajax.reload();
+    applyFilters();
 }
 
-// Refresh data
+/**
+ * Refresh data
+ */
 function refreshData() {
     outOfStockTable.ajax.reload();
     loadStatistics();
 }
 
-// Urgent restock
-function urgentRestock(productId, warehouseId, productName, productSku, daysOut, threshold) {
+/**
+ * Update selected items
+ */
+function updateSelectedItems() {
+    selectedItems = [];
+    $('.item-checkbox:checked').each(function() {
+        selectedItems.push({
+            id: $(this).data('id'),
+            product_id: $(this).data('product-id'),
+            variant_id: $(this).data('variant-id') || null,
+            warehouse_id: $(this).data('warehouse-id'),
+            threshold: parseInt($(this).data('threshold')),
+            name: $(this).data('name'),
+            variant_name: $(this).data('variant-name') || null,
+            sku: $(this).data('sku')
+        });
+    });
+
+    $('#selectedItemsCount').text(selectedItems.length);
+
+    // Update select all checkbox
+    const totalCheckboxes = $('.item-checkbox').length;
+    const checkedCheckboxes = $('.item-checkbox:checked').length;
+    $('#selectAll').prop('checked', totalCheckboxes > 0 && totalCheckboxes === checkedCheckboxes);
+}
+
+/**
+ * Urgent restock - handles both products and variants
+ */
+function urgentRestock(productId, variantId, warehouseId, productName, variantName, productSku, daysOut, threshold) {
     $('#restockProductId').val(productId);
+    $('#restockVariantId').val(variantId || '');
     $('#restockWarehouseId').val(warehouseId);
-    $('#restockProductName').text(productName);
+
+    // Display name with variant if applicable
+    let displayName = productName;
+    if (variantName) {
+        displayName += ' - ' + variantName;
+    }
+    $('#restockProductName').text(displayName);
     $('#restockProductSku').text(productSku);
     $('#restockDaysOut').text(daysOut);
 
@@ -716,20 +827,30 @@ function urgentRestock(productId, warehouseId, productName, productSku, daysOut,
     $('#urgentRestockModal').modal('show');
 }
 
-// Handle urgent restock form
+/**
+ * Handle urgent restock form submission
+ */
 $('#urgentRestockForm').on('submit', function(e) {
     e.preventDefault();
 
     const formData = new FormData(this);
-    const data = Object.fromEntries(formData.entries());
+    const data = {
+        product_id: formData.get('product_id'),
+        variant_id: formData.get('variant_id') || '',
+        warehouse_id: formData.get('warehouse_id'),
+        action_type: 'add',
+        quantity: formData.get('quantity'),
+        reason: formData.get('reason'),
+        notes: formData.get('notes') || '',
+        expected_date: formData.get('expected_date'),
+        supplier: formData.get('supplier') || '',
+        _token: '{{ csrf_token() }}'
+    };
 
     $.ajax({
         url: '{{ route("admin.inventory.adjust.store") }}',
         type: 'POST',
-        data: {
-            ...data,
-            _token: '{{ csrf_token() }}'
-        },
+        data: data,
         beforeSend: function() {
             $('#urgentRestockModal').modal('hide');
             Swal.fire({
@@ -747,7 +868,8 @@ $('#urgentRestockForm').on('submit', function(e) {
                     icon: 'success',
                     title: 'Restock Confirmed!',
                     text: 'Stock has been scheduled for restocking',
-                    confirmButtonColor: '#5B914C'
+                    confirmButtonColor: '#5B914C',
+                    timer: 3000
                 });
                 $('#urgentRestockForm')[0].reset();
                 refreshData();
@@ -757,35 +879,27 @@ $('#urgentRestockForm').on('submit', function(e) {
             Swal.fire({
                 icon: 'error',
                 title: 'Error!',
-                text: xhr.responseJSON?.message || 'Failed to process restock'
+                text: xhr.responseJSON?.message || 'Failed to process restock',
+                confirmButtonColor: '#dc3545'
             });
         }
     });
 });
 
-// View stock history
-function viewHistory(productId) {
-    window.location.href = `{{ route('admin.inventory.movement') }}?product_id=${productId}`;
+/**
+ * View stock history
+ */
+function viewHistory(productId, variantId) {
+    let url = `{{ route('admin.inventory.movement') }}?product_id=${productId}`;
+    if (variantId) {
+        url += `&variant_id=${variantId}`;
+    }
+    window.location.href = url;
 }
 
-// Update selected items
-function updateSelectedItems() {
-    selectedItems = [];
-    $('.item-checkbox:checked').each(function() {
-        selectedItems.push({
-            id: $(this).data('id'),
-            product_id: $(this).data('product-id'),
-            warehouse_id: $(this).data('warehouse-id'),
-            threshold: parseInt($(this).data('threshold')),
-            name: $(this).data('name'),
-            sku: $(this).data('sku')
-        });
-    });
-
-    $('#selectedItemsCount').text(selectedItems.length);
-}
-
-// Open bulk restock modal
+/**
+ * Open bulk restock modal
+ */
 function bulkRestockModal() {
     if (selectedItems.length === 0) {
         Swal.fire({
@@ -800,7 +914,9 @@ function bulkRestockModal() {
     $('#bulkRestockModal').modal('show');
 }
 
-// Preview bulk restock
+/**
+ * Preview bulk restock
+ */
 function previewBulkRestock() {
     const strategy = $('#bulkRestockStrategy').val();
     const customQty = parseInt($('#bulkCustomQuantity').val()) || 0;
@@ -839,13 +955,18 @@ function previewBulkRestock() {
         const newTotal = 0 + addQty; // Current is 0 for out of stock
         totalQuantity += addQty;
 
+        let displayName = item.name;
+        if (item.variant_name) {
+            displayName += ' - ' + item.variant_name;
+        }
+
         html += `
             <tr>
-                <td><small>${item.name}</small></td>
+                <td><small>${displayName}</small></td>
                 <td><small>${item.warehouse_name || 'Default'}</small></td>
-                <td><strong class="text-danger">0</strong></td>
-                <td class="text-success"><strong>+${addQty}</strong></td>
-                <td class="text-primary"><strong>${newTotal}</strong></td>
+                <td class="text-center"><strong class="text-danger">0</strong></td>
+                <td class="text-center"><strong class="text-success">+${addQty}</strong></td>
+                <td class="text-center"><strong class="text-primary">${newTotal}</strong></td>
             </tr>
         `;
     });
@@ -857,7 +978,9 @@ function previewBulkRestock() {
     $('#bulkRestockSubmit').prop('disabled', false);
 }
 
-// Handle bulk restock form
+/**
+ * Handle bulk restock form submission
+ */
 $('#bulkRestockForm').on('submit', function(e) {
     e.preventDefault();
 
@@ -900,10 +1023,12 @@ $('#bulkRestockForm').on('submit', function(e) {
         if (addQty > 0) {
             requests.push({
                 product_id: item.product_id,
+                variant_id: item.variant_id || '',
                 warehouse_id: item.warehouse_id,
                 action_type: 'add',
                 quantity: addQty,
-                reason: `${reason} | Priority: ${priority} | Expected: ${expectedDate}`
+                reason: `${reason} | Priority: ${priority} | Expected: ${expectedDate}`,
+                _token: '{{ csrf_token() }}'
             });
         }
     });
@@ -927,10 +1052,7 @@ $('#bulkRestockForm').on('submit', function(e) {
         $.ajax({
             url: '{{ route("admin.inventory.adjust.store") }}',
             type: 'POST',
-            data: {
-                ...req,
-                _token: '{{ csrf_token() }}'
-            }
+            data: req
         })
     )).then((results) => {
         results.forEach(result => {
@@ -938,6 +1060,7 @@ $('#bulkRestockForm').on('submit', function(e) {
                 completed++;
             } else {
                 failed++;
+                console.error('Failed request:', result.reason);
             }
         });
 
@@ -957,6 +1080,7 @@ $('#bulkRestockForm').on('submit', function(e) {
             });
         }
 
+        // Reset form and clear selections
         $('#bulkRestockForm')[0].reset();
         $('#bulkRestockPreview').hide();
         $('#bulkRestockSubmit').prop('disabled', true);
@@ -967,7 +1091,9 @@ $('#bulkRestockForm').on('submit', function(e) {
     });
 });
 
-// Export out of stock report
+/**
+ * Export out of stock report
+ */
 function exportOutOfStock() {
     Swal.fire({
         title: 'Export Report',
@@ -977,32 +1103,75 @@ function exportOutOfStock() {
         timer: 2000
     });
 
-    // In a real implementation, this would trigger a backend export
     setTimeout(() => {
-        Swal.fire({
-            icon: 'success',
-            title: 'Report Ready',
-            text: 'Out of stock report has been generated',
-            confirmButtonColor: '#5B914C'
+        const params = new URLSearchParams({
+            warehouse_id: currentWarehouse,
+            impact: $('#filterImpact').val(),
+            days_out: $('#filterDaysOut').val(),
+            category: $('#filterCategory').val(),
+            search: $('#filterSearch').val()
         });
+
+        window.location.href = '{{ route("admin.inventory.movement.export") }}?stock_status=out_of_stock&' + params.toString();
     }, 2000);
 }
 
-// Auto-refresh every 5 minutes for critical page
-setInterval(function() {
-    refreshData();
-}, 300000); // 5 minutes
-
-// Show notification badge
+/**
+ * Show notification badge in page title
+ */
 function showNotificationBadge() {
-    if ($('#statOutOfStockCount').text() > 0) {
-        document.title = `(${$('#statOutOfStockCount').text()}) Out of Stock - Admin`;
+    const outOfStockCount = parseInt($('#statOutOfStockCount').text()) || 0;
+    if (outOfStockCount > 0) {
+        document.title = `(${outOfStockCount}) Out of Stock - Admin Panel`;
+    } else {
+        document.title = 'Out of Stock - Admin Panel';
     }
 }
 
-// Call on page load and after refresh
-$(document).ready(function() {
-    showNotificationBadge();
+/**
+ * Auto-refresh every 5 minutes for critical page
+ */
+setInterval(function() {
+    refreshData();
+    console.log('Auto-refreshed out of stock data at:', new Date().toLocaleTimeString());
+}, 300000); // 5 minutes
+
+/**
+ * Keyboard shortcuts
+ */
+$(document).on('keydown', function(e) {
+    // Ctrl/Cmd + R: Refresh
+    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        refreshData();
+
+        Swal.fire({
+            icon: 'info',
+            title: 'Refreshing...',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1500
+        });
+    }
+
+    // Escape: Clear selections
+    if (e.key === 'Escape') {
+        $('.item-checkbox').prop('checked', false);
+        $('#selectAll').prop('checked', false);
+        updateSelectedItems();
+    }
+});
+
+/**
+ * Warn before leaving if items are selected
+ */
+window.addEventListener('beforeunload', function(e) {
+    if (selectedItems.length > 0) {
+        e.preventDefault();
+        e.returnValue = 'You have selected items. Are you sure you want to leave?';
+        return e.returnValue;
+    }
 });
 </script>
 @endpush
