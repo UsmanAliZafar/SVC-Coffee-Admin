@@ -83,6 +83,17 @@
     .quick-stock-btn:hover i {
         color: #5B914C !important;
     }
+    .view-variants-btn {
+        font-size: 0.60rem;
+        padding: 0.25rem 0.5rem;
+        margin-left: 8px;
+    }
+
+    .view-variants-btn:hover {
+        background-color: #5B914C;
+        border-color: #5B914C;
+        color: white;
+    }
 </style>
 @endpush
 
@@ -439,7 +450,46 @@
         </div>
     </div>
 </div>
-
+<!-- Variants Modal -->
+<div class="modal fade" id="variantsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-grid-3x3-gap"></i> Product Variants:
+                    <span id="variantsProductName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="variantsLoader" class="text-center py-5">
+                    <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="mt-2">Loading variants...</div>
+                </div>
+                <div id="variantsContent" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="60">Image</th>
+                                    <th>Variant</th>
+                                    <th>SKU</th>
+                                    <th>Price</th>
+                                    <th>Stock</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="variantsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -941,5 +991,56 @@ function viewProductImage(imageUrl, productName) {
         }
     });
 }
+// View product variants in modal
+$(document).on('click', '.view-variants-btn', function() {
+    const productId = $(this).data('id');
+    const productName = $(this).data('name');
+
+    $('#variantsProductName').text(productName);
+    $('#variantsLoader').show();
+    $('#variantsContent').hide();
+    $('#variantsTableBody').empty();
+    $('#variantsModal').modal('show');
+
+    $.ajax({
+        url: `/admin/products/${productId}/modal-variants`,
+        type: 'GET',
+        success: function(response) {
+            if (response.success && response.variants.length > 0) {
+                let html = '';
+
+                response.variants.forEach(function(variant) {
+                    html += `
+                        <tr>
+                            <td>
+                                <img src="${variant.image}"
+                                     alt="${variant.name}"
+                                     class="img-thumbnail"
+                                     style="width: 50px; height: 50px; object-fit: cover;">
+                            </td>
+                            <td>
+                                <strong>${variant.name}</strong>
+                                ${variant.is_default ? '<span class="badge bg-primary ms-2">Default</span>' : ''}
+                            </td>
+                            <td><code>${variant.sku}</code></td>
+                            <td>${variant.price}</td>
+                            <td>${variant.stock_badge}</td>
+                            <td>${variant.status_badge}</td>
+                        </tr>
+                    `;
+                });
+
+                $('#variantsTableBody').html(html);
+                $('#variantsLoader').hide();
+                $('#variantsContent').show();
+            } else {
+                $('#variantsLoader').html('<div class="alert alert-info">No variants found</div>');
+            }
+        },
+        error: function(xhr) {
+            $('#variantsLoader').html('<div class="alert alert-danger">Failed to load variants</div>');
+        }
+    });
+});
 </script>
 @endpush

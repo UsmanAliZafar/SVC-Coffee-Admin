@@ -177,9 +177,18 @@ class ProductsController extends Controller
                 $html .= '<div class="product-title">';
                 $html .= '<strong><a href="' . $editUrl . '" class="text-decoration-none product-link">'
                      . htmlspecialchars($product->name) . '</a></strong>';
+                if ($product->has_variants && $product->variants()->count() > 0) {
+                    $html .= ' <button type="button" class="btn btn-xs btn-outline-primary view-variants-btn"
+                                data-id="' . $product->id . '"
+                                data-name="' . htmlspecialchars($product->name) . '"
+                                title="View Variants">
+                                <i class="bi bi-grid-3x3-gap"></i> ' . $product->variants()->count() . ' variants
+                            </button>';
+                }
                 if ($product->is_featured) {
                     $html .= ' <i class="bi bi-star-fill text-warning" title="Featured Product"></i>';
                 }
+
                 $html .= '</div>';
 
                 // Product details
@@ -349,6 +358,39 @@ class ProductsController extends Controller
             })
             ->rawColumns(['checkbox', 'image_preview', 'name_link', 'category_name', 'current_stock', 'threshold', 'price_display', 'stock_badge', 'product_type_badge', 'status_badge', 'badges', 'actions'])
             ->make(true);
+    }
+
+    /**
+     * Get variants for a product (AJAX)
+     */
+    public function getModalVariants(Request $request, $productId)
+    {
+        if (!auth('admin')->user()->hasPermission('products.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $product = Product::with(['variants.status', 'variants.warehouseStock'])
+            ->findOrFail($productId);
+
+        $variants = $product->variants()->ordered()->get()->map(function($variant) {
+            return [
+                'id' => $variant->id,
+                'name' => $variant->getFullName(),
+                'sku' => $variant->sku,
+                'price' => $variant->getFormattedFinalPrice(),
+                'stock' => $variant->stock_quantity,
+                'stock_badge' => $variant->getStockBadge(),
+                'status_badge' => $variant->getStatusBadge(),
+                'image' => $variant->getImageUrl(),
+                'is_default' => $variant->is_default,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'product_name' => $product->name,
+            'variants' => $variants
+        ]);
     }
 
     /**
