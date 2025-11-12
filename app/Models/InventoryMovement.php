@@ -19,6 +19,7 @@ class InventoryMovement extends Model
 
     protected $fillable = [
         'product_id',
+        'variant_id',        // ← ADD THIS
         'warehouse_id',
         'from_warehouse_id',
         'to_warehouse_id',
@@ -56,10 +57,16 @@ class InventoryMovement extends Model
         });
     }
 
-    // RELATIONSHIPS
+    // ==================== RELATIONSHIPS ====================
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
 
     public function warehouse(): BelongsTo
@@ -82,10 +89,16 @@ class InventoryMovement extends Model
         return $this->belongsTo(AdminUser::class, 'created_by');
     }
 
-    // SCOPES
+    // ==================== SCOPES ====================
+
     public function scopeForProduct($query, string $productId)
     {
         return $query->where('product_id', $productId);
+    }
+
+    public function scopeForVariant($query, string $variantId)
+    {
+        return $query->where('variant_id', $variantId);
     }
 
     public function scopeForWarehouse($query, string $warehouseId)
@@ -103,7 +116,42 @@ class InventoryMovement extends Model
         return $query->where('created_at', '>=', now()->subDays($days));
     }
 
-    // HELPER METHODS
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Check if this movement is for a variant
+     */
+    public function isVariantMovement(): bool
+    {
+        return !is_null($this->variant_id);
+    }
+
+    /**
+     * Get the entity (product or variant) this movement is for
+     */
+    public function getEntity()
+    {
+        return $this->isVariantMovement() ? $this->variant : $this->product;
+    }
+
+    /**
+     * Get entity name
+     */
+    public function getEntityName(): string
+    {
+        $entity = $this->getEntity();
+
+        if (!$entity) {
+            return 'Unknown';
+        }
+
+        if ($this->isVariantMovement()) {
+            return $this->product->name . ' - ' . $entity->getFullName();
+        }
+
+        return $entity->name;
+    }
+
     public function getFormattedQuantity(): string
     {
         return ($this->quantity >= 0 ? '+' : '') . $this->quantity;

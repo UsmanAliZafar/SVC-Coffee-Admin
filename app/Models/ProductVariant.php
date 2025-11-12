@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ProductVariant extends Model
@@ -53,6 +55,8 @@ class ProductVariant extends Model
         'sort_order',
         'is_default',
         'status_key_code',
+        'stock_quantity',           // ← ADD THIS (synced from warehouses)
+        'low_stock_threshold',      // ← ADD THIS
     ];
 
     /**
@@ -66,6 +70,8 @@ class ProductVariant extends Model
         'width' => 'decimal:2',
         'height' => 'decimal:2',
         'sort_order' => 'integer',
+        'stock_quantity' => 'integer',      // ← ADD THIS
+        'low_stock_threshold' => 'integer', // ← ADD THIS
         'is_default' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -100,6 +106,14 @@ class ProductVariant extends Model
                 $maxOrder = static::where('product_id', $model->product_id)->max('sort_order');
                 $model->sort_order = $maxOrder ? $maxOrder + 1 : 0;
             }
+
+            // Set default stock values
+            if (!isset($model->stock_quantity)) {
+                $model->stock_quantity = 0;
+            }
+            if (!isset($model->low_stock_threshold)) {
+                $model->low_stock_threshold = 10;
+            }
         });
 
         // When setting default variant, unset others
@@ -116,6 +130,9 @@ class ProductVariant extends Model
             if ($model->image_path && Storage::disk('public')->exists($model->image_path)) {
                 Storage::disk('public')->delete($model->image_path);
             }
+
+            // Delete all warehouse stock records
+            $model->warehouseStock()->delete();
         });
     }
 
@@ -138,11 +155,45 @@ class ProductVariant extends Model
     }
 
     /**
-     * Get inventory records for this variant
+     * Get warehouse stock for this variant
      */
-    public function inventory(): HasMany
+    public function warehouseStock(): HasMany
     {
-        return $this->hasMany(ProductInventory::class, 'variant_id');
+        return $this->hasMany(ProductWarehouseStock::class, 'variant_id');
+    }
+
+    /**
+     * Get warehouses that have this variant in stock
+     */
+    public function warehouses(): BelongsToMany
+    {
+        return $this->belongsToMany(Warehouse::class, 'product_warehouse_stock', 'variant_id', 'warehouse_id')
+                    ->withPivot('quantity', 'reserved_quantity', 'available_quantity', 'location')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Get inventory movements for this variant
+     */
+    public function inventoryMovements(): HasMany
+    {
+        return $this->hasMany(InventoryMovement::class, 'variant_id');
+    }
+
+    /**
+     * Get stock alerts for this variant
+     */
+    public function stockAlerts(): HasMany
+    {
+        return $this->hasMany(StockAlert::class, 'variant_id');
+    }
+
+    /**
+     * Get active/unresolved stock alerts
+     */
+    public function activeStockAlerts(): HasMany
+    {
+        return $this->hasMany(StockAlert::class, 'variant_id')->where('is_resolved', false);
     }
 
     // ==================== SCOPES ====================
@@ -205,9 +256,24 @@ class ProductVariant extends Model
      */
     public function scopeInStock($query)
     {
-        return $query->whereHas('inventory', function ($q) {
-            $q->where('quantity', '>', 0);
-        });
+        return $query->where('stock_quantity', '>', 0);
+    }
+
+    /**
+     * Scope: Get variants out of stock
+     */
+    public function scopeOutOfStock($query)
+    {
+        return $query->where('stock_quantity', '<=', 0);
+    }
+
+    /**
+     * Scope: Get variants with low stock
+     */
+    public function scopeLowStock($query)
+    {
+        return $query->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                    ->where('stock_quantity', '>', 0);
     }
 
     /**
@@ -219,7 +285,7 @@ class ProductVariant extends Model
                     ->whereColumn('sale_price', '<', 'price');
     }
 
-    // ==================== HELPER METHODS ====================
+    // ==================== PRICING METHODS ====================
 
     /**
      * Get final selling price (considers sale price)
@@ -260,11 +326,85 @@ class ProductVariant extends Model
     }
 
     /**
-     * Get total stock across all warehouses
+     * Get formatted price
+     */
+    public function getFormattedPrice(): string
+    {
+        $currency = $this->product->curency ?? 'USD';
+        return $currency . ' ' . number_format($this->price, 2);
+    }
+
+    /**
+     * Get formatted sale price
+     */
+    public function getFormattedSalePrice(): string
+    {
+        if (!$this->sale_price) {
+            return '';
+        }
+        $currency = $this->product->curency ?? 'USD';
+        return $currency . ' ' . number_format($this->sale_price, 2);
+    }
+
+    /**
+     * Get formatted final price
+     */
+    public function getFormattedFinalPrice(): string
+    {
+        $currency = $this->product->curency ?? 'USD';
+        return $currency . ' ' . number_format($this->getFinalPrice(), 2);
+    }
+
+    // ==================== STOCK METHODS (MATCHING PRODUCT MODEL) ====================
+
+    /**
+     * Get total stock across all warehouses (synced value)
      */
     public function getTotalStock(): int
     {
-        return $this->inventory()->sum('quantity');
+        return $this->stock_quantity ?? 0;
+    }
+
+    /**
+     * Get total stock from warehouse records (for verification)
+     */
+    public function getTotalWarehouseStock(): int
+    {
+        return $this->warehouseStock()->sum('quantity');
+    }
+
+    /**
+     * Get total available stock (not reserved)
+     */
+    public function getTotalAvailableStock(): int
+    {
+        return $this->warehouseStock()->sum('available_quantity');
+    }
+
+    /**
+     * Get total reserved stock
+     */
+    public function getTotalReservedStock(): int
+    {
+        return $this->warehouseStock()->sum('reserved_quantity');
+    }
+
+    /**
+     * Get stock for specific warehouse
+     */
+    public function getWarehouseStock(string $warehouseId): int
+    {
+        $stock = $this->warehouseStock()->where('warehouse_id', $warehouseId)->first();
+        return $stock ? $stock->quantity : 0;
+    }
+
+    /**
+     * Get available stock for specific warehouse
+     */
+    public function getAvailableWarehouseStock(string $warehouseId): int
+    {
+        $stock = $this->warehouseStock()->where('warehouse_id', $warehouseId)->first();
+        return $stock ? $stock->available_quantity : 0;
     }
 
     /**
@@ -272,8 +412,304 @@ class ProductVariant extends Model
      */
     public function isInStock(): bool
     {
-        return $this->getTotalStock() > 0;
+        return $this->stock_quantity > 0;
     }
+
+    /**
+     * Check if variant is low on stock
+     */
+    public function isLowStock(): bool
+    {
+        $threshold = $this->low_stock_threshold ?? 10;
+        return $this->stock_quantity > 0 && $this->stock_quantity <= $threshold;
+    }
+
+    /**
+     * Check if variant is out of stock
+     */
+    public function isOutOfStock(): bool
+    {
+        return $this->stock_quantity <= 0;
+    }
+
+    /**
+     * Check if has stock in any warehouse
+     */
+    public function hasWarehouseStock(): bool
+    {
+        return $this->warehouseStock()->where('quantity', '>', 0)->exists();
+    }
+
+    /**
+     * Check if has available stock in any warehouse
+     */
+    public function hasAvailableStock(int $quantity = 1): bool
+    {
+        return $this->warehouseStock()->where('available_quantity', '>=', $quantity)->exists();
+    }
+
+    // ==================== WAREHOUSE STOCK MANAGEMENT ====================
+
+    /**
+     * Add stock to a specific warehouse
+     */
+    public function addWarehouseStock(string $warehouseId, int $quantity, string $reason = null): bool
+    {
+        try {
+            DB::beginTransaction();
+
+            $stock = ProductWarehouseStock::firstOrCreate(
+                [
+                    'product_id' => $this->product_id,
+                    'variant_id' => $this->id,
+                    'warehouse_id' => $warehouseId,
+                ],
+                [
+                    'quantity' => 0,
+                    'reserved_quantity' => 0,
+                    'available_quantity' => 0,
+                ]
+            );
+
+            $previousQuantity = $stock->quantity;
+            $stock->addStock($quantity);
+
+            // Create movement record
+            InventoryMovement::create([
+                'product_id' => $this->product_id,
+                'variant_id' => $this->id,
+                'warehouse_id' => $warehouseId,
+                'type' => 'adjustment',
+                'quantity' => $quantity,
+                'previous_quantity' => $previousQuantity,
+                'new_quantity' => $stock->fresh()->quantity,
+                'reason' => $reason ?? 'Stock added to variant',
+            ]);
+
+            // Update variant total stock
+            $this->updateTotalStock();
+
+            DB::commit();
+            return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to add variant warehouse stock: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Reduce stock from a specific warehouse
+     */
+    public function reduceWarehouseStock(string $warehouseId, int $quantity, string $reason = null): bool
+    {
+        try {
+            DB::beginTransaction();
+
+            $stock = ProductWarehouseStock::where('product_id', $this->product_id)
+                                        ->where('variant_id', $this->id)
+                                        ->where('warehouse_id', $warehouseId)
+                                        ->first();
+
+            if (!$stock || $stock->available_quantity < $quantity) {
+                DB::rollBack();
+                return false;
+            }
+
+            $previousQuantity = $stock->quantity;
+            $stock->reduceStock($quantity);
+
+            // Create movement record
+            InventoryMovement::create([
+                'product_id' => $this->product_id,
+                'variant_id' => $this->id,
+                'warehouse_id' => $warehouseId,
+                'type' => 'adjustment',
+                'quantity' => -$quantity,
+                'previous_quantity' => $previousQuantity,
+                'new_quantity' => $stock->fresh()->quantity,
+                'reason' => $reason ?? 'Stock reduced from variant',
+            ]);
+
+            // Update variant total stock
+            $this->updateTotalStock();
+
+            DB::commit();
+            return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to reduce variant warehouse stock: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Transfer stock between warehouses
+     */
+    public function transferStock(string $fromWarehouseId, string $toWarehouseId, int $quantity, string $reason = null): bool
+    {
+        try {
+            DB::beginTransaction();
+
+            // Get source warehouse stock
+            $fromStock = ProductWarehouseStock::where('product_id', $this->product_id)
+                                            ->where('variant_id', $this->id)
+                                            ->where('warehouse_id', $fromWarehouseId)
+                                            ->first();
+
+            if (!$fromStock || $fromStock->available_quantity < $quantity) {
+                DB::rollBack();
+                return false;
+            }
+
+            // Get or create destination warehouse stock
+            $toStock = ProductWarehouseStock::firstOrCreate(
+                [
+                    'product_id' => $this->product_id,
+                    'variant_id' => $this->id,
+                    'warehouse_id' => $toWarehouseId,
+                ],
+                [
+                    'quantity' => 0,
+                    'reserved_quantity' => 0,
+                    'available_quantity' => 0,
+                ]
+            );
+
+            // Reduce from source
+            $fromPreviousQty = $fromStock->quantity;
+            $fromStock->reduceStock($quantity);
+
+            // Add to destination
+            $toPreviousQty = $toStock->quantity;
+            $toStock->addStock($quantity);
+
+            // Create movement record
+            InventoryMovement::create([
+                'product_id' => $this->product_id,
+                'variant_id' => $this->id,
+                'warehouse_id' => $toWarehouseId,
+                'from_warehouse_id' => $fromWarehouseId,
+                'to_warehouse_id' => $toWarehouseId,
+                'type' => 'transfer',
+                'quantity' => $quantity,
+                'previous_quantity' => $toPreviousQty,
+                'new_quantity' => $toStock->fresh()->quantity,
+                'reason' => $reason ?? 'Variant stock transfer',
+            ]);
+
+            // Total stock remains the same, no need to update
+            // But we'll update anyway for consistency
+            $this->updateTotalStock();
+
+            DB::commit();
+            return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to transfer variant stock: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Reserve stock for an order
+     */
+    public function reserveStock(string $warehouseId, int $quantity): bool
+    {
+        $stock = ProductWarehouseStock::where('product_id', $this->product_id)
+                                    ->where('variant_id', $this->id)
+                                    ->where('warehouse_id', $warehouseId)
+                                    ->first();
+
+        if (!$stock) {
+            return false;
+        }
+
+        return $stock->reserveStock($quantity);
+    }
+
+    /**
+     * Release reserved stock
+     */
+    public function releaseStock(string $warehouseId, int $quantity): bool
+    {
+        $stock = ProductWarehouseStock::where('product_id', $this->product_id)
+                                    ->where('variant_id', $this->id)
+                                    ->where('warehouse_id', $warehouseId)
+                                    ->first();
+
+        if (!$stock) {
+            return false;
+        }
+
+        $stock->releaseStock($quantity);
+        return true;
+    }
+
+    /**
+     * Update total stock quantity from all warehouses
+     */
+    public function updateTotalStock(): void
+    {
+        $totalStock = $this->warehouseStock()->sum('quantity');
+        $this->update(['stock_quantity' => $totalStock]);
+
+        // Also update parent product's total stock
+        $this->product->updateTotalStock();
+    }
+
+    /**
+     * Sync variant stock with warehouse stocks
+     */
+    public function syncWarehouseStock(): void
+    {
+        $this->updateTotalStock();
+
+        // Check for alerts
+        if ($this->isLowStock() || $this->stock_quantity <= 0) {
+            $this->createStockAlerts();
+        }
+    }
+
+    /**
+     * Create stock alerts for all warehouses
+     */
+    protected function createStockAlerts(): void
+    {
+        foreach ($this->warehouseStock as $stock) {
+            if ($stock->quantity <= 0) {
+                StockAlert::updateOrCreate(
+                    [
+                        'product_id' => $this->product_id,
+                        'variant_id' => $this->id,
+                        'warehouse_id' => $stock->warehouse_id,
+                        'alert_type' => 'out_of_stock',
+                        'is_resolved' => false,
+                    ],
+                    [
+                        'current_quantity' => $stock->quantity,
+                        'threshold_quantity' => 0,
+                    ]
+                );
+            } elseif ($stock->quantity <= $this->low_stock_threshold) {
+                StockAlert::updateOrCreate(
+                    [
+                        'product_id' => $this->product_id,
+                        'variant_id' => $this->id,
+                        'warehouse_id' => $stock->warehouse_id,
+                        'alert_type' => 'low_stock',
+                        'is_resolved' => false,
+                    ],
+                    [
+                        'current_quantity' => $stock->quantity,
+                        'threshold_quantity' => $this->low_stock_threshold,
+                    ]
+                );
+            }
+        }
+    }
+
+    // ==================== IMAGE & DISPLAY METHODS ====================
 
     /**
      * Get image URL with fallback
@@ -307,36 +743,6 @@ class ProductVariant extends Model
 
         // Final fallback to placeholder
         return asset('images/placeholders/variant-placeholder.jpg');
-    }
-
-    /**
-     * Get formatted price
-     */
-    public function getFormattedPrice(): string
-    {
-        $currency = $this->product->curency ?? 'USD';
-        return $currency . ' ' . number_format($this->price, 2);
-    }
-
-    /**
-     * Get formatted sale price
-     */
-    public function getFormattedSalePrice(): string
-    {
-        if (!$this->sale_price) {
-            return '';
-        }
-        $currency = $this->product->curency ?? 'USD';
-        return $currency . ' ' . number_format($this->sale_price, 2);
-    }
-
-    /**
-     * Get formatted final price
-     */
-    public function getFormattedFinalPrice(): string
-    {
-        $currency = $this->product->curency ?? 'USD';
-        return $currency . ' ' . number_format($this->getFinalPrice(), 2);
     }
 
     /**
@@ -376,6 +782,57 @@ class ProductVariant extends Model
         }
         return null;
     }
+
+    /**
+     * Check if variant has physical dimensions
+     */
+    public function hasPhysicalDimensions(): bool
+    {
+        return !is_null($this->length) && !is_null($this->width) && !is_null($this->height);
+    }
+
+    /**
+     * Check if variant has weight
+     */
+    public function hasWeight(): bool
+    {
+        return !is_null($this->weight);
+    }
+
+    /**
+     * Get shipping weight (with fallback to product weight)
+     */
+    public function getShippingWeight(): ?float
+    {
+        return $this->weight ?? $this->product->weight ?? null;
+    }
+
+    /**
+     * Get shipping dimensions (with fallback to product dimensions)
+     */
+    public function getShippingDimensions(): ?array
+    {
+        if ($this->hasPhysicalDimensions()) {
+            return [
+                'length' => $this->length,
+                'width' => $this->width,
+                'height' => $this->height,
+            ];
+        }
+
+        // Fallback to product dimensions
+        if ($this->product && $this->product->length && $this->product->width && $this->product->height) {
+            return [
+                'length' => $this->product->length,
+                'width' => $this->product->width,
+                'height' => $this->product->height,
+            ];
+        }
+
+        return null;
+    }
+
+    // ==================== STATUS METHODS ====================
 
     /**
      * Check if variant is active
@@ -435,16 +892,18 @@ class ProductVariant extends Model
      */
     public function getStockBadge(): string
     {
-        $stock = $this->getTotalStock();
+        $stock = $this->stock_quantity;
 
         if ($stock <= 0) {
             return '<span class="badge bg-danger">Out of Stock</span>';
-        } elseif ($stock < 10) {
+        } elseif ($this->isLowStock()) {
             return '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
         } else {
             return '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
         }
     }
+
+    // ==================== UTILITY METHODS ====================
 
     /**
      * Update sort order
@@ -482,29 +941,5 @@ class ProductVariant extends Model
             return Storage::disk('public')->delete($this->image_path);
         }
         return false;
-    }
-
-    /**
-     * Check if variant has physical dimensions
-     */
-    public function hasPhysicalDimensions(): bool
-    {
-        return !is_null($this->length) && !is_null($this->width) && !is_null($this->height);
-    }
-
-    /**
-     * Check if variant has weight
-     */
-    public function hasWeight(): bool
-    {
-        return !is_null($this->weight);
-    }
-
-    /**
-     * Get shipping weight (with fallback to product weight)
-     */
-    public function getShippingWeight(): ?float
-    {
-        return $this->weight ?? $this->product->weight ?? null;
     }
 }

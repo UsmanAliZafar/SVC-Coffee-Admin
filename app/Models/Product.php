@@ -1476,8 +1476,10 @@ class Product extends Model
      */
     public function updateTotalStock(): void
     {
-        if ($this->track_inventory) {
-            $totalStock = $this->warehouseStock()->sum('quantity');
+        if ($this->track_inventory && !$this->needsVariants()) {
+            $totalStock = $this->warehouseStock()
+                            ->whereNull('variant_id')  // Only simple product stock
+                            ->sum('quantity');
             $this->update(['stock_quantity' => $totalStock]);
         }
     }
@@ -1547,12 +1549,24 @@ class Product extends Model
         return $this->sale_price ?? $this->price;
     }
 
-    public function getStock()
+    /**
+     * Get total stock (handles both simple and variant products)
+     */
+    public function getStock(): int
     {
-        if ($this->needsVariants()) {
-            return $this->variants()->sum(fn($v) => $v->getTotalStock());
+        if (!$this->track_inventory) {
+            return PHP_INT_MAX;
         }
-        return $this->stock_quantity;
+
+        if ($this->needsVariants()) {
+            // For variant products: sum all variant warehouse stocks
+            return ProductWarehouseStock::where('product_id', $this->id)
+                                    ->whereNotNull('variant_id')
+                                    ->sum('quantity');
+        }
+
+        // For simple products: return synced stock_quantity field
+        return $this->stock_quantity ?? 0;
     }
 
 }

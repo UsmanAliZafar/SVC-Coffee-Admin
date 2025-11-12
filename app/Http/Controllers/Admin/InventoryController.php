@@ -546,7 +546,15 @@ class InventoryController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $query = InventoryMovement::with(['product', 'warehouse', 'fromWarehouse', 'toWarehouse', 'creator'])
+        $query = InventoryMovement::with([
+                'product' => function($query) {
+                    $query->withTrashed(); // Include soft deleted products
+                },
+                'warehouse',
+                'fromWarehouse',
+                'toWarehouse',
+                'creator'
+            ])
             ->latest();
 
         // Apply filters
@@ -572,9 +580,20 @@ class InventoryController extends Controller
 
         return DataTables::of($query)
             ->addColumn('product_info', function($movement) {
+                if (!$movement->product) {
+                    return '<div>
+                        <strong class="text-danger">Product Deleted</strong><br>
+                        <small class="text-muted">ID: ' . $movement->product_id . '</small>
+                    </div>';
+                }
+
+                $deletedBadge = $movement->product->trashed()
+                    ? ' <span class="badge badge-sm badge-danger">Deleted</span>'
+                    : '';
+
                 return '<div>
-                    <strong>' . $movement->product->name . '</strong><br>
-                    <small class="text-muted">SKU: ' . $movement->product->sku . '</small>
+                    <strong>' . e($movement->product->name) . '</strong>' . $deletedBadge . '<br>
+                    <small class="text-muted">SKU: ' . e($movement->product->sku) . '</small>
                 </div>';
             })
             ->addColumn('type_badge', function($movement) {
@@ -582,12 +601,17 @@ class InventoryController extends Controller
             })
             ->addColumn('warehouse_info', function($movement) {
                 if ($movement->type === 'transfer') {
+                    $fromName = $movement->fromWarehouse ? e($movement->fromWarehouse->name) : 'N/A';
+                    $toName = $movement->toWarehouse ? e($movement->toWarehouse->name) : 'N/A';
+
                     return '<div>
-                        <small><strong>From:</strong> ' . ($movement->fromWarehouse->name ?? 'N/A') . '</small><br>
-                        <small><strong>To:</strong> ' . ($movement->toWarehouse->name ?? 'N/A') . '</small>
+                        <small><strong>From:</strong> ' . $fromName . '</small><br>
+                        <small><strong>To:</strong> ' . $toName . '</small>
                     </div>';
                 }
-                return $movement->warehouse ? $movement->warehouse->name : '<span class="text-muted">N/A</span>';
+                return $movement->warehouse
+                    ? e($movement->warehouse->name)
+                    : '<span class="text-muted">N/A</span>';
             })
             ->addColumn('quantity_change', function($movement) {
                 $class = $movement->quantity >= 0 ? 'text-success' : 'text-danger';
@@ -601,9 +625,10 @@ class InventoryController extends Controller
                 return '<span class="text-muted">—</span>';
             })
             ->addColumn('created_info', function($movement) {
+                $creatorName = $movement->creator ? e($movement->creator->name) : 'System';
                 return '<div>
                     <small>' . $movement->created_at->format('M d, Y H:i') . '</small><br>
-                    <small class="text-muted">' . ($movement->creator->name ?? 'System') . '</small>
+                    <small class="text-muted">' . $creatorName . '</small>
                 </div>';
             })
             ->rawColumns(['product_info', 'type_badge', 'warehouse_info', 'quantity_change', 'stock_levels', 'created_info'])

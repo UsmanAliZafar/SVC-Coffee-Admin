@@ -27,6 +27,7 @@ class AdminUserSeeder extends Seeder
         // 1. Create Super Admin User
         $superAdmin = AdminUser::create([
             'name' => 'Super Administrator',
+            'username' => 'superadmin',
             'email' => 'admin@coffee.com',
             'password' => 'password123', // Will be automatically hashed by the model
             'phone' => '+1234567890',
@@ -42,6 +43,7 @@ class AdminUserSeeder extends Seeder
         // 2. Create Manager User
         $manager = AdminUser::create([
             'name' => 'Store Manager',
+            'username' => 'storemanager',
             'email' => 'manager@coffee.com',
             'password' => 'password123',
             'phone' => '+1234567891',
@@ -58,6 +60,7 @@ class AdminUserSeeder extends Seeder
         $staff = AdminUser::create([
             'name' => 'Staff Member',
             'email' => 'staff@coffee.com',
+            'username' => 'staffmember',
             'password' => 'password123',
             'phone' => '+1234567892',
             'is_active' => true,
@@ -73,6 +76,7 @@ class AdminUserSeeder extends Seeder
         $inventoryManager = AdminUser::create([
             'name' => 'Inventory Manager',
             'email' => 'inventory@coffee.com',
+            'username' => 'inventorymanager',
             'password' => 'password123',
             'phone' => '+1234567893',
             'is_active' => true,
@@ -88,6 +92,7 @@ class AdminUserSeeder extends Seeder
         $customerService = AdminUser::create([
             'name' => 'Customer Service Rep',
             'email' => 'support@coffee.com',
+            'username' => 'customerservice',
             'password' => 'password123',
             'phone' => '+1234567894',
             'is_active' => true,
@@ -103,6 +108,7 @@ class AdminUserSeeder extends Seeder
         $multiRoleUser = AdminUser::create([
             'name' => 'John Doe',
             'email' => 'john@coffee.com',
+            'username' => 'johndoe',
             'password' => 'password123',
             'phone' => '+1234567895',
             'is_active' => true,
@@ -120,6 +126,7 @@ class AdminUserSeeder extends Seeder
         $inactiveUser = AdminUser::create([
             'name' => 'Inactive User',
             'email' => 'inactive@coffee.com',
+            'username' => 'inactiveuser',
             'password' => 'password123',
             'phone' => '+1234567896',
             'is_active' => false, // Inactive user

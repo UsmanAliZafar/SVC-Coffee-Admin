@@ -124,6 +124,54 @@ class SystemStatusSeeder extends Seeder
             ],
 
             // ============================================
+            // PRODUCTS VARIENT MODULE STATUSES
+            // ============================================
+            [
+                'module' => 'product_variants',
+                'name' => 'Active',
+                'key_code' => 'VARIANT_ACTIVE',
+                'slug' => 'active',
+                'color' => '#ffffff',
+                'bg_color' => '#28a745',
+                'icon' => 'bi-check-circle-fill',
+                'description' => 'Product variant is active and available for purchase',
+                'order' => 1,
+                'is_active' => true,
+                'is_default' => true,
+                'is_final' => false,
+            ],
+            [
+                'module' => 'product_variants',
+                'name' => 'Inactive',
+                'key_code' => 'VARIANT_INACTIVE',
+                'slug' => 'inactive',
+                'color' => '#ffffff',
+                'bg_color' => '#6c757d',
+                'icon' => 'bi-dash-circle-fill',
+                'description' => 'Product variant is inactive and hidden from customers',
+                'order' => 2,
+                'is_active' => true,
+                'is_default' => false,
+                'is_final' => false,
+            ],
+            [
+                'module' => 'product_variants',
+                'name' => 'Out of Stock',
+                'key_code' => 'VARIANT_OUT_OF_STOCK',
+                'slug' => 'out-of-stock',
+                'color' => '#ffffff',
+                'bg_color' => '#dc3545',
+                'icon' => 'bi-x-circle-fill',
+                'description' => 'Product variant is out of stock',
+                'order' => 3,
+                'is_active' => true,
+                'is_default' => false,
+                'is_final' => false,
+                'send_email' => true,
+                'email_template' => 'variant_out_of_stock',
+            ],
+
+            // ============================================
             // ORDERS MODULE STATUSES
             // ============================================
             [
