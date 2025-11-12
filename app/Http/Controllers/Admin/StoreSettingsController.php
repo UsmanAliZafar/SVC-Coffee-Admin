@@ -270,35 +270,140 @@ class StoreSettingsController extends Controller
      */
     public function updateShipping(Request $request)
     {
-        // Check permission
-        if (!auth('admin')->user()->hasPermission('settings.update')) {
-            return redirect()->back()->with('error', 'Unauthorized access');
-        }
+        try {
+            // Check permission
+            if (!auth('admin')->user()->hasPermission('settings.update')) {
+                return redirect()->back()->with('error', 'Unauthorized access');
+            }
 
-        $validator = Validator::make($request->all(), [
-            'shipping_enabled' => 'boolean',
-            'free_shipping_threshold' => 'nullable|numeric|min:0',
-            'default_shipping_cost' => 'required|numeric|min:0',
-        ]);
+            $validator = Validator::make($request->all(), [
+                'shipping_enabled' => 'sometimes|accepted',  // Changed from 'boolean'
+                'free_shipping_threshold' => 'nullable|numeric|min:0',
+                'default_shipping_cost' => 'required|numeric|min:0',
 
-        if ($validator->fails()) {
+                // Enhanced shipping validation
+                'shipping_calculation_type' => 'required|in:flat_rate,per_kg,per_liter,per_item,tiered',
+                'shipping_rate_per_kg' => 'nullable|numeric|min:0',
+                'shipping_rate_per_liter' => 'nullable|numeric|min:0',
+                'shipping_rate_per_item' => 'nullable|numeric|min:0',
+                'enable_nationwide_flat_rate' => 'sometimes|accepted',  // Changed from 'boolean'
+                'nationwide_flat_rate' => 'nullable|numeric|min:0',
+                'enable_regional_rates' => 'sometimes|accepted',  // Changed from 'boolean'
+                'minimum_order_for_shipping' => 'nullable|numeric|min:0',
+                'max_weight_standard_shipping' => 'nullable|numeric|min:0',
+                'max_volume_standard_shipping' => 'nullable|numeric|min:0',
+                'handling_fee' => 'nullable|numeric|min:0',
+                'estimated_delivery_days_min' => 'nullable|integer|min:1',
+                'estimated_delivery_days_max' => 'nullable|integer|min:1',
+            ]);
+
+            if ($validator->fails()) {
+                Log::warning('Shipping settings validation failed', [
+                    'errors' => $validator->errors()->toArray(),
+                    'input' => $request->except(['_token', '_method']),
+                    'user_id' => auth('admin')->id(),
+                ]);
+
+                return redirect()->back()
+                            ->withErrors($validator)
+                            ->withInput()
+                            ->with('section', 'shipping')
+                            ->with('error', 'Validation failed. Please check the form.');
+            }
+
+            $settings = StoreSetting::getSettings();
+
+            // Parse tiered rates if provided
+            $tieredRates = null;
+            if ($request->filled('tiered_shipping_rates')) {
+                try {
+                    $tieredRates = json_decode($request->tiered_shipping_rates, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        throw new \Exception('Invalid JSON for tiered rates: ' . json_last_error_msg());
+                    }
+                    // Empty array should be null
+                    if (empty($tieredRates)) {
+                        $tieredRates = null;
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Failed to parse tiered shipping rates', [
+                        'error' => $e->getMessage(),
+                        'raw_data' => $request->tiered_shipping_rates
+                    ]);
+                    return redirect()->back()
+                                ->withInput()
+                                ->with('section', 'shipping')
+                                ->with('error', 'Invalid tiered rates format.');
+                }
+            }
+
+            Log::info('Attempting to update shipping settings', [
+                'user_id' => auth('admin')->id(),
+                'calculation_type' => $request->shipping_calculation_type
+            ]);
+
+            $updateData = [
+                'shipping_enabled' => $request->has('shipping_enabled'),
+                'free_shipping_threshold' => $request->free_shipping_threshold,
+                'default_shipping_cost' => $request->default_shipping_cost,
+
+                // Enhanced fields
+                'shipping_calculation_type' => $request->shipping_calculation_type,
+                'shipping_rate_per_kg' => $request->shipping_rate_per_kg,
+                'shipping_rate_per_liter' => $request->shipping_rate_per_liter,
+                'shipping_rate_per_item' => $request->shipping_rate_per_item,
+                'enable_nationwide_flat_rate' => $request->has('enable_nationwide_flat_rate'),
+                'nationwide_flat_rate' => $request->nationwide_flat_rate,
+                'enable_regional_rates' => $request->has('enable_regional_rates'),
+                'minimum_order_for_shipping' => $request->minimum_order_for_shipping,
+                'max_weight_standard_shipping' => $request->max_weight_standard_shipping,
+                'max_volume_standard_shipping' => $request->max_volume_standard_shipping,
+                'handling_fee' => $request->handling_fee ?? 0,
+                'tiered_shipping_rates' => $tieredRates,
+                'estimated_delivery_days_min' => $request->estimated_delivery_days_min,
+                'estimated_delivery_days_max' => $request->estimated_delivery_days_max,
+                'updated_by' => auth('admin')->id(),
+            ];
+
+            Log::info('Shipping settings data to be saved', [
+                'data' => $updateData
+            ]);
+
+            $result = $settings->update($updateData);
+
+            if (!$result) {
+                Log::error('Failed to update shipping settings', [
+                    'settings_id' => $settings->id,
+                    'user_id' => auth('admin')->id()
+                ]);
+                return redirect()->back()
+                            ->withInput()
+                            ->with('section', 'shipping')
+                            ->with('error', 'Failed to save shipping settings. Please try again.');
+            }
+
+            Log::info('Shipping settings updated successfully', [
+                'settings_id' => $settings->id,
+                'user_id' => auth('admin')->id()
+            ]);
+
             return redirect()->back()
-                           ->withErrors($validator)
-                           ->withInput()
-                           ->with('section', 'shipping');
+                        ->with('section', 'shipping')
+                        ->with('success', 'Shipping settings updated successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('Exception while updating shipping settings', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth('admin')->id(),
+                'request_data' => $request->except(['_token', '_method'])
+            ]);
+
+            return redirect()->back()
+                        ->withInput()
+                        ->with('section', 'shipping')
+                        ->with('error', 'An error occurred: ' . $e->getMessage());
         }
-
-        $settings = StoreSetting::getSettings();
-        $settings->update([
-            'shipping_enabled' => $request->has('shipping_enabled'),
-            'free_shipping_threshold' => $request->free_shipping_threshold,
-            'default_shipping_cost' => $request->default_shipping_cost,
-        ]);
-
-        $settings->updated_by = auth('admin')->id();
-        $settings->save();
-
-        return redirect()->back()->with('success', 'Shipping settings updated successfully.');
     }
 
     /**

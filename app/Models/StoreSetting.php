@@ -56,6 +56,20 @@ class StoreSetting extends Model
         'shipping_enabled',
         'free_shipping_threshold',
         'default_shipping_cost',
+        'shipping_calculation_type',
+        'shipping_rate_per_kg',
+        'shipping_rate_per_liter',
+        'shipping_rate_per_item',
+        'enable_nationwide_flat_rate',
+        'nationwide_flat_rate',
+        'enable_regional_rates',
+        'minimum_order_for_shipping',
+        'max_weight_standard_shipping',
+        'max_volume_standard_shipping',
+        'handling_fee',
+        'tiered_shipping_rates',
+        'estimated_delivery_days_min',
+        'estimated_delivery_days_max',
 
         // Inventory Settings
         'track_inventory',
@@ -121,6 +135,19 @@ class StoreSetting extends Model
         'tax_rate' => 'decimal:2',
         'free_shipping_threshold' => 'decimal:2',
         'default_shipping_cost' => 'decimal:2',
+        'enable_nationwide_flat_rate' => 'boolean',
+        'enable_regional_rates' => 'boolean',
+        'shipping_rate_per_kg' => 'decimal:2',
+        'shipping_rate_per_liter' => 'decimal:2',
+        'shipping_rate_per_item' => 'decimal:2',
+        'nationwide_flat_rate' => 'decimal:2',
+        'minimum_order_for_shipping' => 'decimal:2',
+        'max_weight_standard_shipping' => 'decimal:2',
+        'max_volume_standard_shipping' => 'decimal:2',
+        'handling_fee' => 'decimal:2',
+        'tiered_shipping_rates' => 'array',
+        'estimated_delivery_days_min' => 'integer',
+        'estimated_delivery_days_max' => 'integer',
     ];
 
     /**
@@ -351,5 +378,129 @@ class StoreSetting extends Model
             'linkedin' => $this->linkedin_url,
             'youtube' => $this->youtube_url,
         ]);
+    }
+
+    /**
+     * Calculate shipping cost based on order details
+     */
+    public function calculateShipping($orderTotal, $totalWeight = 0, $totalVolume = 0, $itemCount = 0)
+    {
+        if (!$this->shipping_enabled) {
+            return 0;
+        }
+
+        // Check for free shipping threshold
+        if ($this->free_shipping_threshold && $orderTotal >= $this->free_shipping_threshold) {
+            return 0;
+        }
+
+        // Check minimum order for shipping
+        if ($this->minimum_order_for_shipping && $orderTotal < $this->minimum_order_for_shipping) {
+            return null; // Indicate order doesn't meet minimum
+        }
+
+        $shippingCost = 0;
+
+        switch ($this->shipping_calculation_type) {
+            case 'flat_rate':
+                $shippingCost = $this->enable_nationwide_flat_rate
+                    ? $this->nationwide_flat_rate
+                    : $this->default_shipping_cost;
+                break;
+
+            case 'per_kg':
+                if ($totalWeight > 0 && $this->shipping_rate_per_kg) {
+                    $shippingCost = $totalWeight * $this->shipping_rate_per_kg;
+                }
+                break;
+
+            case 'per_liter':
+                if ($totalVolume > 0 && $this->shipping_rate_per_liter) {
+                    $shippingCost = $totalVolume * $this->shipping_rate_per_liter;
+                }
+                break;
+
+            case 'per_item':
+                if ($itemCount > 0 && $this->shipping_rate_per_item) {
+                    $shippingCost = $itemCount * $this->shipping_rate_per_item;
+                }
+                break;
+
+            case 'tiered':
+                $shippingCost = $this->calculateTieredShipping($orderTotal, $totalWeight);
+                break;
+
+            default:
+                $shippingCost = $this->default_shipping_cost;
+        }
+
+        // Add handling fee
+        $shippingCost += $this->handling_fee;
+
+        return max(0, $shippingCost); // Ensure non-negative
+    }
+
+    /**
+     * Calculate tiered shipping based on order total or weight
+     */
+    private function calculateTieredShipping($orderTotal, $totalWeight)
+    {
+        if (!$this->tiered_shipping_rates || empty($this->tiered_shipping_rates)) {
+            return $this->default_shipping_cost;
+        }
+
+        // Sort tiers by threshold
+        $tiers = collect($this->tiered_shipping_rates)->sortBy('threshold');
+
+        $applicableRate = $this->default_shipping_cost;
+
+        foreach ($tiers as $tier) {
+            $threshold = $tier['threshold'] ?? 0;
+            $rate = $tier['rate'] ?? 0;
+            $type = $tier['type'] ?? 'order_total'; // 'order_total' or 'weight'
+
+            if ($type === 'order_total' && $orderTotal >= $threshold) {
+                $applicableRate = $rate;
+            } elseif ($type === 'weight' && $totalWeight >= $threshold) {
+                $applicableRate = $rate;
+            }
+        }
+
+        return $applicableRate;
+    }
+
+    /**
+     * Get estimated delivery range
+     */
+    public function getEstimatedDelivery()
+    {
+        if (!$this->estimated_delivery_days_min && !$this->estimated_delivery_days_max) {
+            return null;
+        }
+
+        $min = $this->estimated_delivery_days_min ?? 1;
+        $max = $this->estimated_delivery_days_max ?? $min;
+
+        if ($min === $max) {
+            return "{$min} business day" . ($min > 1 ? 's' : '');
+        }
+
+        return "{$min}-{$max} business days";
+    }
+
+    /**
+     * Check if order exceeds shipping limits
+     */
+    public function exceedsShippingLimits($totalWeight, $totalVolume)
+    {
+        if ($this->max_weight_standard_shipping && $totalWeight > $this->max_weight_standard_shipping) {
+            return ['exceeds' => true, 'type' => 'weight', 'limit' => $this->max_weight_standard_shipping];
+        }
+
+        if ($this->max_volume_standard_shipping && $totalVolume > $this->max_volume_standard_shipping) {
+            return ['exceeds' => true, 'type' => 'volume', 'limit' => $this->max_volume_standard_shipping];
+        }
+
+        return ['exceeds' => false];
     }
 }

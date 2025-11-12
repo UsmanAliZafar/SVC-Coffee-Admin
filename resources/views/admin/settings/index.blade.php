@@ -1,7 +1,40 @@
 @extends('admin.layouts.app')
 
 @section('title', 'Store Settings')
+@section('styles')
+<style>
+.tier-row {
+    transition: all 0.3s ease;
+    border-left: 3px solid #5B914C !important;
+}
 
+.tier-row:hover {
+    box-shadow: 0 2px 8px rgba(91, 145, 76, 0.2);
+}
+
+.calculation-section {
+    padding: 1rem;
+    border-radius: 8px;
+    background-color: white;
+}
+
+.form-check-input:checked {
+    background-color: #5B914C;
+    border-color: #5B914C;
+}
+
+.btn-outline-primary {
+    color: #5B914C;
+    border-color: #5B914C;
+}
+
+.btn-outline-primary:hover {
+    background-color: #5B914C;
+    border-color: #5B914C;
+    color: white;
+}
+</style>
+@endsection
 @section('content')
 <div class="container-fluid">
     <!-- Page Header -->
@@ -586,50 +619,392 @@
 
                 {{-- SHIPPING SETTINGS TAB --}}
                 <div class="tab-pane fade" id="shipping" role="tabpanel">
-                    <form action="{{ route('admin.settings.update-shipping') }}" method="POST">
+                    <form action="{{ route('admin.settings.update-shipping') }}" method="POST" id="shippingForm">
                         @csrf
                         @method('PUT')
 
                         <h5 class="mb-3"><i class="bi bi-box-seam me-2"></i>Shipping Configuration</h5>
 
+                        {{-- Enable Shipping --}}
                         <div class="row">
-                            <div class="col-12 mb-3">
+                            <div class="col-12 mb-4">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="shipping_enabled" name="shipping_enabled"
-                                           {{ $settings->shipping_enabled ? 'checked' : '' }}>
+                                        {{ old('shipping_enabled', $settings->shipping_enabled) ? 'checked' : '' }}>
                                     <label class="form-check-label" for="shipping_enabled">
-                                        <strong>Enable Shipping</strong>
+                                        <strong class="fs-5">Enable Shipping</strong>
                                     </label>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="col-md-6 mb-3">
-                                <label for="default_shipping_cost" class="form-label">Default Shipping Cost <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control @error('default_shipping_cost') is-invalid @enderror"
-                                       id="default_shipping_cost" name="default_shipping_cost"
-                                       value="{{ old('default_shipping_cost', $settings->default_shipping_cost) }}"
-                                       min="0" step="0.01" required>
-                                @error('default_shipping_cost')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
+                        {{-- Shipping Calculation Method --}}
+                        <div class="card mb-4 border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="bi bi-calculator me-2"></i>Shipping Calculation Method
+                                </h6>
 
-                            <div class="col-md-6 mb-3">
-                                <label for="free_shipping_threshold" class="form-label">Free Shipping Threshold</label>
-                                <input type="number" class="form-control @error('free_shipping_threshold') is-invalid @enderror"
-                                       id="free_shipping_threshold" name="free_shipping_threshold"
-                                       value="{{ old('free_shipping_threshold', $settings->free_shipping_threshold) }}"
-                                       min="0" step="0.01">
-                                <small class="text-muted">Minimum order amount for free shipping (leave empty to disable)</small>
-                                @error('free_shipping_threshold')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="shipping_calculation_type" class="form-label">
+                                            Calculation Type <span class="text-danger">*</span>
+                                        </label>
+                                        <select class="form-select @error('shipping_calculation_type') is-invalid @enderror"
+                                                id="shipping_calculation_type" name="shipping_calculation_type" required>
+                                            <option value="flat_rate" {{ old('shipping_calculation_type', $settings->shipping_calculation_type) == 'flat_rate' ? 'selected' : '' }}>
+                                                Flat Rate (Fixed price)
+                                            </option>
+                                            <option value="per_kg" {{ old('shipping_calculation_type', $settings->shipping_calculation_type) == 'per_kg' ? 'selected' : '' }}>
+                                                Per Kilogram (Weight-based)
+                                            </option>
+                                            <option value="per_liter" {{ old('shipping_calculation_type', $settings->shipping_calculation_type) == 'per_liter' ? 'selected' : '' }}>
+                                                Per Liter (Volume-based)
+                                            </option>
+                                            <option value="per_item" {{ old('shipping_calculation_type', $settings->shipping_calculation_type) == 'per_item' ? 'selected' : '' }}>
+                                                Per Item (Quantity-based)
+                                            </option>
+                                            <option value="tiered" {{ old('shipping_calculation_type', $settings->shipping_calculation_type) == 'tiered' ? 'selected' : '' }}>
+                                                Tiered Rates (Based on order total/weight)
+                                            </option>
+                                        </select>
+                                        @error('shipping_calculation_type')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label for="default_shipping_cost" class="form-label">
+                                            Default Shipping Cost <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                            <input type="number" class="form-control @error('default_shipping_cost') is-invalid @enderror"
+                                                id="default_shipping_cost" name="default_shipping_cost"
+                                                value="{{ old('default_shipping_cost', $settings->default_shipping_cost) }}"
+                                                min="0" step="0.01" required>
+                                            @error('default_shipping_cost')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <small class="text-muted">Fallback rate when other methods don't apply</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
+                        {{-- Calculation Type Specific Settings --}}
+                        <div class="card mb-4 border-0 bg-light" id="calculation-specific-settings">
+                            <div class="card-body">
+
+                                {{-- Flat Rate Settings --}}
+                                <div class="calculation-section" id="flat_rate_section" style="display: none;">
+                                    <h6 class="mb-3"><i class="bi bi-tag me-2"></i>Flat Rate Settings</h6>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="enable_nationwide_flat_rate"
+                                                    name="enable_nationwide_flat_rate"
+                                                    {{ old('enable_nationwide_flat_rate', $settings->enable_nationwide_flat_rate) ? 'checked' : '' }}>
+                                                <label class="form-check-label" for="enable_nationwide_flat_rate">
+                                                    <strong>Enable Nationwide Flat Rate</strong>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-6 mb-3">
+                                            <label for="nationwide_flat_rate" class="form-label">Nationwide Flat Rate</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                                <input type="number" class="form-control @error('nationwide_flat_rate') is-invalid @enderror"
+                                                    id="nationwide_flat_rate" name="nationwide_flat_rate"
+                                                    value="{{ old('nationwide_flat_rate', $settings->nationwide_flat_rate) }}"
+                                                    min="0" step="0.01">
+                                                @error('nationwide_flat_rate')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                            <small class="text-muted">Fixed shipping cost for entire country</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Per Kilogram Settings --}}
+                                <div class="calculation-section" id="per_kg_section" style="display: none;">
+                                    <h6 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Per Kilogram Settings</h6>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="shipping_rate_per_kg" class="form-label">Rate per Kilogram</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                                <input type="number" class="form-control @error('shipping_rate_per_kg') is-invalid @enderror"
+                                                    id="shipping_rate_per_kg" name="shipping_rate_per_kg"
+                                                    value="{{ old('shipping_rate_per_kg', $settings->shipping_rate_per_kg) }}"
+                                                    min="0" step="0.01">
+                                                <span class="input-group-text">/kg</span>
+                                                @error('shipping_rate_per_kg')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                            <small class="text-muted">Cost per kilogram of total order weight</small>
+                                        </div>
+
+                                        <div class="col-md-6 mb-3">
+                                            <label for="max_weight_standard_shipping" class="form-label">Maximum Weight Limit</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control @error('max_weight_standard_shipping') is-invalid @enderror"
+                                                    id="max_weight_standard_shipping" name="max_weight_standard_shipping"
+                                                    value="{{ old('max_weight_standard_shipping', $settings->max_weight_standard_shipping) }}"
+                                                    min="0" step="0.01">
+                                                <span class="input-group-text">kg</span>
+                                                @error('max_weight_standard_shipping')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                            <small class="text-muted">Maximum weight for standard shipping (optional)</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Per Liter Settings --}}
+                                <div class="calculation-section" id="per_liter_section" style="display: none;">
+                                    <h6 class="mb-3"><i class="bi bi-droplet me-2"></i>Per Liter Settings</h6>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="shipping_rate_per_liter" class="form-label">Rate per Liter</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                                <input type="number" class="form-control @error('shipping_rate_per_liter') is-invalid @enderror"
+                                                    id="shipping_rate_per_liter" name="shipping_rate_per_liter"
+                                                    value="{{ old('shipping_rate_per_liter', $settings->shipping_rate_per_liter) }}"
+                                                    min="0" step="0.01">
+                                                <span class="input-group-text">/L</span>
+                                                @error('shipping_rate_per_liter')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                            <small class="text-muted">Cost per liter of total order volume</small>
+                                        </div>
+
+                                        <div class="col-md-6 mb-3">
+                                            <label for="max_volume_standard_shipping" class="form-label">Maximum Volume Limit</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control @error('max_volume_standard_shipping') is-invalid @enderror"
+                                                    id="max_volume_standard_shipping" name="max_volume_standard_shipping"
+                                                    value="{{ old('max_volume_standard_shipping', $settings->max_volume_standard_shipping) }}"
+                                                    min="0" step="0.01">
+                                                <span class="input-group-text">L</span>
+                                                @error('max_volume_standard_shipping')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                            <small class="text-muted">Maximum volume for standard shipping (optional)</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Per Item Settings --}}
+                                <div class="calculation-section" id="per_item_section" style="display: none;">
+                                    <h6 class="mb-3"><i class="bi bi-box me-2"></i>Per Item Settings</h6>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="shipping_rate_per_item" class="form-label">Rate per Item</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                                <input type="number" class="form-control @error('shipping_rate_per_item') is-invalid @enderror"
+                                                    id="shipping_rate_per_item" name="shipping_rate_per_item"
+                                                    value="{{ old('shipping_rate_per_item', $settings->shipping_rate_per_item) }}"
+                                                    min="0" step="0.01">
+                                                <span class="input-group-text">/item</span>
+                                                @error('shipping_rate_per_item')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                            <small class="text-muted">Cost per item in the order</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Tiered Settings --}}
+                                <div class="calculation-section" id="tiered_section" style="display: none;">
+                                    <h6 class="mb-3"><i class="bi bi-bar-chart-steps me-2"></i>Tiered Shipping Rates</h6>
+
+                                    <div id="tiered-rates-container">
+                                        @php
+                                            $tieredRates = old('tiered_shipping_rates', $settings->tiered_shipping_rates ?? []);
+                                            if (is_string($tieredRates)) {
+                                                $tieredRates = json_decode($tieredRates, true) ?? [];
+                                            }
+                                        @endphp
+
+                                        @forelse($tieredRates as $index => $tier)
+                                        <div class="tier-row card mb-3 border" data-tier-index="{{ $index }}">
+                                            <div class="card-body">
+                                                <div class="row align-items-end">
+                                                    <div class="col-md-3">
+                                                        <label class="form-label">Tier Type</label>
+                                                        <select class="form-select tier-type" name="tiers[{{ $index }}][type]">
+                                                            <option value="order_total" {{ ($tier['type'] ?? '') == 'order_total' ? 'selected' : '' }}>
+                                                                Order Total
+                                                            </option>
+                                                            <option value="weight" {{ ($tier['type'] ?? '') == 'weight' ? 'selected' : '' }}>
+                                                                Weight
+                                                            </option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label">Minimum Threshold</label>
+                                                        <input type="number" class="form-control tier-threshold"
+                                                            name="tiers[{{ $index }}][threshold]"
+                                                            value="{{ $tier['threshold'] ?? 0 }}"
+                                                            min="0" step="0.01" required>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Shipping Rate</label>
+                                                        <div class="input-group">
+                                                            <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                                            <input type="number" class="form-control tier-rate"
+                                                                name="tiers[{{ $index }}][rate]"
+                                                                value="{{ $tier['rate'] ?? 0 }}"
+                                                                min="0" step="0.01" required>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <button type="button" class="btn btn-danger btn-sm remove-tier w-100">
+                                                            <i class="bi bi-trash"></i> Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        @empty
+                                        <p class="text-muted" id="no-tiers-message">No tiers added yet. Click "Add Tier" to create one.</p>
+                                        @endforelse
+                                    </div>
+
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="add-tier-btn">
+                                        <i class="bi bi-plus-circle me-2"></i>Add Tier
+                                    </button>
+
+                                    <input type="hidden" name="tiered_shipping_rates" id="tiered_shipping_rates_input">
+
+                                    <div class="alert alert-info mt-3">
+                                        <small>
+                                            <strong>How it works:</strong> Create multiple shipping rate tiers based on order total or weight.
+                                            The system will apply the highest tier that the order qualifies for.
+                                        </small>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        {{-- Additional Shipping Settings --}}
+                        <div class="card mb-4 border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="bi bi-gear me-2"></i>Additional Settings
+                                </h6>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="free_shipping_threshold" class="form-label">
+                                            <i class="bi bi-truck me-1"></i>Free Shipping Threshold
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                            <input type="number" class="form-control @error('free_shipping_threshold') is-invalid @enderror"
+                                                id="free_shipping_threshold" name="free_shipping_threshold"
+                                                value="{{ old('free_shipping_threshold', $settings->free_shipping_threshold) }}"
+                                                min="0" step="0.01">
+                                            @error('free_shipping_threshold')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <small class="text-muted">Orders above this amount get free shipping (leave empty to disable)</small>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label for="minimum_order_for_shipping" class="form-label">
+                                            <i class="bi bi-cart-check me-1"></i>Minimum Order for Shipping
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                            <input type="number" class="form-control @error('minimum_order_for_shipping') is-invalid @enderror"
+                                                id="minimum_order_for_shipping" name="minimum_order_for_shipping"
+                                                value="{{ old('minimum_order_for_shipping', $settings->minimum_order_for_shipping) }}"
+                                                min="0" step="0.01">
+                                            @error('minimum_order_for_shipping')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <small class="text-muted">Minimum order value required for shipping (optional)</small>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label for="handling_fee" class="form-label">
+                                            <i class="bi bi-wallet2 me-1"></i>Handling Fee
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                            <input type="number" class="form-control @error('handling_fee') is-invalid @enderror"
+                                                id="handling_fee" name="handling_fee"
+                                                value="{{ old('handling_fee', $settings->handling_fee ?? 0) }}"
+                                                min="0" step="0.01">
+                                            @error('handling_fee')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <small class="text-muted">Additional handling fee added to shipping cost</small>
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label for="estimated_delivery_days_min" class="form-label">
+                                            <i class="bi bi-calendar-check me-1"></i>Est. Delivery (Min Days)
+                                        </label>
+                                        <input type="number" class="form-control @error('estimated_delivery_days_min') is-invalid @enderror"
+                                            id="estimated_delivery_days_min" name="estimated_delivery_days_min"
+                                            value="{{ old('estimated_delivery_days_min', $settings->estimated_delivery_days_min) }}"
+                                            min="1">
+                                        @error('estimated_delivery_days_min')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    <div class="col-md-3 mb-3">
+                                        <label for="estimated_delivery_days_max" class="form-label">
+                                            <i class="bi bi-calendar-range me-1"></i>Est. Delivery (Max Days)
+                                        </label>
+                                        <input type="number" class="form-control @error('estimated_delivery_days_max') is-invalid @enderror"
+                                            id="estimated_delivery_days_max" name="estimated_delivery_days_max"
+                                            value="{{ old('estimated_delivery_days_max', $settings->estimated_delivery_days_max) }}"
+                                            min="1">
+                                        @error('estimated_delivery_days_max')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="enable_regional_rates"
+                                                name="enable_regional_rates"
+                                                {{ old('enable_regional_rates', $settings->enable_regional_rates) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="enable_regional_rates">
+                                                Enable Regional Rates (Coming Soon)
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Zone-based shipping rates for different regions</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Save Button --}}
                         <div class="text-end">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-save me-2"></i>Save Changes
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-save me-2"></i>Save Shipping Settings
                             </button>
                         </div>
                     </form>
@@ -1134,5 +1509,124 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 @endif
 </script>
+{{-- Shipping Tab JavaScript --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Show/hide calculation type specific sections
+    const calculationType = document.getElementById('shipping_calculation_type');
+    const sections = document.querySelectorAll('.calculation-section');
 
+    function updateCalculationSection() {
+        const selectedType = calculationType.value;
+
+        // Hide all sections
+        sections.forEach(section => {
+            section.style.display = 'none';
+        });
+
+        // Show selected section
+        const selectedSection = document.getElementById(selectedType + '_section');
+        if (selectedSection) {
+            selectedSection.style.display = 'block';
+        }
+    }
+
+    calculationType.addEventListener('change', updateCalculationSection);
+
+    // Initialize on page load
+    updateCalculationSection();
+
+    // Tiered Rates Management
+    let tierIndex = {{ count($tieredRates ?? []) }};
+    const tieredContainer = document.getElementById('tiered-rates-container');
+    const addTierBtn = document.getElementById('add-tier-btn');
+    const noTiersMessage = document.getElementById('no-tiers-message');
+
+    // Add new tier
+    addTierBtn?.addEventListener('click', function() {
+        if (noTiersMessage) {
+            noTiersMessage.remove();
+        }
+
+        const tierHtml = `
+            <div class="tier-row card mb-3 border" data-tier-index="${tierIndex}">
+                <div class="card-body">
+                    <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Tier Type</label>
+                            <select class="form-select tier-type" name="tiers[${tierIndex}][type]">
+                                <option value="order_total">Order Total</option>
+                                <option value="weight">Weight</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Minimum Threshold</label>
+                            <input type="number" class="form-control tier-threshold"
+                                   name="tiers[${tierIndex}][threshold]"
+                                   value="0" min="0" step="0.01" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Shipping Rate</label>
+                            <div class="input-group">
+                                <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                <input type="number" class="form-control tier-rate"
+                                       name="tiers[${tierIndex}][rate]"
+                                       value="0" min="0" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-danger btn-sm remove-tier w-100">
+                                <i class="bi bi-trash"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        tieredContainer.insertAdjacentHTML('beforeend', tierHtml);
+        tierIndex++;
+    });
+
+    // Remove tier
+    tieredContainer?.addEventListener('click', function(e) {
+        if (e.target.closest('.remove-tier')) {
+            const tierRow = e.target.closest('.tier-row');
+            tierRow.remove();
+
+            // Show "no tiers" message if all removed
+            if (tieredContainer.children.length === 0) {
+                tieredContainer.innerHTML = '<p class="text-muted" id="no-tiers-message">No tiers added yet. Click "Add Tier" to create one.</p>';
+            }
+        }
+    });
+
+    // Serialize tiered rates before form submission
+    const shippingForm = document.getElementById('shippingForm');
+    shippingForm?.addEventListener('submit', function(e) {
+        const tiers = [];
+        const tierRows = document.querySelectorAll('.tier-row');
+
+        tierRows.forEach(row => {
+            const type = row.querySelector('.tier-type')?.value;
+            const threshold = row.querySelector('.tier-threshold')?.value;
+            const rate = row.querySelector('.tier-rate')?.value;
+
+            if (type && threshold && rate) {
+                tiers.push({
+                    type: type,
+                    threshold: parseFloat(threshold),
+                    rate: parseFloat(rate)
+                });
+            }
+        });
+
+        // Set JSON value
+        const hiddenInput = document.getElementById('tiered_shipping_rates_input');
+        if (hiddenInput) {
+            hiddenInput.value = JSON.stringify(tiers);
+        }
+    });
+});
+</script>
 @endsection
