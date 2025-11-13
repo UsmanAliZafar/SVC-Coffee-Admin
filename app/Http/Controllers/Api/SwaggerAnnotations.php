@@ -74,6 +74,10 @@ namespace App\Http\Controllers\Api;
  *     name="Orders",
  *     description="Order management - View, track, cancel orders and request returns"
  * )
+ * @OA\Tag(
+ *    name="Store Settings",
+ *    description="Store settings and configuration endpoints"
+ * )
  *
  * @OA\Response(
  *     response="Success",
@@ -491,6 +495,304 @@ namespace App\Http\Controllers\Api;
  *         @OA\Property(property="tracking_url", type="string", nullable=true, example="https://fedex.com/track/123456789")
  *     ),
  *     @OA\Property(property="estimated_delivery", type="string", format="date-time", nullable=true)
+ * )
+/**
+ * @OA\Schema(
+ *     schema="StoreSettings",
+ *     type="object",
+ *     title="Store Settings",
+ *     description="Complete store settings and configuration",
+ *     @OA\Property(property="basic_info", ref="#/components/schemas/BasicInfo"),
+ *     @OA\Property(property="branding", ref="#/components/schemas/Branding"),
+ *     @OA\Property(property="regional", ref="#/components/schemas/RegionalSettings"),
+ *     @OA\Property(property="order_settings", ref="#/components/schemas/OrderSettings"),
+ *     @OA\Property(property="tax_settings", ref="#/components/schemas/TaxSettings"),
+ *     @OA\Property(property="shipping_settings", ref="#/components/schemas/ShippingSettings"),
+ *     @OA\Property(property="inventory_settings", ref="#/components/schemas/InventorySettings"),
+ *     @OA\Property(property="email_settings", ref="#/components/schemas/EmailSettings"),
+ *     @OA\Property(property="checkout_settings", ref="#/components/schemas/CheckoutSettings"),
+ *     @OA\Property(property="social_media", ref="#/components/schemas/SocialMedia"),
+ *     @OA\Property(property="seo", ref="#/components/schemas/SeoSettings"),
+ *     @OA\Property(property="maintenance", ref="#/components/schemas/MaintenanceMode"),
+ *     @OA\Property(property="business_hours", type="object", nullable=true, description="Business hours for each day of week")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="BasicInfo",
+ *     type="object",
+ *     title="Basic Store Information",
+ *     description="Store basic information and contact details",
+ *     @OA\Property(property="store_name", type="string", example="My Store"),
+ *     @OA\Property(property="store_email", type="string", format="email", example="store@example.com"),
+ *     @OA\Property(property="store_phone", type="string", nullable=true, example="+92-300-1234567"),
+ *     @OA\Property(property="store_address", type="string", nullable=true, example="123 Main Street"),
+ *     @OA\Property(property="store_city", type="string", nullable=true, example="Lahore"),
+ *     @OA\Property(property="store_state", type="string", nullable=true, example="Punjab"),
+ *     @OA\Property(property="store_zip", type="string", nullable=true, example="54000"),
+ *     @OA\Property(property="store_country", type="string", nullable=true, example="PK"),
+ *     @OA\Property(property="store_tagline", type="string", nullable=true, example="Your One-Stop Shop"),
+ *     @OA\Property(property="store_description", type="string", nullable=true, example="Welcome to our online store"),
+ *     @OA\Property(property="full_address", type="string", nullable=true, example="123 Main Street, Lahore, Punjab, 54000, PK")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="Branding",
+ *     type="object",
+ *     title="Store Branding",
+ *     description="Store branding assets (logo, favicon, banner)",
+ *     @OA\Property(property="logo_url", type="string", format="uri", example="https://example.com/storage/branding/logos/logo.png"),
+ *     @OA\Property(property="favicon_url", type="string", format="uri", example="https://example.com/storage/branding/favicons/favicon.png"),
+ *     @OA\Property(property="banner_url", type="string", format="uri", example="https://example.com/storage/branding/banners/banner.jpg")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="RegionalSettings",
+ *     type="object",
+ *     title="Regional Settings",
+ *     description="Regional configuration (timezone, currency, formats)",
+ *     @OA\Property(property="timezone", type="string", example="Asia/Karachi"),
+ *     @OA\Property(property="date_format", type="string", example="Y-m-d"),
+ *     @OA\Property(property="time_format", type="string", example="H:i:s"),
+ *     @OA\Property(property="currency_code", type="string", example="PKR"),
+ *     @OA\Property(property="currency_symbol", type="string", example="Rs."),
+ *     @OA\Property(property="currency_position", type="string", enum={"left", "right"}, example="left"),
+ *     @OA\Property(property="decimal_places", type="integer", example=2),
+ *     @OA\Property(property="thousand_separator", type="string", example=","),
+ *     @OA\Property(property="decimal_separator", type="string", example=".")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="OrderSettings",
+ *     type="object",
+ *     title="Order Settings",
+ *     description="Order numbering and configuration",
+ *     @OA\Property(property="order_prefix", type="string", example="ORD-"),
+ *     @OA\Property(property="order_number_start", type="integer", example=1000),
+ *     @OA\Property(property="order_number_length", type="integer", example=6),
+ *     @OA\Property(property="order_auto_confirm", type="boolean", example=false),
+ *     @OA\Property(property="order_notification_email", type="boolean", example=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="TaxSettings",
+ *     type="object",
+ *     title="Tax Settings",
+ *     description="Tax configuration and rates",
+ *     @OA\Property(property="tax_enabled", type="boolean", example=false),
+ *     @OA\Property(property="tax_rate", type="number", format="float", example=0.00),
+ *     @OA\Property(property="tax_name", type="string", example="VAT"),
+ *     @OA\Property(property="tax_included_in_price", type="boolean", example=false)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="ShippingSettings",
+ *     type="object",
+ *     title="Shipping Settings",
+ *     description="Shipping configuration and rates",
+ *     @OA\Property(property="shipping_enabled", type="boolean", example=true),
+ *     @OA\Property(property="free_shipping_threshold", type="number", format="float", nullable=true, example=5000.00),
+ *     @OA\Property(property="default_shipping_cost", type="number", format="float", example=200.00),
+ *     @OA\Property(property="shipping_calculation_type", type="string", enum={"flat_rate", "per_kg", "per_liter", "per_item", "tiered"}, example="flat_rate"),
+ *     @OA\Property(property="shipping_rate_per_kg", type="number", format="float", nullable=true, example=null),
+ *     @OA\Property(property="shipping_rate_per_liter", type="number", format="float", nullable=true, example=null),
+ *     @OA\Property(property="shipping_rate_per_item", type="number", format="float", nullable=true, example=null),
+ *     @OA\Property(property="enable_nationwide_flat_rate", type="boolean", example=true),
+ *     @OA\Property(property="nationwide_flat_rate", type="number", format="float", nullable=true, example=200.00),
+ *     @OA\Property(property="enable_regional_rates", type="boolean", example=false),
+ *     @OA\Property(property="minimum_order_for_shipping", type="number", format="float", nullable=true, example=null),
+ *     @OA\Property(property="max_weight_standard_shipping", type="number", format="float", nullable=true, example=null),
+ *     @OA\Property(property="max_volume_standard_shipping", type="number", format="float", nullable=true, example=null),
+ *     @OA\Property(property="handling_fee", type="number", format="float", example=0.00),
+ *     @OA\Property(property="tiered_shipping_rates", type="array", nullable=true, @OA\Items(ref="#/components/schemas/TieredShippingRate")),
+ *     @OA\Property(property="estimated_delivery_days_min", type="integer", nullable=true, example=3),
+ *     @OA\Property(property="estimated_delivery_days_max", type="integer", nullable=true, example=7),
+ *     @OA\Property(property="estimated_delivery", type="string", nullable=true, example="3-7 business days")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="TieredShippingRate",
+ *     type="object",
+ *     title="Tiered Shipping Rate",
+ *     description="Tiered shipping rate tier",
+ *     @OA\Property(property="type", type="string", enum={"order_total", "weight"}, example="order_total"),
+ *     @OA\Property(property="threshold", type="number", format="float", example=1000.00),
+ *     @OA\Property(property="rate", type="number", format="float", example=150.00)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="InventorySettings",
+ *     type="object",
+ *     title="Inventory Settings",
+ *     description="Inventory tracking configuration",
+ *     @OA\Property(property="track_inventory", type="boolean", example=true),
+ *     @OA\Property(property="allow_backorders", type="boolean", example=false),
+ *     @OA\Property(property="low_stock_threshold", type="integer", example=10),
+ *     @OA\Property(property="low_stock_notifications", type="boolean", example=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="EmailSettings",
+ *     type="object",
+ *     title="Email Settings",
+ *     description="Email configuration and notifications",
+ *     @OA\Property(property="email_from_name", type="string", example="My Store"),
+ *     @OA\Property(property="email_from_address", type="string", format="email", example="noreply@example.com"),
+ *     @OA\Property(property="customer_registration_email", type="boolean", example=true),
+ *     @OA\Property(property="order_confirmation_email", type="boolean", example=true),
+ *     @OA\Property(property="order_shipped_email", type="boolean", example=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="CheckoutSettings",
+ *     type="object",
+ *     title="Checkout Settings",
+ *     description="Checkout and payment configuration",
+ *     @OA\Property(property="payment_methods", type="object",
+ *         @OA\Property(property="cod", ref="#/components/schemas/PaymentMethodCOD"),
+ *         @OA\Property(property="online_payment", ref="#/components/schemas/PaymentMethodOnline"),
+ *         @OA\Property(property="bank_transfer", ref="#/components/schemas/PaymentMethodBankTransfer")
+ *     ),
+ *     @OA\Property(property="available_payment_methods", type="array", @OA\Items(ref="#/components/schemas/AvailablePaymentMethod")),
+ *     @OA\Property(property="checkout_options", ref="#/components/schemas/CheckoutOptions"),
+ *     @OA\Property(property="order_confirmation", ref="#/components/schemas/OrderConfirmation")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PaymentMethodCOD",
+ *     type="object",
+ *     title="Cash on Delivery Payment Method",
+ *     @OA\Property(property="enabled", type="boolean", example=true),
+ *     @OA\Property(property="instructions", type="string", nullable=true, example="Please keep exact change ready")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PaymentMethodOnline",
+ *     type="object",
+ *     title="Online Payment Method",
+ *     @OA\Property(property="enabled", type="boolean", example=false),
+ *     @OA\Property(property="gateway", type="string", nullable=true, example="stripe"),
+ *     @OA\Property(property="mode", type="string", enum={"sandbox", "live"}, example="sandbox"),
+ *     @OA\Property(property="instructions", type="string", nullable=true, example="You will be redirected to payment gateway")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PaymentMethodBankTransfer",
+ *     type="object",
+ *     title="Bank Transfer Payment Method",
+ *     @OA\Property(property="enabled", type="boolean", example=true),
+ *     @OA\Property(property="instructions", type="string", nullable=true, example="Transfer to our bank account"),
+ *     @OA\Property(property="bank_details", type="object", nullable=true,
+ *         @OA\Property(property="bank_name", type="string", example="HBL Bank"),
+ *         @OA\Property(property="account_name", type="string", example="My Store"),
+ *         @OA\Property(property="account_number", type="string", example="1234567890"),
+ *         @OA\Property(property="iban", type="string", nullable=true, example="PK36HBLB0000001234567890"),
+ *         @OA\Property(property="swift_code", type="string", nullable=true, example="HBLBPKKAXXX"),
+ *         @OA\Property(property="branch", type="string", nullable=true, example="Main Branch, Lahore"),
+ *         @OA\Property(property="formatted", type="string", example="Bank Name: HBL Bank\nAccount Name: My Store...")
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="AvailablePaymentMethod",
+ *     type="object",
+ *     title="Available Payment Method",
+ *     @OA\Property(property="key", type="string", example="cod"),
+ *     @OA\Property(property="name", type="string", example="Cash on Delivery"),
+ *     @OA\Property(property="icon", type="string", example="bi-cash-coin"),
+ *     @OA\Property(property="instructions", type="string", nullable=true, example="Pay when you receive")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="CheckoutOptions",
+ *     type="object",
+ *     title="Checkout Options",
+ *     @OA\Property(property="require_phone", type="boolean", example=true),
+ *     @OA\Property(property="require_address", type="boolean", example=true),
+ *     @OA\Property(property="enable_guest_checkout", type="boolean", example=true),
+ *     @OA\Property(property="terms_required", type="boolean", example=true),
+ *     @OA\Property(property="terms_text", type="string", nullable=true, example="By placing order, you agree to our terms")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="OrderConfirmation",
+ *     type="object",
+ *     title="Order Confirmation Settings",
+ *     @OA\Property(property="message", type="string", nullable=true, example="Thank you for your order!"),
+ *     @OA\Property(property="show_bank_details", type="boolean", example=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="SocialMedia",
+ *     type="object",
+ *     title="Social Media Links",
+ *     description="Store social media profiles",
+ *     @OA\Property(property="facebook", type="string", format="uri", nullable=true, example="https://facebook.com/mystore"),
+ *     @OA\Property(property="twitter", type="string", format="uri", nullable=true, example="https://twitter.com/mystore"),
+ *     @OA\Property(property="instagram", type="string", format="uri", nullable=true, example="https://instagram.com/mystore"),
+ *     @OA\Property(property="linkedin", type="string", format="uri", nullable=true, example="https://linkedin.com/company/mystore"),
+ *     @OA\Property(property="youtube", type="string", format="uri", nullable=true, example="https://youtube.com/mystore"),
+ *     @OA\Property(property="social_links", type="object", description="Filtered non-null social links")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="SeoSettings",
+ *     type="object",
+ *     title="SEO Settings",
+ *     description="SEO and analytics configuration",
+ *     @OA\Property(property="meta_title", type="string", nullable=true, example="My Store - Best Products"),
+ *     @OA\Property(property="meta_description", type="string", nullable=true, example="Shop the best products at great prices"),
+ *     @OA\Property(property="meta_keywords", type="string", nullable=true, example="online store, shopping, products"),
+ *     @OA\Property(property="google_analytics_id", type="string", nullable=true, example="G-XXXXXXXXXX"),
+ *     @OA\Property(property="facebook_pixel_id", type="string", nullable=true, example="123456789012345")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="MaintenanceMode",
+ *     type="object",
+ *     title="Maintenance Mode",
+ *     description="Store maintenance mode status",
+ *     @OA\Property(property="maintenance_mode", type="boolean", example=false),
+ *     @OA\Property(property="maintenance_message", type="string", nullable=true, example="We are performing maintenance"),
+ *     @OA\Property(property="is_in_maintenance", type="boolean", example=false)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="ShippingCalculation",
+ *     type="object",
+ *     title="Shipping Calculation Result",
+ *     description="Calculated shipping cost details",
+ *     @OA\Property(property="shipping_cost", type="number", format="float", example=200.00),
+ *     @OA\Property(property="formatted_cost", type="string", example="Rs.200.00"),
+ *     @OA\Property(property="is_free_shipping", type="boolean", example=false),
+ *     @OA\Property(property="calculation_type", type="string", example="flat_rate"),
+ *     @OA\Property(property="estimated_delivery", type="string", nullable=true, example="3-7 business days"),
+ *     @OA\Property(property="currency_symbol", type="string", example="Rs.")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="CurrencyFormat",
+ *     type="object",
+ *     title="Currency Format Result",
+ *     description="Formatted currency amount",
+ *     @OA\Property(property="amount", type="number", format="float", example=1234.56),
+ *     @OA\Property(property="formatted", type="string", example="Rs.1,234.56"),
+ *     @OA\Property(property="currency_code", type="string", example="PKR"),
+ *     @OA\Property(property="currency_symbol", type="string", example="Rs.")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="BusinessHours",
+ *     type="object",
+ *     title="Business Hours",
+ *     description="Store business hours information",
+ *     @OA\Property(property="business_hours", type="object", description="Hours for each day"),
+ *     @OA\Property(property="is_open_today", type="boolean", example=true),
+ *     @OA\Property(property="today_hours", type="object", nullable=true,
+ *         @OA\Property(property="is_open", type="boolean", example=true),
+ *         @OA\Property(property="open", type="string", example="09:00"),
+ *         @OA\Property(property="close", type="string", example="18:00")
+ *     ),
+ *     @OA\Property(property="timezone", type="string", example="Asia/Karachi")
  * )
  */
 class SwaggerAnnotations

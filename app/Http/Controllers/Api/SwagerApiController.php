@@ -1102,4 +1102,300 @@ class SwagerApiController extends Controller
      * )
      */
     public function requestReturn() {}
+
+     /**
+     * @OA\Get(
+     *     path="/api/store/settings",
+     *     operationId="getAllStoreSettings",
+     *     tags={"Store Settings"},
+     *     summary="Get all store settings",
+     *     description="Retrieve complete store configuration including basic info, branding, regional settings, payment methods, shipping, and more",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Store settings retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Store settings retrieved successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="basic_info", ref="#/components/schemas/BasicInfo"),
+     *                 @OA\Property(property="branding", ref="#/components/schemas/Branding"),
+     *                 @OA\Property(property="regional", ref="#/components/schemas/RegionalSettings"),
+     *                 @OA\Property(property="order_settings", ref="#/components/schemas/OrderSettings"),
+     *                 @OA\Property(property="tax_settings", ref="#/components/schemas/TaxSettings"),
+     *                 @OA\Property(property="shipping_settings", ref="#/components/schemas/ShippingSettings"),
+     *                 @OA\Property(property="inventory_settings", ref="#/components/schemas/InventorySettings"),
+     *                 @OA\Property(property="email_settings", ref="#/components/schemas/EmailSettings"),
+     *                 @OA\Property(property="checkout_settings", ref="#/components/schemas/CheckoutSettings"),
+     *                 @OA\Property(property="social_media", ref="#/components/schemas/SocialMedia"),
+     *                 @OA\Property(property="seo", ref="#/components/schemas/SeoSettings"),
+     *                 @OA\Property(property="maintenance", ref="#/components/schemas/MaintenanceMode"),
+     *                 @OA\Property(property="business_hours", type="object", description="Business hours for each day of the week")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Store settings not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Store settings not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function index() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/store/settings/basic-info",
+     *     operationId="getBasicStoreInfo",
+     *     tags={"Store Settings"},
+     *     summary="Get basic store information",
+     *     description="Retrieve store name, contact details, address, and description",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Basic information retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/BasicInfo")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function basicInfo() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/store/settings/branding",
+     *     operationId="getBrandingAssets",
+     *     tags={"Store Settings"},
+     *     summary="Get branding assets",
+     *     description="Retrieve store logo, favicon, and banner URLs",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Branding information retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/Branding")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function branding() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/store/settings/regional",
+     *     operationId="getRegionalSettings",
+     *     tags={"Store Settings"},
+     *     summary="Get regional settings",
+     *     description="Retrieve timezone, date/time formats, currency, and number formatting settings",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Regional settings retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/RegionalSettings")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function regional() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/store/settings/shipping",
+     *     operationId="getShippingSettings",
+     *     tags={"Store Settings"},
+     *     summary="Get shipping settings",
+     *     description="Retrieve shipping configuration including rates, calculation types, delivery estimates, and free shipping thresholds",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Shipping settings retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/ShippingSettings")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function shipping() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/store/settings/checkout",
+     *     operationId="getCheckoutSettings",
+     *     tags={"Store Settings"},
+     *     summary="Get checkout and payment settings",
+     *     description="Retrieve payment methods configuration including COD, online payment, and bank transfer details",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Checkout settings retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/CheckoutSettings")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function checkout() {}
+
+    /**
+     * @OA\Post(
+     *     path="/api/store/settings/calculate-shipping",
+     *     operationId="calculateShippingCost",
+     *     tags={"Store Settings"},
+     *     summary="Calculate shipping cost",
+     *     description="Calculate shipping cost based on order total, weight, volume, and item count",
+     *     security={{"apiKey": {}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"order_total"},
+     *             @OA\Property(property="order_total", type="number", format="float", example=5000.00, description="Order subtotal amount"),
+     *             @OA\Property(property="total_weight", type="number", format="float", example=2.5, description="Total weight in kg (optional)"),
+     *             @OA\Property(property="total_volume", type="number", format="float", example=0.5, description="Total volume in liters (optional)"),
+     *             @OA\Property(property="item_count", type="integer", example=3, description="Number of items (optional)")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Shipping cost calculated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Shipping cost calculated successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/ShippingCalculation")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Order does not meet minimum requirements",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Order does not meet minimum shipping requirements"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="minimum_order", type="number", example=1000.00),
+     *                 @OA\Property(property="currency_symbol", type="string", example="Rs.")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Validation error"),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function calculateShipping() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/store/settings/social-media",
+     *     operationId="getSocialMediaLinks",
+     *     tags={"Store Settings"},
+     *     summary="Get social media links",
+     *     description="Retrieve store's social media profile URLs",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Social media links retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/SocialMedia")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function socialMedia() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/store/settings/maintenance-status",
+     *     operationId="getMaintenanceStatus",
+     *     tags={"Store Settings"},
+     *     summary="Check maintenance mode status",
+     *     description="Check if store is in maintenance mode",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Maintenance status retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/MaintenanceMode")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function maintenanceStatus() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/store/settings/business-hours",
+     *     operationId="getBusinessHours",
+     *     tags={"Store Settings"},
+     *     summary="Get business hours",
+     *     description="Retrieve store business hours with current open/closed status",
+     *     security={{"apiKey": {}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Business hours retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/BusinessHours")
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function businessHours() {}
+
+    /**
+     * @OA\Post(
+     *     path="/api/store/settings/format-currency",
+     *     operationId="formatCurrencyAmount",
+     *     tags={"Store Settings"},
+     *     summary="Format currency amount",
+     *     description="Format a numeric amount according to store's currency settings",
+     *     security={{"apiKey": {}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"amount"},
+     *             @OA\Property(property="amount", type="number", format="float", example=1234.56, description="Amount to format")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Currency formatted successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Currency formatted successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/CurrencyFormat")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Validation error"),
+     *     @OA\Response(response=500, description="Server error")
+     * )
+     */
+    public function formatCurrency() {}
 }

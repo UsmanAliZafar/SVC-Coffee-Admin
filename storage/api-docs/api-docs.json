@@ -2499,6 +2499,642 @@
                     }
                 ]
             }
+        },
+        "/api/store/settings": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Get all store settings",
+                "description": "Retrieve complete store configuration including basic info, branding, regional settings, payment methods, shipping, and more",
+                "operationId": "getAllStoreSettings",
+                "responses": {
+                    "200": {
+                        "description": "Store settings retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Store settings retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "basic_info": {
+                                                    "$ref": "#/components/schemas/BasicInfo"
+                                                },
+                                                "branding": {
+                                                    "$ref": "#/components/schemas/Branding"
+                                                },
+                                                "regional": {
+                                                    "$ref": "#/components/schemas/RegionalSettings"
+                                                },
+                                                "order_settings": {
+                                                    "$ref": "#/components/schemas/OrderSettings"
+                                                },
+                                                "tax_settings": {
+                                                    "$ref": "#/components/schemas/TaxSettings"
+                                                },
+                                                "shipping_settings": {
+                                                    "$ref": "#/components/schemas/ShippingSettings"
+                                                },
+                                                "inventory_settings": {
+                                                    "$ref": "#/components/schemas/InventorySettings"
+                                                },
+                                                "email_settings": {
+                                                    "$ref": "#/components/schemas/EmailSettings"
+                                                },
+                                                "checkout_settings": {
+                                                    "$ref": "#/components/schemas/CheckoutSettings"
+                                                },
+                                                "social_media": {
+                                                    "$ref": "#/components/schemas/SocialMedia"
+                                                },
+                                                "seo": {
+                                                    "$ref": "#/components/schemas/SeoSettings"
+                                                },
+                                                "maintenance": {
+                                                    "$ref": "#/components/schemas/MaintenanceMode"
+                                                },
+                                                "business_hours": {
+                                                    "description": "Business hours for each day of the week",
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Store settings not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Store settings not found"
+                                        },
+                                        "data": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/basic-info": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Get basic store information",
+                "description": "Retrieve store name, contact details, address, and description",
+                "operationId": "getBasicStoreInfo",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Basic information retrieved successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/BasicInfo"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/branding": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Get branding assets",
+                "description": "Retrieve store logo, favicon, and banner URLs",
+                "operationId": "getBrandingAssets",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Branding information retrieved successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/Branding"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/regional": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Get regional settings",
+                "description": "Retrieve timezone, date/time formats, currency, and number formatting settings",
+                "operationId": "getRegionalSettings",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Regional settings retrieved successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/RegionalSettings"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/shipping": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Get shipping settings",
+                "description": "Retrieve shipping configuration including rates, calculation types, delivery estimates, and free shipping thresholds",
+                "operationId": "getShippingSettings",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Shipping settings retrieved successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ShippingSettings"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/checkout": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Get checkout and payment settings",
+                "description": "Retrieve payment methods configuration including COD, online payment, and bank transfer details",
+                "operationId": "getCheckoutSettings",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Checkout settings retrieved successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/CheckoutSettings"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/calculate-shipping": {
+            "post": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Calculate shipping cost",
+                "description": "Calculate shipping cost based on order total, weight, volume, and item count",
+                "operationId": "calculateShippingCost",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "order_total"
+                                ],
+                                "properties": {
+                                    "order_total": {
+                                        "description": "Order subtotal amount",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 5000
+                                    },
+                                    "total_weight": {
+                                        "description": "Total weight in kg (optional)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 2.5
+                                    },
+                                    "total_volume": {
+                                        "description": "Total volume in liters (optional)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 0.5
+                                    },
+                                    "item_count": {
+                                        "description": "Number of items (optional)",
+                                        "type": "integer",
+                                        "example": 3
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Shipping cost calculated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Shipping cost calculated successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ShippingCalculation"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Order does not meet minimum requirements",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Order does not meet minimum shipping requirements"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "minimum_order": {
+                                                    "type": "number",
+                                                    "example": 1000
+                                                },
+                                                "currency_symbol": {
+                                                    "type": "string",
+                                                    "example": "Rs."
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/social-media": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Get social media links",
+                "description": "Retrieve store's social media profile URLs",
+                "operationId": "getSocialMediaLinks",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Social media links retrieved successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/SocialMedia"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/maintenance-status": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Check maintenance mode status",
+                "description": "Check if store is in maintenance mode",
+                "operationId": "getMaintenanceStatus",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Maintenance status retrieved successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/MaintenanceMode"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/business-hours": {
+            "get": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Get business hours",
+                "description": "Retrieve store business hours with current open/closed status",
+                "operationId": "getBusinessHours",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Business hours retrieved successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/BusinessHours"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/store/settings/format-currency": {
+            "post": {
+                "tags": [
+                    "Store Settings"
+                ],
+                "summary": "Format currency amount",
+                "description": "Format a numeric amount according to store's currency settings",
+                "operationId": "formatCurrencyAmount",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "amount"
+                                ],
+                                "properties": {
+                                    "amount": {
+                                        "description": "Amount to format",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 1234.56
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Currency formatted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Currency formatted successfully"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/CurrencyFormat"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -3643,6 +4279,801 @@
                     }
                 },
                 "type": "object"
+            },
+            "StoreSettings": {
+                "title": "Store Settings",
+                "description": "Complete store settings and configuration",
+                "properties": {
+                    "basic_info": {
+                        "$ref": "#/components/schemas/BasicInfo"
+                    },
+                    "branding": {
+                        "$ref": "#/components/schemas/Branding"
+                    },
+                    "regional": {
+                        "$ref": "#/components/schemas/RegionalSettings"
+                    },
+                    "order_settings": {
+                        "$ref": "#/components/schemas/OrderSettings"
+                    },
+                    "tax_settings": {
+                        "$ref": "#/components/schemas/TaxSettings"
+                    },
+                    "shipping_settings": {
+                        "$ref": "#/components/schemas/ShippingSettings"
+                    },
+                    "inventory_settings": {
+                        "$ref": "#/components/schemas/InventorySettings"
+                    },
+                    "email_settings": {
+                        "$ref": "#/components/schemas/EmailSettings"
+                    },
+                    "checkout_settings": {
+                        "$ref": "#/components/schemas/CheckoutSettings"
+                    },
+                    "social_media": {
+                        "$ref": "#/components/schemas/SocialMedia"
+                    },
+                    "seo": {
+                        "$ref": "#/components/schemas/SeoSettings"
+                    },
+                    "maintenance": {
+                        "$ref": "#/components/schemas/MaintenanceMode"
+                    },
+                    "business_hours": {
+                        "description": "Business hours for each day of week",
+                        "type": "object",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "BasicInfo": {
+                "title": "Basic Store Information",
+                "description": "Store basic information and contact details",
+                "properties": {
+                    "store_name": {
+                        "type": "string",
+                        "example": "My Store"
+                    },
+                    "store_email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "store@example.com"
+                    },
+                    "store_phone": {
+                        "type": "string",
+                        "example": "+92-300-1234567",
+                        "nullable": true
+                    },
+                    "store_address": {
+                        "type": "string",
+                        "example": "123 Main Street",
+                        "nullable": true
+                    },
+                    "store_city": {
+                        "type": "string",
+                        "example": "Lahore",
+                        "nullable": true
+                    },
+                    "store_state": {
+                        "type": "string",
+                        "example": "Punjab",
+                        "nullable": true
+                    },
+                    "store_zip": {
+                        "type": "string",
+                        "example": "54000",
+                        "nullable": true
+                    },
+                    "store_country": {
+                        "type": "string",
+                        "example": "PK",
+                        "nullable": true
+                    },
+                    "store_tagline": {
+                        "type": "string",
+                        "example": "Your One-Stop Shop",
+                        "nullable": true
+                    },
+                    "store_description": {
+                        "type": "string",
+                        "example": "Welcome to our online store",
+                        "nullable": true
+                    },
+                    "full_address": {
+                        "type": "string",
+                        "example": "123 Main Street, Lahore, Punjab, 54000, PK",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "Branding": {
+                "title": "Store Branding",
+                "description": "Store branding assets (logo, favicon, banner)",
+                "properties": {
+                    "logo_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://example.com/storage/branding/logos/logo.png"
+                    },
+                    "favicon_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://example.com/storage/branding/favicons/favicon.png"
+                    },
+                    "banner_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://example.com/storage/branding/banners/banner.jpg"
+                    }
+                },
+                "type": "object"
+            },
+            "RegionalSettings": {
+                "title": "Regional Settings",
+                "description": "Regional configuration (timezone, currency, formats)",
+                "properties": {
+                    "timezone": {
+                        "type": "string",
+                        "example": "Asia/Karachi"
+                    },
+                    "date_format": {
+                        "type": "string",
+                        "example": "Y-m-d"
+                    },
+                    "time_format": {
+                        "type": "string",
+                        "example": "H:i:s"
+                    },
+                    "currency_code": {
+                        "type": "string",
+                        "example": "PKR"
+                    },
+                    "currency_symbol": {
+                        "type": "string",
+                        "example": "Rs."
+                    },
+                    "currency_position": {
+                        "type": "string",
+                        "enum": [
+                            "left",
+                            "right"
+                        ],
+                        "example": "left"
+                    },
+                    "decimal_places": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "thousand_separator": {
+                        "type": "string",
+                        "example": ","
+                    },
+                    "decimal_separator": {
+                        "type": "string",
+                        "example": "."
+                    }
+                },
+                "type": "object"
+            },
+            "OrderSettings": {
+                "title": "Order Settings",
+                "description": "Order numbering and configuration",
+                "properties": {
+                    "order_prefix": {
+                        "type": "string",
+                        "example": "ORD-"
+                    },
+                    "order_number_start": {
+                        "type": "integer",
+                        "example": 1000
+                    },
+                    "order_number_length": {
+                        "type": "integer",
+                        "example": 6
+                    },
+                    "order_auto_confirm": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "order_notification_email": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "TaxSettings": {
+                "title": "Tax Settings",
+                "description": "Tax configuration and rates",
+                "properties": {
+                    "tax_enabled": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "tax_rate": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 0
+                    },
+                    "tax_name": {
+                        "type": "string",
+                        "example": "VAT"
+                    },
+                    "tax_included_in_price": {
+                        "type": "boolean",
+                        "example": false
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingSettings": {
+                "title": "Shipping Settings",
+                "description": "Shipping configuration and rates",
+                "properties": {
+                    "shipping_enabled": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "free_shipping_threshold": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 5000,
+                        "nullable": true
+                    },
+                    "default_shipping_cost": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 200
+                    },
+                    "shipping_calculation_type": {
+                        "type": "string",
+                        "enum": [
+                            "flat_rate",
+                            "per_kg",
+                            "per_liter",
+                            "per_item",
+                            "tiered"
+                        ],
+                        "example": "flat_rate"
+                    },
+                    "shipping_rate_per_kg": {
+                        "type": "number",
+                        "format": "float",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "shipping_rate_per_liter": {
+                        "type": "number",
+                        "format": "float",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "shipping_rate_per_item": {
+                        "type": "number",
+                        "format": "float",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "enable_nationwide_flat_rate": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "nationwide_flat_rate": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 200,
+                        "nullable": true
+                    },
+                    "enable_regional_rates": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "minimum_order_for_shipping": {
+                        "type": "number",
+                        "format": "float",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "max_weight_standard_shipping": {
+                        "type": "number",
+                        "format": "float",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "max_volume_standard_shipping": {
+                        "type": "number",
+                        "format": "float",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "handling_fee": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 0
+                    },
+                    "tiered_shipping_rates": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/TieredShippingRate"
+                        },
+                        "nullable": true
+                    },
+                    "estimated_delivery_days_min": {
+                        "type": "integer",
+                        "example": 3,
+                        "nullable": true
+                    },
+                    "estimated_delivery_days_max": {
+                        "type": "integer",
+                        "example": 7,
+                        "nullable": true
+                    },
+                    "estimated_delivery": {
+                        "type": "string",
+                        "example": "3-7 business days",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "TieredShippingRate": {
+                "title": "Tiered Shipping Rate",
+                "description": "Tiered shipping rate tier",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "order_total",
+                            "weight"
+                        ],
+                        "example": "order_total"
+                    },
+                    "threshold": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 1000
+                    },
+                    "rate": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 150
+                    }
+                },
+                "type": "object"
+            },
+            "InventorySettings": {
+                "title": "Inventory Settings",
+                "description": "Inventory tracking configuration",
+                "properties": {
+                    "track_inventory": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "allow_backorders": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "low_stock_threshold": {
+                        "type": "integer",
+                        "example": 10
+                    },
+                    "low_stock_notifications": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "EmailSettings": {
+                "title": "Email Settings",
+                "description": "Email configuration and notifications",
+                "properties": {
+                    "email_from_name": {
+                        "type": "string",
+                        "example": "My Store"
+                    },
+                    "email_from_address": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "noreply@example.com"
+                    },
+                    "customer_registration_email": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "order_confirmation_email": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "order_shipped_email": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "CheckoutSettings": {
+                "title": "Checkout Settings",
+                "description": "Checkout and payment configuration",
+                "properties": {
+                    "payment_methods": {
+                        "properties": {
+                            "cod": {
+                                "$ref": "#/components/schemas/PaymentMethodCOD"
+                            },
+                            "online_payment": {
+                                "$ref": "#/components/schemas/PaymentMethodOnline"
+                            },
+                            "bank_transfer": {
+                                "$ref": "#/components/schemas/PaymentMethodBankTransfer"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "available_payment_methods": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AvailablePaymentMethod"
+                        }
+                    },
+                    "checkout_options": {
+                        "$ref": "#/components/schemas/CheckoutOptions"
+                    },
+                    "order_confirmation": {
+                        "$ref": "#/components/schemas/OrderConfirmation"
+                    }
+                },
+                "type": "object"
+            },
+            "PaymentMethodCOD": {
+                "title": "Cash on Delivery Payment Method",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "example": "Please keep exact change ready",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PaymentMethodOnline": {
+                "title": "Online Payment Method",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "gateway": {
+                        "type": "string",
+                        "example": "stripe",
+                        "nullable": true
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": [
+                            "sandbox",
+                            "live"
+                        ],
+                        "example": "sandbox"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "example": "You will be redirected to payment gateway",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PaymentMethodBankTransfer": {
+                "title": "Bank Transfer Payment Method",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "example": "Transfer to our bank account",
+                        "nullable": true
+                    },
+                    "bank_details": {
+                        "properties": {
+                            "bank_name": {
+                                "type": "string",
+                                "example": "HBL Bank"
+                            },
+                            "account_name": {
+                                "type": "string",
+                                "example": "My Store"
+                            },
+                            "account_number": {
+                                "type": "string",
+                                "example": "1234567890"
+                            },
+                            "iban": {
+                                "type": "string",
+                                "example": "PK36HBLB0000001234567890",
+                                "nullable": true
+                            },
+                            "swift_code": {
+                                "type": "string",
+                                "example": "HBLBPKKAXXX",
+                                "nullable": true
+                            },
+                            "branch": {
+                                "type": "string",
+                                "example": "Main Branch, Lahore",
+                                "nullable": true
+                            },
+                            "formatted": {
+                                "type": "string",
+                                "example": "Bank Name: HBL Bank\\nAccount Name: My Store..."
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "AvailablePaymentMethod": {
+                "title": "Available Payment Method",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "example": "cod"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Cash on Delivery"
+                    },
+                    "icon": {
+                        "type": "string",
+                        "example": "bi-cash-coin"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "example": "Pay when you receive",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "CheckoutOptions": {
+                "title": "Checkout Options",
+                "properties": {
+                    "require_phone": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "require_address": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "enable_guest_checkout": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "terms_required": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "terms_text": {
+                        "type": "string",
+                        "example": "By placing order, you agree to our terms",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "OrderConfirmation": {
+                "title": "Order Confirmation Settings",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Thank you for your order!",
+                        "nullable": true
+                    },
+                    "show_bank_details": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "SocialMedia": {
+                "title": "Social Media Links",
+                "description": "Store social media profiles",
+                "properties": {
+                    "facebook": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://facebook.com/mystore",
+                        "nullable": true
+                    },
+                    "twitter": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://twitter.com/mystore",
+                        "nullable": true
+                    },
+                    "instagram": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://instagram.com/mystore",
+                        "nullable": true
+                    },
+                    "linkedin": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://linkedin.com/company/mystore",
+                        "nullable": true
+                    },
+                    "youtube": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://youtube.com/mystore",
+                        "nullable": true
+                    },
+                    "social_links": {
+                        "description": "Filtered non-null social links",
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "SeoSettings": {
+                "title": "SEO Settings",
+                "description": "SEO and analytics configuration",
+                "properties": {
+                    "meta_title": {
+                        "type": "string",
+                        "example": "My Store - Best Products",
+                        "nullable": true
+                    },
+                    "meta_description": {
+                        "type": "string",
+                        "example": "Shop the best products at great prices",
+                        "nullable": true
+                    },
+                    "meta_keywords": {
+                        "type": "string",
+                        "example": "online store, shopping, products",
+                        "nullable": true
+                    },
+                    "google_analytics_id": {
+                        "type": "string",
+                        "example": "G-XXXXXXXXXX",
+                        "nullable": true
+                    },
+                    "facebook_pixel_id": {
+                        "type": "string",
+                        "example": "123456789012345",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "MaintenanceMode": {
+                "title": "Maintenance Mode",
+                "description": "Store maintenance mode status",
+                "properties": {
+                    "maintenance_mode": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "maintenance_message": {
+                        "type": "string",
+                        "example": "We are performing maintenance",
+                        "nullable": true
+                    },
+                    "is_in_maintenance": {
+                        "type": "boolean",
+                        "example": false
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingCalculation": {
+                "title": "Shipping Calculation Result",
+                "description": "Calculated shipping cost details",
+                "properties": {
+                    "shipping_cost": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 200
+                    },
+                    "formatted_cost": {
+                        "type": "string",
+                        "example": "Rs.200.00"
+                    },
+                    "is_free_shipping": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "calculation_type": {
+                        "type": "string",
+                        "example": "flat_rate"
+                    },
+                    "estimated_delivery": {
+                        "type": "string",
+                        "example": "3-7 business days",
+                        "nullable": true
+                    },
+                    "currency_symbol": {
+                        "type": "string",
+                        "example": "Rs."
+                    }
+                },
+                "type": "object"
+            },
+            "CurrencyFormat": {
+                "title": "Currency Format Result",
+                "description": "Formatted currency amount",
+                "properties": {
+                    "amount": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 1234.56
+                    },
+                    "formatted": {
+                        "type": "string",
+                        "example": "Rs.1,234.56"
+                    },
+                    "currency_code": {
+                        "type": "string",
+                        "example": "PKR"
+                    },
+                    "currency_symbol": {
+                        "type": "string",
+                        "example": "Rs."
+                    }
+                },
+                "type": "object"
+            },
+            "BusinessHours": {
+                "title": "Business Hours",
+                "description": "Store business hours information",
+                "properties": {
+                    "business_hours": {
+                        "description": "Hours for each day",
+                        "type": "object"
+                    },
+                    "is_open_today": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "today_hours": {
+                        "properties": {
+                            "is_open": {
+                                "type": "boolean",
+                                "example": true
+                            },
+                            "open": {
+                                "type": "string",
+                                "example": "09:00"
+                            },
+                            "close": {
+                                "type": "string",
+                                "example": "18:00"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "timezone": {
+                        "type": "string",
+                        "example": "Asia/Karachi"
+                    }
+                },
+                "type": "object"
             }
         },
         "responses": {
@@ -3882,6 +5313,10 @@
         {
             "name": "Orders",
             "description": "Order management - View, track, cancel orders and request returns"
+        },
+        {
+            "name": "Store Settings",
+            "description": "Store settings and configuration endpoints"
         }
     ],
     "security": [
