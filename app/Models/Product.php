@@ -1570,7 +1570,7 @@ class Product extends Model
         return $this->stock_quantity ?? 0;
     }
 
-    protected function getTranslatableFields(): array
+    public function getTranslatableFields(): array
     {
         return [
             'name',
