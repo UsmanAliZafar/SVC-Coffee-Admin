@@ -14,7 +14,15 @@
     $safeItemId = str_replace('-', '_', $itemId);
     $safeItemName = isset($itemName) ? addslashes($itemName) : 'Item';
 @endphp
+<style>
+    .swal2-popup {
+        border-top: 3px solid #5B914C;
+    }
 
+    .swal2-timer-progress-bar {
+        background-color: #5B914C;
+    }
+</style>
 <!-- Translation Button (Floating Action Button Style) -->
 <div class="translation-fab-container">
     <button type="button"
@@ -582,16 +590,33 @@
         },
 
         showSuccess: function(message) {
-            if (typeof toastr !== 'undefined') {
-                toastr.success(message);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: message,
+                    timer: 5000,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
             } else {
                 alert(message);
             }
         },
 
         showError: function(message) {
-            if (typeof toastr !== 'undefined') {
-                toastr.error(message);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: message,
+                    timer: 5000,
+                    timerProgressBar: true,
+                    showConfirmButton: true,
+                    confirmButtonColor: '#5B914C'
+                });
             } else {
                 alert(message);
             }
