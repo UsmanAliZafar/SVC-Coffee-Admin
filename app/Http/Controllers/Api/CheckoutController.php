@@ -57,7 +57,7 @@ class CheckoutController extends Controller
 
                 // Order details
                 'shipping_method' => 'required|string',
-                'payment_method' => 'required|string|in:cod,online,bank_transfer,cash', // ✅ UPDATED
+                'payment_method' => 'required|string|in:cod,online,bank_transfer', // ✅ UPDATED
                 'payment_gateway' => 'nullable|string|in:stripe,paypal,razorpay', // ✅ ADDED for online payments
                 'customer_notes' => 'nullable|string',
                 'coupon_code' => 'nullable|string',

@@ -597,4 +597,164 @@ class StoreSettingsController extends Controller
 
         return redirect()->back()->with('success', 'Maintenance mode updated successfully.');
     }
+
+    /**
+     * Update checkout settings
+     */
+    public function updateCheckout(Request $request)
+    {
+        try {
+            // Check permission
+            if (!auth('admin')->user()->hasPermission('settings.update')) {
+                return redirect()->back()->with('error', 'Unauthorized access');
+            }
+
+            $validator = Validator::make($request->all(), [
+                // Payment Methods
+                'enable_cod' => 'sometimes|accepted',
+                'enable_online_payment' => 'sometimes|accepted',
+                'enable_bank_transfer' => 'sometimes|accepted',
+
+                // Instructions
+                'cod_instructions' => 'nullable|string|max:2000',
+                'online_payment_instructions' => 'nullable|string|max:2000',
+                'bank_transfer_instructions' => 'nullable|string|max:2000',
+
+                // Payment Gateway Settings
+                'payment_gateway' => 'nullable|string|in:stripe,paypal,razorpay,jazzcash,easypaisa',
+                'payment_gateway_mode' => 'nullable|string|in:sandbox,live',
+                'payment_gateway_public_key' => 'nullable|string|max:500',
+                'payment_gateway_secret_key' => 'nullable|string|max:500',
+
+                // Bank Details
+                'bank_name' => 'nullable|string|max:255',
+                'bank_account_name' => 'nullable|string|max:255',
+                'bank_account_number' => 'nullable|string|max:100',
+                'bank_iban' => 'nullable|string|max:100',
+                'bank_swift_code' => 'nullable|string|max:50',
+                'bank_branch' => 'nullable|string|max:255',
+
+                // Checkout Options
+                'require_phone_checkout' => 'sometimes|accepted',
+                'require_address_checkout' => 'sometimes|accepted',
+                'enable_guest_checkout' => 'sometimes|accepted',
+                'terms_conditions_required' => 'sometimes|accepted',
+                'checkout_terms_text' => 'nullable|string|max:1000',
+
+                // Order Confirmation
+                'show_bank_details_on_confirmation' => 'sometimes|accepted',
+                'order_confirmation_message' => 'nullable|string|max:1000',
+            ]);
+
+            if ($validator->fails()) {
+                Log::warning('Checkout settings validation failed', [
+                    'errors' => $validator->errors()->toArray(),
+                    'input' => $request->except(['_token', '_method', 'payment_gateway_secret_key']),
+                    'user_id' => auth('admin')->id(),
+                ]);
+
+                return redirect()->back()
+                            ->withErrors($validator)
+                            ->withInput()
+                            ->with('section', 'checkout')
+                            ->with('error', 'Validation failed. Please check the form.');
+            }
+
+            // Check that at least one payment method is enabled
+            $hasPaymentMethod = $request->has('enable_cod') ||
+                            $request->has('enable_online_payment') ||
+                            $request->has('enable_bank_transfer');
+
+            if (!$hasPaymentMethod) {
+                return redirect()->back()
+                            ->withInput()
+                            ->with('section', 'checkout')
+                            ->with('error', 'Please enable at least one payment method.');
+            }
+
+            Log::info('Attempting to update checkout settings', [
+                'user_id' => auth('admin')->id(),
+            ]);
+
+            $settings = StoreSetting::getSettings();
+
+            $updateData = [
+                // Payment Methods
+                'enable_cod' => $request->has('enable_cod'),
+                'enable_online_payment' => $request->has('enable_online_payment'),
+                'enable_bank_transfer' => $request->has('enable_bank_transfer'),
+
+                // Instructions
+                'cod_instructions' => $request->cod_instructions,
+                'online_payment_instructions' => $request->online_payment_instructions,
+                'bank_transfer_instructions' => $request->bank_transfer_instructions,
+
+                // Payment Gateway
+                'payment_gateway' => $request->payment_gateway,
+                'payment_gateway_mode' => $request->payment_gateway_mode ?? 'sandbox',
+                'payment_gateway_public_key' => $request->payment_gateway_public_key,
+                'payment_gateway_secret_key' => $request->payment_gateway_secret_key,
+
+                // Bank Details
+                'bank_name' => $request->bank_name,
+                'bank_account_name' => $request->bank_account_name,
+                'bank_account_number' => $request->bank_account_number,
+                'bank_iban' => $request->bank_iban,
+                'bank_swift_code' => $request->bank_swift_code,
+                'bank_branch' => $request->bank_branch,
+
+                // Checkout Options
+                'require_phone_checkout' => $request->has('require_phone_checkout'),
+                'require_address_checkout' => $request->has('require_address_checkout'),
+                'enable_guest_checkout' => $request->has('enable_guest_checkout'),
+                'terms_conditions_required' => $request->has('terms_conditions_required'),
+                'checkout_terms_text' => $request->checkout_terms_text,
+
+                // Order Confirmation
+                'show_bank_details_on_confirmation' => $request->has('show_bank_details_on_confirmation'),
+                'order_confirmation_message' => $request->order_confirmation_message,
+
+                'updated_by' => auth('admin')->id(),
+            ];
+
+            Log::info('Checkout settings data to be saved', [
+                'data' => array_diff_key($updateData, ['payment_gateway_secret_key' => ''])
+            ]);
+
+            $result = $settings->update($updateData);
+
+            if (!$result) {
+                Log::error('Failed to update checkout settings', [
+                    'settings_id' => $settings->id,
+                    'user_id' => auth('admin')->id()
+                ]);
+                return redirect()->back()
+                            ->withInput()
+                            ->with('section', 'checkout')
+                            ->with('error', 'Failed to save checkout settings. Please try again.');
+            }
+
+            Log::info('Checkout settings updated successfully', [
+                'settings_id' => $settings->id,
+                'user_id' => auth('admin')->id()
+            ]);
+
+            return redirect()->back()
+                        ->with('section', 'checkout')
+                        ->with('success', 'Checkout settings updated successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('Exception while updating checkout settings', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth('admin')->id(),
+                'request_data' => $request->except(['_token', '_method', 'payment_gateway_secret_key'])
+            ]);
+
+            return redirect()->back()
+                        ->withInput()
+                        ->with('section', 'checkout')
+                        ->with('error', 'An error occurred: ' . $e->getMessage());
+        }
+    }
 }

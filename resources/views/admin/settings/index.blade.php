@@ -91,7 +91,7 @@
                         <i class="bi bi-cart-check me-2"></i>Orders
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item d-none" role="presentation">
                     <button class="nav-link" id="tax-tab" data-bs-toggle="tab" data-bs-target="#tax" type="button" role="tab">
                         <i class="bi bi-receipt me-2"></i>Tax
                     </button>
@@ -101,14 +101,19 @@
                         <i class="bi bi-truck me-2"></i>Shipping
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item d-none" role="presentation">
                     <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">
                         <i class="bi bi-boxes me-2"></i>Inventory
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item d-none" role="presentation">
                     <button class="nav-link" id="email-tab" data-bs-toggle="tab" data-bs-target="#email" type="button" role="tab">
                         <i class="bi bi-envelope me-2"></i>Email
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="checkout-tab" data-bs-toggle="tab" data-bs-target="#checkout" type="button" role="tab">
+                        <i class="bi bi-credit-card me-2"></i>Checkout
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -1142,6 +1147,349 @@
                         </div>
                     </form>
                 </div>
+                {{-- CHECKOUT SETTINGS TAB --}}
+                <div class="tab-pane fade" id="checkout" role="tabpanel">
+                    <form action="{{ route('admin.settings.update-checkout') }}" method="POST" id="checkoutForm">
+                        @csrf
+                        @method('PUT')
+
+                        <h5 class="mb-3"><i class="bi bi-credit-card-2-front me-2"></i>Checkout & Payment Configuration</h5>
+
+                        {{-- Payment Methods Section --}}
+                        <div class="card mb-4 border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="bi bi-wallet2 me-2"></i>Available Payment Methods
+                                </h6>
+
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>Note:</strong> At least one payment method must be enabled for customers to complete their orders.
+                                </div>
+
+                                {{-- Cash on Delivery --}}
+                                <div class="card mb-3">
+                                    <div class="card-header bg-white">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-cash-coin text-success me-3" style="font-size: 24px;"></i>
+                                                <div>
+                                                    <h6 class="mb-0">Cash on Delivery (COD)</h6>
+                                                    <small class="text-muted">Customer pays when order is delivered</small>
+                                                </div>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="enable_cod"
+                                                    name="enable_cod" style="width: 3rem; height: 1.5rem;"
+                                                    {{ old('enable_cod', $settings->enable_cod) ? 'checked' : '' }}>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-body" id="cod_settings" style="display: {{ old('enable_cod', $settings->enable_cod) ? 'block' : 'none' }};">
+                                        <label for="cod_instructions" class="form-label">COD Instructions for Customers</label>
+                                        <textarea class="form-control @error('cod_instructions') is-invalid @enderror"
+                                                id="cod_instructions" name="cod_instructions" rows="4"
+                                                placeholder="Enter instructions for COD payments (e.g., Please keep exact change ready, Payment accepted in PKR only)">{{ old('cod_instructions', $settings->cod_instructions) }}</textarea>
+                                        <small class="text-muted">These instructions will be shown to customers during checkout</small>
+                                        @error('cod_instructions')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                {{-- Online Payment --}}
+                                <div class="card mb-3">
+                                    <div class="card-header bg-white">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-credit-card text-primary me-3" style="font-size: 24px;"></i>
+                                                <div>
+                                                    <h6 class="mb-0">Online Payment</h6>
+                                                    <small class="text-muted">Stripe, PayPal, or other payment gateways</small>
+                                                </div>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="enable_online_payment"
+                                                    name="enable_online_payment" style="width: 3rem; height: 1.5rem;"
+                                                    {{ old('enable_online_payment', $settings->enable_online_payment) ? 'checked' : '' }}>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-body" id="online_payment_settings" style="display: {{ old('enable_online_payment', $settings->enable_online_payment) ? 'block' : 'none' }};">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label for="payment_gateway" class="form-label">Payment Gateway</label>
+                                                <select class="form-select @error('payment_gateway') is-invalid @enderror"
+                                                        id="payment_gateway" name="payment_gateway">
+                                                    <option value="">-- Select Gateway --</option>
+                                                    <option value="stripe" {{ old('payment_gateway', $settings->payment_gateway) == 'stripe' ? 'selected' : '' }}>Stripe</option>
+                                                    <option value="paypal" {{ old('payment_gateway', $settings->payment_gateway) == 'paypal' ? 'selected' : '' }}>PayPal</option>
+                                                    <option value="razorpay" {{ old('payment_gateway', $settings->payment_gateway) == 'razorpay' ? 'selected' : '' }}>Razorpay</option>
+                                                    <option value="jazzcash" {{ old('payment_gateway', $settings->payment_gateway) == 'jazzcash' ? 'selected' : '' }}>JazzCash</option>
+                                                    <option value="easypaisa" {{ old('payment_gateway', $settings->payment_gateway) == 'easypaisa' ? 'selected' : '' }}>Easypaisa</option>
+                                                </select>
+                                                @error('payment_gateway')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <label for="payment_gateway_mode" class="form-label">Gateway Mode</label>
+                                                <select class="form-select @error('payment_gateway_mode') is-invalid @enderror"
+                                                        id="payment_gateway_mode" name="payment_gateway_mode">
+                                                    <option value="sandbox" {{ old('payment_gateway_mode', $settings->payment_gateway_mode) == 'sandbox' ? 'selected' : '' }}>Sandbox (Testing)</option>
+                                                    <option value="live" {{ old('payment_gateway_mode', $settings->payment_gateway_mode) == 'live' ? 'selected' : '' }}>Live (Production)</option>
+                                                </select>
+                                                @error('payment_gateway_mode')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label for="payment_gateway_public_key" class="form-label">Public/Publishable Key</label>
+                                                <input type="text" class="form-control @error('payment_gateway_public_key') is-invalid @enderror"
+                                                    id="payment_gateway_public_key" name="payment_gateway_public_key"
+                                                    value="{{ old('payment_gateway_public_key', $settings->payment_gateway_public_key) }}"
+                                                    placeholder="pk_test_...">
+                                                @error('payment_gateway_public_key')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <label for="payment_gateway_secret_key" class="form-label">Secret Key</label>
+                                                <input type="password" class="form-control @error('payment_gateway_secret_key') is-invalid @enderror"
+                                                    id="payment_gateway_secret_key" name="payment_gateway_secret_key"
+                                                    value="{{ old('payment_gateway_secret_key', $settings->payment_gateway_secret_key) }}"
+                                                    placeholder="sk_test_...">
+                                                <small class="text-muted">Keep this confidential</small>
+                                                @error('payment_gateway_secret_key')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                        </div>
+
+                                        <label for="online_payment_instructions" class="form-label">Online Payment Instructions</label>
+                                        <textarea class="form-control @error('online_payment_instructions') is-invalid @enderror"
+                                                id="online_payment_instructions" name="online_payment_instructions" rows="3"
+                                                placeholder="Enter instructions for online payments">{{ old('online_payment_instructions', $settings->online_payment_instructions) }}</textarea>
+                                        @error('online_payment_instructions')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                {{-- Bank Transfer --}}
+                                <div class="card mb-3">
+                                    <div class="card-header bg-white">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-bank text-info me-3" style="font-size: 24px;"></i>
+                                                <div>
+                                                    <h6 class="mb-0">Bank Transfer</h6>
+                                                    <small class="text-muted">Direct bank deposit or transfer</small>
+                                                </div>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="enable_bank_transfer"
+                                                    name="enable_bank_transfer" style="width: 3rem; height: 1.5rem;"
+                                                    {{ old('enable_bank_transfer', $settings->enable_bank_transfer) ? 'checked' : '' }}>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-body" id="bank_transfer_settings" style="display: {{ old('enable_bank_transfer', $settings->enable_bank_transfer) ? 'block' : 'none' }};">
+                                        <h6 class="mb-3">Bank Account Details</h6>
+
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="bank_name" class="form-label">Bank Name</label>
+                                                <input type="text" class="form-control @error('bank_name') is-invalid @enderror"
+                                                    id="bank_name" name="bank_name"
+                                                    value="{{ old('bank_name', $settings->bank_name) }}"
+                                                    placeholder="e.g., HBL, UBL, MCB">
+                                                @error('bank_name')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+
+                                            <div class="col-md-6 mb-3">
+                                                <label for="bank_account_name" class="form-label">Account Holder Name</label>
+                                                <input type="text" class="form-control @error('bank_account_name') is-invalid @enderror"
+                                                    id="bank_account_name" name="bank_account_name"
+                                                    value="{{ old('bank_account_name', $settings->bank_account_name) }}"
+                                                    placeholder="Full name as per bank records">
+                                                @error('bank_account_name')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+
+                                            <div class="col-md-6 mb-3">
+                                                <label for="bank_account_number" class="form-label">Account Number</label>
+                                                <input type="text" class="form-control @error('bank_account_number') is-invalid @enderror"
+                                                    id="bank_account_number" name="bank_account_number"
+                                                    value="{{ old('bank_account_number', $settings->bank_account_number) }}"
+                                                    placeholder="1234567890">
+                                                @error('bank_account_number')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+
+                                            <div class="col-md-6 mb-3">
+                                                <label for="bank_iban" class="form-label">IBAN (Optional)</label>
+                                                <input type="text" class="form-control @error('bank_iban') is-invalid @enderror"
+                                                    id="bank_iban" name="bank_iban"
+                                                    value="{{ old('bank_iban', $settings->bank_iban) }}"
+                                                    placeholder="PK36SCBL0000001123456702">
+                                                @error('bank_iban')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+
+                                            <div class="col-md-6 mb-3">
+                                                <label for="bank_swift_code" class="form-label">SWIFT Code (Optional)</label>
+                                                <input type="text" class="form-control @error('bank_swift_code') is-invalid @enderror"
+                                                    id="bank_swift_code" name="bank_swift_code"
+                                                    value="{{ old('bank_swift_code', $settings->bank_swift_code) }}"
+                                                    placeholder="HBLBPKKAXXX">
+                                                @error('bank_swift_code')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+
+                                            <div class="col-md-6 mb-3">
+                                                <label for="bank_branch" class="form-label">Branch Name (Optional)</label>
+                                                <input type="text" class="form-control @error('bank_branch') is-invalid @enderror"
+                                                    id="bank_branch" name="bank_branch"
+                                                    value="{{ old('bank_branch', $settings->bank_branch) }}"
+                                                    placeholder="Main Branch, Lahore">
+                                                @error('bank_branch')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                        </div>
+
+                                        <label for="bank_transfer_instructions" class="form-label">Bank Transfer Instructions</label>
+                                        <textarea class="form-control @error('bank_transfer_instructions') is-invalid @enderror"
+                                                id="bank_transfer_instructions" name="bank_transfer_instructions" rows="4"
+                                                placeholder="Enter instructions (e.g., Please transfer amount and send screenshot to whatsapp +92-XXX-XXXXXXX)">{{ old('bank_transfer_instructions', $settings->bank_transfer_instructions) }}</textarea>
+                                        <small class="text-muted">Instructions for customers on how to complete bank transfer and submit proof</small>
+                                        @error('bank_transfer_instructions')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+
+                                        <div class="form-check form-switch mt-3">
+                                            <input class="form-check-input" type="checkbox" id="show_bank_details_on_confirmation"
+                                                name="show_bank_details_on_confirmation"
+                                                {{ old('show_bank_details_on_confirmation', $settings->show_bank_details_on_confirmation) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="show_bank_details_on_confirmation">
+                                                Show bank details on order confirmation page
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Checkout Options --}}
+                        <div class="card mb-4 border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="bi bi-gear me-2"></i>Checkout Options
+                                </h6>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="require_phone_checkout"
+                                                name="require_phone_checkout"
+                                                {{ old('require_phone_checkout', $settings->require_phone_checkout) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="require_phone_checkout">
+                                                <strong>Require Phone Number</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Customer must provide phone number at checkout</small>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="require_address_checkout"
+                                                name="require_address_checkout"
+                                                {{ old('require_address_checkout', $settings->require_address_checkout) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="require_address_checkout">
+                                                <strong>Require Delivery Address</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Customer must provide full delivery address</small>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="enable_guest_checkout"
+                                                name="enable_guest_checkout"
+                                                {{ old('enable_guest_checkout', $settings->enable_guest_checkout) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="enable_guest_checkout">
+                                                <strong>Enable Guest Checkout</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Allow customers to checkout without creating an account</small>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="terms_conditions_required"
+                                                name="terms_conditions_required"
+                                                {{ old('terms_conditions_required', $settings->terms_conditions_required) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="terms_conditions_required">
+                                                <strong>Require Terms & Conditions Acceptance</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Customer must agree to terms before placing order</small>
+                                    </div>
+
+                                    <div class="col-12 mb-3">
+                                        <label for="checkout_terms_text" class="form-label">Terms & Conditions Text</label>
+                                        <textarea class="form-control @error('checkout_terms_text') is-invalid @enderror"
+                                                id="checkout_terms_text" name="checkout_terms_text" rows="3"
+                                                placeholder="By placing this order, you agree to our terms and conditions...">{{ old('checkout_terms_text', $settings->checkout_terms_text) }}</textarea>
+                                        <small class="text-muted">Short terms text shown at checkout (link to full T&C page recommended)</small>
+                                        @error('checkout_terms_text')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Order Confirmation --}}
+                        <div class="card mb-4 border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="bi bi-check-circle me-2"></i>Order Confirmation
+                                </h6>
+
+                                <div class="mb-3">
+                                    <label for="order_confirmation_message" class="form-label">Order Confirmation Message</label>
+                                    <textarea class="form-control @error('order_confirmation_message') is-invalid @enderror"
+                                            id="order_confirmation_message" name="order_confirmation_message" rows="4"
+                                            placeholder="Thank you for your order! We will process it shortly...">{{ old('order_confirmation_message', $settings->order_confirmation_message) }}</textarea>
+                                    <small class="text-muted">Message shown to customers after successful order placement</small>
+                                    @error('order_confirmation_message')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Save Button --}}
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-save me-2"></i>Save Checkout Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
 
                 {{-- SOCIAL MEDIA TAB --}}
                 <div class="tab-pane fade" id="social" role="tabpanel">
@@ -1626,6 +1974,33 @@ document.addEventListener('DOMContentLoaded', function() {
         if (hiddenInput) {
             hiddenInput.value = JSON.stringify(tiers);
         }
+    });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle COD settings
+    const codCheckbox = document.getElementById('enable_cod');
+    const codSettings = document.getElementById('cod_settings');
+
+    codCheckbox?.addEventListener('change', function() {
+        codSettings.style.display = this.checked ? 'block' : 'none';
+    });
+
+    // Toggle Online Payment settings
+    const onlineCheckbox = document.getElementById('enable_online_payment');
+    const onlineSettings = document.getElementById('online_payment_settings');
+
+    onlineCheckbox?.addEventListener('change', function() {
+        onlineSettings.style.display = this.checked ? 'block' : 'none';
+    });
+
+    // Toggle Bank Transfer settings
+    const bankCheckbox = document.getElementById('enable_bank_transfer');
+    const bankSettings = document.getElementById('bank_transfer_settings');
+
+    bankCheckbox?.addEventListener('change', function() {
+        bankSettings.style.display = this.checked ? 'block' : 'none';
     });
 });
 </script>

@@ -28,5 +28,6 @@ Route::prefix('settings')->name('settings.')->group(function () {
         Route::put('/social', [StoreSettingsController::class, 'updateSocial'])->name('update-social');
         Route::put('/seo', [StoreSettingsController::class, 'updateSeo'])->name('update-seo');
         Route::put('/maintenance', [StoreSettingsController::class, 'updateMaintenance'])->name('update-maintenance');
+        Route::put('/checkout', [StoreSettingsController::class, 'updateCheckout'])->name('update-checkout');
     });
 });

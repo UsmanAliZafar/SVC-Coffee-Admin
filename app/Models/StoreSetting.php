@@ -112,6 +112,31 @@ class StoreSetting extends Model
         'google_analytics_id',
         'facebook_pixel_id',
 
+        // Checkout & Payment Settings
+        'enable_cod',
+        'enable_online_payment',
+        'enable_bank_transfer',
+        'cod_instructions',
+        'online_payment_instructions',
+        'bank_transfer_instructions',
+        'payment_gateway',
+        'payment_gateway_mode',
+        'payment_gateway_public_key',
+        'payment_gateway_secret_key',
+        'bank_name',
+        'bank_account_name',
+        'bank_account_number',
+        'bank_iban',
+        'bank_swift_code',
+        'bank_branch',
+        'require_phone_checkout',
+        'require_address_checkout',
+        'enable_guest_checkout',
+        'terms_conditions_required',
+        'checkout_terms_text',
+        'show_bank_details_on_confirmation',
+        'order_confirmation_message',
+
         // System Settings
         'is_active',
         'updated_by',
@@ -148,6 +173,14 @@ class StoreSetting extends Model
         'tiered_shipping_rates' => 'array',
         'estimated_delivery_days_min' => 'integer',
         'estimated_delivery_days_max' => 'integer',
+        'enable_cod' => 'boolean',
+        'enable_online_payment' => 'boolean',
+        'enable_bank_transfer' => 'boolean',
+        'require_phone_checkout' => 'boolean',
+        'require_address_checkout' => 'boolean',
+        'enable_guest_checkout' => 'boolean',
+        'terms_conditions_required' => 'boolean',
+        'show_bank_details_on_confirmation' => 'boolean',
     ];
 
     /**
@@ -502,5 +535,99 @@ class StoreSetting extends Model
         }
 
         return ['exceeds' => false];
+    }
+
+    /**
+        * Get available payment methods
+    */
+    public function getAvailablePaymentMethodsAttribute()
+    {
+        $methods = [];
+
+        if ($this->enable_cod) {
+            $methods[] = [
+                'key' => 'cod',
+                'name' => 'Cash on Delivery',
+                'icon' => 'bi-cash-coin',
+                'instructions' => $this->cod_instructions,
+            ];
+        }
+
+        if ($this->enable_online_payment) {
+            $methods[] = [
+                'key' => 'online',
+                'name' => 'Online Payment',
+                'icon' => 'bi-credit-card',
+                'instructions' => $this->online_payment_instructions,
+            ];
+        }
+
+        if ($this->enable_bank_transfer) {
+            $methods[] = [
+                'key' => 'bank_transfer',
+                'name' => 'Bank Transfer',
+                'icon' => 'bi-bank',
+                'instructions' => $this->bank_transfer_instructions,
+            ];
+        }
+
+        return $methods;
+    }
+
+    /**
+     * Check if at least one payment method is enabled
+     */
+    public function hasPaymentMethodEnabled()
+    {
+        return $this->enable_cod || $this->enable_online_payment || $this->enable_bank_transfer;
+    }
+
+    /**
+     * Get bank details as array
+     */
+    public function getBankDetailsAttribute()
+    {
+        return [
+            'bank_name' => $this->bank_name,
+            'account_name' => $this->bank_account_name,
+            'account_number' => $this->bank_account_number,
+            'iban' => $this->bank_iban,
+            'swift_code' => $this->bank_swift_code,
+            'branch' => $this->bank_branch,
+        ];
+    }
+
+    /**
+     * Get formatted bank details for display
+     */
+    public function getFormattedBankDetails()
+    {
+        $details = [];
+
+        if ($this->bank_name) {
+            $details[] = "Bank Name: {$this->bank_name}";
+        }
+
+        if ($this->bank_account_name) {
+            $details[] = "Account Name: {$this->bank_account_name}";
+        }
+
+        if ($this->bank_account_number) {
+            $details[] = "Account Number: {$this->bank_account_number}";
+        }
+
+        if ($this->bank_iban) {
+            $details[] = "IBAN: {$this->bank_iban}";
+        }
+
+        if ($this->bank_swift_code) {
+            $details[] = "SWIFT Code: {$this->bank_swift_code}";
+        }
+
+        if ($this->bank_branch) {
+            $details[] = "Branch: {$this->bank_branch}";
+        }
+
+        return implode("\n", $details);
     }
 }
