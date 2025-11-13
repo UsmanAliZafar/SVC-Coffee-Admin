@@ -9,10 +9,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
-
+use App\Traits\HasTranslations;
 class ProductsCategories extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use HasFactory, HasUuids, SoftDeletes, HasTranslations;
 
     /**
      * The table associated with the model.
@@ -580,5 +580,22 @@ class ProductsCategories extends Model
         }
 
         return $result;
+    }
+
+    protected function getTranslatableFields(): array
+    {
+        return [
+            'title',
+            'short_description',
+            'description',
+            'meta_title',
+            'meta_description',
+            'meta_keywords',
+        ];
+    }
+
+    protected function getTranslationModule(): string
+    {
+        return 'category';
     }
 }

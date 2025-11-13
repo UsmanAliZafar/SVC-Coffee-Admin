@@ -435,6 +435,13 @@
         </div>
     </form>
 </div>
+{{-- Translation button --}}
+@include('admin.components.translation-modal', [
+    'module' => 'category',
+    'itemId' => $category->id,
+    'itemName' => $category->title
+])
+{{-- Translation button --}}
 @endsection
 
 @push('scripts')
