@@ -377,6 +377,252 @@
                 </div>
             </div>
             @endif
+            <!-- Product Variants Summary -->
+            @php
+                $totalVariants = 0;
+                $variantsByProduct = [];
+
+                foreach($category->products as $product) {
+                    if ($product->has_variants && $product->variants->count() > 0) {
+                        $totalVariants += $product->variants->count();
+                        $variantsByProduct[$product->id] = [
+                            'product' => $product,
+                            'variants' => $product->variants
+                        ];
+                    }
+                }
+            @endphp
+
+            @if($totalVariants > 0)
+            <div class="detail-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="detail-card-title mb-0">
+                        <i class="bi bi-grid-3x3-gap"></i> Product Variants
+                        <span class="badge bg-primary ms-2">{{ $totalVariants }} Total</span>
+                    </h3>
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#variantsCollapse">
+                        <i class="bi bi-chevron-down"></i> Toggle All
+                    </button>
+                </div>
+
+                <div class="collapse show" id="variantsCollapse">
+                    <!-- Variants Summary Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-box-seam fs-2 text-primary"></i>
+                                    <h4 class="mt-2 mb-0">{{ count($variantsByProduct) }}</h4>
+                                    <small class="text-muted">Products with Variants</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-check-circle fs-2 text-success"></i>
+                                    <h4 class="mt-2 mb-0">
+                                        @php
+                                            $inStockVariants = 0;
+                                            foreach($variantsByProduct as $data) {
+                                                $inStockVariants += $data['variants']->filter(fn($v) => $v->isInStock())->count();
+                                            }
+                                            echo $inStockVariants;
+                                        @endphp
+                                    </h4>
+                                    <small class="text-muted">In Stock Variants</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-danger">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-x-circle fs-2 text-danger"></i>
+                                    <h4 class="mt-2 mb-0">
+                                        @php
+                                            $outOfStockVariants = 0;
+                                            foreach($variantsByProduct as $data) {
+                                                $outOfStockVariants += $data['variants']->filter(fn($v) => $v->isOutOfStock())->count();
+                                            }
+                                            echo $outOfStockVariants;
+                                        @endphp
+                                    </h4>
+                                    <small class="text-muted">Out of Stock Variants</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Products with Variants Accordion -->
+                    <div class="accordion" id="variantsAccordion">
+                        @foreach($variantsByProduct as $productId => $data)
+                        @php
+                            $product = $data['product'];
+                            $variants = $data['variants'];
+                        @endphp
+                        <div class="accordion-item mb-3 border rounded">
+                            <h2 class="accordion-header" id="heading{{ $product->id }}">
+                                <button class="accordion-button collapsed" type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#collapse{{ $product->id }}"
+                                        aria-expanded="false"
+                                        aria-controls="collapse{{ $product->id }}">
+                                    <div class="d-flex align-items-center w-100">
+                                        <img src="{{ $product->getMainImageUrl() }}"
+                                            alt="{{ $product->name }}"
+                                            class="me-3"
+                                            style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px;">
+                                        <div class="flex-grow-1">
+                                            <strong>{{ $product->name }}</strong>
+                                            <br>
+                                            <small class="text-muted">SKU: {{ $product->sku }}</small>
+                                        </div>
+                                        <div class="text-end me-3">
+                                            <span class="badge bg-primary">{{ $variants->count() }} Variants</span>
+                                            <span class="badge bg-success">{{ $variants->filter(fn($v) => $v->isInStock())->count() }} In Stock</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse{{ $product->id }}"
+                                class="accordion-collapse collapse"
+                                aria-labelledby="heading{{ $product->id }}"
+                                data-bs-parent="#variantsAccordion">
+                                <div class="accordion-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-sm">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 60px;">Image</th>
+                                                    <th>Variant</th>
+                                                    <th>SKU</th>
+                                                    <th>Price</th>
+                                                    <th>Stock</th>
+                                                    <th>Dimensions</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($variants->sortBy('sort_order') as $variant)
+                                                <tr class="{{ $variant->is_default ? 'table-primary' : '' }}">
+                                                    <!-- Image -->
+                                                    <td>
+                                                        <img src="{{ $variant->getImageUrl() }}"
+                                                            alt="{{ $variant->getFullName() }}"
+                                                            class="img-thumbnail"
+                                                            style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;"
+                                                            onclick="viewVariantImage('{{ $variant->getImageUrl() }}', '{{ $variant->getFullName() }}')">
+                                                    </td>
+
+                                                    <!-- Variant Name -->
+                                                    <td>
+                                                        <strong>{{ $variant->getFullName() }}</strong>
+                                                        @if($variant->is_default)
+                                                            <span class="badge bg-info badge-sm ms-1">Default</span>
+                                                        @endif
+                                                        <br>
+                                                        <small class="text-muted">{{ $variant->variant_name }}: {{ $variant->variant_value }}</small>
+                                                    </td>
+
+                                                    <!-- SKU -->
+                                                    <td>
+                                                        <code class="small">{{ $variant->sku }}</code>
+                                                    </td>
+
+                                                    <!-- Price -->
+                                                    <td>
+                                                        <div>
+                                                            @if($variant->isOnSale())
+                                                                <span class="text-decoration-line-through text-muted small">
+                                                                    {{ $variant->getFormattedPrice() }}
+                                                                </span>
+                                                                <br>
+                                                                <strong class="text-success">{{ $variant->getFormattedSalePrice() }}</strong>
+                                                                <br>
+                                                                <span class="badge bg-danger badge-sm">
+                                                                    -{{ $variant->getDiscountPercentage() }}%
+                                                                </span>
+                                                            @else
+                                                                <strong>{{ $variant->getFormattedPrice() }}</strong>
+                                                            @endif
+                                                        </div>
+                                                    </td>
+
+                                                    <!-- Stock -->
+                                                    <td>
+                                                        {!! $variant->getStockBadge() !!}
+                                                        @if($variant->isLowStock())
+                                                            <br>
+                                                            <small class="text-warning">
+                                                                <i class="bi bi-exclamation-triangle"></i> Low Stock
+                                                            </small>
+                                                        @endif
+                                                    </td>
+
+                                                    <!-- Dimensions -->
+                                                    <td>
+                                                        @if($variant->hasPhysicalDimensions() || $variant->hasWeight())
+                                                            <small>
+                                                                @if($variant->hasWeight())
+                                                                    <i class="bi bi-box"></i> {{ $variant->getFormattedWeight() }}
+                                                                    <br>
+                                                                @endif
+                                                                @if($variant->hasPhysicalDimensions())
+                                                                    <i class="bi bi-rulers"></i> {{ $variant->getDimensions() }}
+                                                                @endif
+                                                            </small>
+                                                        @else
+                                                            <span class="text-muted">—</span>
+                                                        @endif
+                                                    </td>
+
+                                                    <!-- Status -->
+                                                    <td>{!! $variant->getStatusBadge() !!}</td>
+
+                                                    <!-- Actions -->
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button type="button"
+                                                                    class="btn btn-outline-info btn-sm"
+                                                                    onclick="viewVariantDetails('{{ $variant->id }}')"
+                                                                    title="View Details">
+                                                                <i class="bi bi-eye"></i>
+                                                            </button>
+                                                            @if(auth('admin')->user()->hasPermission('products.update'))
+                                                            <a href="{{ route('admin.products.edit', $product->id) }}#variants"
+                                                            class="btn btn-outline-warning btn-sm"
+                                                            title="Edit">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </a>
+                                                            @endif
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Product Actions -->
+                                    <div class="mt-3 text-end">
+                                        <a href="{{ route('admin.products.show', $product->id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i> View Product Details
+                                        </a>
+                                        @if(auth('admin')->user()->hasPermission('products.update'))
+                                        <a href="{{ route('admin.products.edit', $product->id) }}#variants" class="btn btn-sm btn-outline-warning">
+                                            <i class="bi bi-pencil"></i> Edit Variants
+                                        </a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            @endif
         </div>
 
         <!-- Right Column -->

@@ -14,12 +14,13 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use App\Traits\InventoryManager;
+use App\Traits\HasTranslations;
 
 class Product extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
     use InventoryManager;
-
+    use HasTranslations;
     /**
      * The table associated with the model.
      */
@@ -1567,6 +1568,23 @@ class Product extends Model
 
         // For simple products: return synced stock_quantity field
         return $this->stock_quantity ?? 0;
+    }
+
+    protected function getTranslatableFields(): array
+    {
+        return [
+            'name',
+            'short_description',
+            'description',
+            'meta_title',
+            'meta_description',
+            'meta_keywords',
+        ];
+    }
+
+    protected function getTranslationModule(): string
+    {
+        return 'product';
     }
 
 }

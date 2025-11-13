@@ -1306,8 +1306,16 @@
         </div>
     </div>
 </div>
-
+{{-- Translation button --}}
+@include('admin.components.translation-modal', [
+    'module' => 'product',
+    'itemId' => $product->id,
+    'itemName' => $product->name
+])
+{{-- Translation button --}}
 @endsection
+
+
 @push('scripts')
 <!-- CKEditor -->
 <script src="https://cdn.ckeditor.com/ckeditor5/39.0.0/classic/ckeditor.js"></script>
