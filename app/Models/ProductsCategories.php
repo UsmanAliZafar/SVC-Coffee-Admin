@@ -598,4 +598,10 @@ class ProductsCategories extends Model
     {
         return 'category';
     }
+
+    public function urlRedirects(): HasMany
+    {
+        return $this->hasMany(UrlRedirect::class, 'entity_id')
+                    ->where('entity_type', 'category');
+    }
 }

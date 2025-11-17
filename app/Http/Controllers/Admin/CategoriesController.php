@@ -374,8 +374,8 @@ class CategoriesController extends Controller
                 // Create redirect if requested
                 if ($request->create_redirect) {
                     UrlRedirect::create([
-                        'old_url' => '/categories/' . $oldSlug,
-                        'new_url' => '/categories/' . $newSlug,
+                        'old_url' => '/category/' . $oldSlug,
+                        'new_url' => '/category/' . $newSlug,
                         'redirect_type' => '301',
                         'entity_type' => 'category',
                         'entity_id' => $category->id,

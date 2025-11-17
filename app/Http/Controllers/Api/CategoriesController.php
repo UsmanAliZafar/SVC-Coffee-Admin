@@ -141,41 +141,95 @@ class CategoriesController extends Controller
     public function getBySlug(string $slug): JsonResponse
     {
         try {
-            $category = ProductsCategories::query()
+            // Normalize incoming category URL
+            $requestedUrl = '/category/' . trim($slug, '/');
+            $normalizedUrl = \App\Models\UrlRedirect::normalizeUrl($requestedUrl);
+
+            // Check if redirect exists for this category
+            $redirect = \App\Models\UrlRedirect::findByOldUrl($normalizedUrl);
+
+            if ($redirect) {
+
+                // Increment redirect hit counter
+                $redirect->incrementHits();
+
+                // If redirect points to a valid category
+                if ($redirect->entity_type === 'category' && $redirect->entity_id) {
+
+                    $category = \App\Models\ProductsCategories::query()
+                        ->active()
+                        ->where('id', $redirect->entity_id)
+                        ->with([
+                            'parent',
+                            'children' => function ($query) {
+                                $query->active()->ordered();
+                            },
+                        ])
+                        ->withCount('products')
+                        ->first();
+
+                    if ($category) {
+                        return response()->json([
+                            'success'        => true,
+                            'redirect'       => true,
+                            'redirect_type'  => $redirect->redirect_type,
+                            'new_url'        => ltrim(str_replace('/category/', '', $redirect->new_url), '/'),
+                            'message'        => 'Redirected from old category slug to new slug',
+                            'timestamp'      => now()->toIso8601String(),
+                        ], $redirect->isPermanent() ? 301 : 302);
+                    }
+                }
+
+                // If redirect exists but no category found
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Redirect target category not found',
+                    'timestamp' => now()->toIso8601String(),
+                ], 404);
+            }
+
+            // No redirect — load category by current slug
+            $category = \App\Models\ProductsCategories::query()
                 ->active()
                 ->where('slug', $slug)
-                ->with(['parent', 'children' => function($query) {
-                    $query->active()->ordered();
-                }])
+                ->with([
+                    'parent',
+                    'children' => function ($query) {
+                        $query->active()->ordered();
+                    },
+                ])
                 ->withCount('products')
                 ->firstOrFail();
 
-            // Increment views count
+            // Increment views
             $category->incrementViews();
 
             return response()->json([
-                'success' => true,
-                'message' => 'Category retrieved successfully',
-                'data' => $this->transformCategory($category, true),
-                'timestamp' => now()->toIso8601String()
+                'success'   => true,
+                'message'   => 'Category retrieved successfully',
+                'data'      => $this->transformCategory($category, true),
+                'timestamp' => now()->toIso8601String(),
             ], 200);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+
             return response()->json([
                 'success' => false,
                 'message' => 'Category not found',
-                'timestamp' => now()->toIso8601String()
+                'timestamp' => now()->toIso8601String(),
             ], 404);
 
         } catch (\Exception $e) {
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve category',
                 'error' => $e->getMessage(),
-                'timestamp' => now()->toIso8601String()
+                'timestamp' => now()->toIso8601String(),
             ], 500);
         }
     }
+
 
     /**
      * Get category tree structure
@@ -431,6 +485,14 @@ class CategoriesController extends Controller
             'id' => $category->id,
             'title' => $category->title,
             'slug' => $category->slug,
+            'url_redirects' => $category->urlRedirects->map(function($redirect) {
+                return [
+                    'id' => $redirect->id,
+                    'old_url' => ltrim(str_replace('/products/', '', $redirect->old_url), '/'),
+                    'new_url' => ltrim(str_replace('/products/', '', $redirect->new_url), '/'),
+                    'redirect_type' => $redirect->redirect_type,
+                ];
+            }),
             'short_description' => $category->short_description,
             'parent_id' => $category->parent_id,
             'images' => $category->getAllImages(),
@@ -745,21 +807,72 @@ class CategoriesController extends Controller
     public function productsBySlug(string $slug, Request $request): JsonResponse
     {
         try {
-            $category = ProductsCategories::where('slug', $slug)->firstOrFail();
+            // Normalize incoming category URL
+            $requestedUrl = '/category/' . trim($slug, '/');
+            $normalizedUrl = \App\Models\UrlRedirect::normalizeUrl($requestedUrl);
 
-            // Reuse the products method logic
+            // Check if redirect exists
+            $redirect = \App\Models\UrlRedirect::findByOldUrl($normalizedUrl);
+
+            if ($redirect) {
+
+                // Increment redirect hit count
+                $redirect->incrementHits();
+
+                // If redirect has a valid category target
+                if ($redirect->entity_type === 'category' && $redirect->entity_id) {
+
+                    $category = \App\Models\ProductsCategories::query()
+                        ->active()
+                        ->where('id', $redirect->entity_id)
+                        ->first();
+
+                    if ($category) {
+                        return response()->json([
+                            'success'        => true,
+                            'redirect'       => true,
+                            'redirect_type'  => $redirect->redirect_type,
+                            'new_url'        => ltrim(str_replace('/category/', '', $redirect->new_url), '/'),
+                            'message'        => 'Redirected from old category slug to new slug',
+                            'timestamp'      => now()->toIso8601String(),
+                        ], $redirect->isPermanent() ? 301 : 302);
+                    }
+                }
+
+                // Redirect exists but category missing
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Redirect target category not found',
+                    'timestamp' => now()->toIso8601String()
+                ], 404);
+            }
+
+            // No redirect found — load category by slug
+            $category = \App\Models\ProductsCategories::where('slug', $slug)->firstOrFail();
+
+            // Pass category ID to products() method
             $request->merge(['category_id' => $category->id]);
+
             return $this->products($category->id, $request);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+
             return response()->json([
                 'success' => false,
                 'message' => 'Category not found',
                 'timestamp' => now()->toIso8601String()
             ], 404);
+
+        } catch (\Exception $e) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load category products',
+                'error'   => $e->getMessage(),
+                'timestamp' => now()->toIso8601String()
+            ], 500);
         }
     }
-
     /**
      * Get featured products from a category
      *
