@@ -44,7 +44,7 @@ class StoreSettingsController extends Controller
             'store_city' => 'nullable|string|max:100',
             'store_state' => 'nullable|string|max:100',
             'store_zip' => 'nullable|string|max:20',
-            'store_country' => 'nullable|string|max:2',
+            'store_country' => 'nullable|string|max:5',
             'store_tagline' => 'nullable|string|max:255',
             'store_description' => 'nullable|string',
         ]);
@@ -87,7 +87,7 @@ class StoreSettingsController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'store_logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
+            'store_logo' => 'nullable|file|mimes:jpeg,png,jpg,svg|max:5120',
             'store_favicon' => 'nullable|image|mimes:png,ico|max:512',
             'store_banner' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
         ]);

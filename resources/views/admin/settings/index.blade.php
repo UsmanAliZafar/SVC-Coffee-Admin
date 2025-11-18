@@ -3,36 +3,36 @@
 @section('title', 'Store Settings')
 @section('styles')
 <style>
-.tier-row {
-    transition: all 0.3s ease;
-    border-left: 3px solid #5B914C !important;
-}
+    .tier-row {
+        transition: all 0.3s ease;
+        border-left: 3px solid #5B914C !important;
+    }
 
-.tier-row:hover {
-    box-shadow: 0 2px 8px rgba(91, 145, 76, 0.2);
-}
+    .tier-row:hover {
+        box-shadow: 0 2px 8px rgba(91, 145, 76, 0.2);
+    }
 
-.calculation-section {
-    padding: 1rem;
-    border-radius: 8px;
-    background-color: white;
-}
+    .calculation-section {
+        padding: 1rem;
+        border-radius: 8px;
+        background-color: white;
+    }
 
-.form-check-input:checked {
-    background-color: #5B914C;
-    border-color: #5B914C;
-}
+    .form-check-input:checked {
+        background-color: #5B914C;
+        border-color: #5B914C;
+    }
 
-.btn-outline-primary {
-    color: #5B914C;
-    border-color: #5B914C;
-}
+    .btn-outline-primary {
+        color: #5B914C;
+        border-color: #5B914C;
+    }
 
-.btn-outline-primary:hover {
-    background-color: #5B914C;
-    border-color: #5B914C;
-    color: white;
-}
+    .btn-outline-primary:hover {
+        background-color: #5B914C;
+        border-color: #5B914C;
+        color: white;
+    }
 </style>
 @endsection
 @section('content')
@@ -230,8 +230,8 @@
                             <div class="col-md-4 mb-3">
                                 <label for="store_country" class="form-label">Country Code</label>
                                 <input type="text" class="form-control @error('store_country') is-invalid @enderror"
-                                       id="store_country" name="store_country" value="{{ old('store_country', $settings->store_country) }}" maxlength="2">
-                                <small class="text-muted">2-letter country code (e.g., PK, US, UK)</small>
+                                       id="store_country" name="store_country" value="{{ old('store_country', $settings->store_country) }}" maxlength="5">
+                                <small class="text-muted">Max 5-letter country code (e.g., PK, US, UK)</small>
                                 @error('store_country')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -269,7 +269,7 @@
                                 </div>
                                 <input type="file" class="form-control @error('store_logo') is-invalid @enderror"
                                        name="store_logo" accept="image/jpeg,image/png,image/jpg,image/svg+xml">
-                                <small class="text-muted">Max 2MB (JPEG, PNG, JPG, SVG)</small>
+                                <small class="text-muted">Max 5MB (JPEG, PNG, JPG, SVG)</small>
                                 @error('store_logo')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                                 @enderror
