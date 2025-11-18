@@ -48,7 +48,7 @@ class CartController extends Controller
                 'message' => 'Cart retrieved successfully',
                 'data' => [
                     'cart_id' => $cartId,
-                    'items' => $cart,
+                    'items' => array_values($cart),
                     'coupon' => $cartMeta['coupon'] ?? null,
                     'totals' => $totals,
                 ],
@@ -131,7 +131,7 @@ class CartController extends Controller
                 'message' => 'Item added to cart',
                 'data' => [
                     'cart_id' => $cartId,
-                    'items' => $cart,
+                    'items' => array_values($cart),
                     'coupon' => $cartMeta['coupon'] ?? null,
                     'totals' => $totals,
                 ],
@@ -206,7 +206,7 @@ class CartController extends Controller
                 'message' => 'Cart updated successfully',
                 'data' => [
                     'cart_id' => $validated['cart_id'],
-                    'items' => $cart,
+                    'items' => array_values($cart),
                     'coupon' => $cartMeta['coupon'] ?? null,
                     'totals' => $totals,
                 ],
@@ -264,7 +264,7 @@ class CartController extends Controller
                 'message' => 'Item removed from cart',
                 'data' => [
                     'cart_id' => $validated['cart_id'],
-                    'items' => $cart,
+                    'items' => array_values($cart),
                     'coupon' => $cartMeta['coupon'] ?? null,
                     'totals' => $totals,
                 ],
@@ -467,7 +467,7 @@ class CartController extends Controller
                 'message' => 'Coupon removed successfully',
                 'data' => [
                     'cart_id' => $validated['cart_id'],
-                    'items' => $cart,
+                    'items' => array_values($cart),
                     'totals' => $totals,
                 ],
             ]);
