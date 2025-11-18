@@ -625,10 +625,10 @@ class ProductsController extends Controller
                 if (is_array($features)) {
                     // Optional: Add server-side validation
                     $richTextCount = count(array_filter($features, fn($f) => ($f['type'] ?? '') === 'rich_text'));
-                    if ($richTextCount > 1) {
+                    if ($richTextCount > 100) {
                         return response()->json([
                             'success' => false,
-                            'message' => 'Only one Rich Text feature is allowed'
+                            'message' => 'Only 100 Rich Text feature is allowed'
                         ], 422);
                     }
 
@@ -785,9 +785,9 @@ class ProductsController extends Controller
         // Validation
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            // 'slug' => 'nullable|string|max:255|unique:products,slug',
-            // 'sku' => 'required|string|max:255|unique:products,sku',
-            // 'barcode' => 'nullable|string|max:255|unique:products,barcode',
+            // 'slug' => 'nullable|string|max:255|unique:products,slug,'. $id,
+            'sku' => 'required|string|max:255|unique:products,sku,'. $id,
+            'barcode' => 'nullable|string|max:255|unique:products,barcode,'. $id,
             'category_id' => 'nullable|exists:products_categories,id',
             'vendor_id' => 'nullable|exists:vendors,id',
             'product_type' => 'nullable|string|max:100',
@@ -946,7 +946,7 @@ class ProductsController extends Controller
                 if (is_array($features)) {
                     // Optional: Add server-side validation
                     $richTextCount = count(array_filter($features, fn($f) => ($f['type'] ?? '') === 'rich_text'));
-                    if ($richTextCount > 1) {
+                    if ($richTextCount > 100) {
                         return response()->json([
                             'success' => false,
                             'message' => 'Only one Rich Text feature is allowed'
@@ -2274,8 +2274,11 @@ class ProductsController extends Controller
         }
 
         try {
-            // Check if tag already exists
-            $existingTag = ProductTag::where('name', $request->name)->first();
+            $tagName = trim($request->name);
+            $slug = Str::slug($tagName);
+
+            // Check if tag already exists by slug
+            $existingTag = ProductTag::where('slug', $slug)->first();
 
             if ($existingTag) {
                 return response()->json([
@@ -2289,7 +2292,8 @@ class ProductsController extends Controller
             }
 
             $tag = ProductTag::create([
-                'name' => $request->name,
+                'name' => $tagName,
+                'slug' => $slug,
                 'status_key_code' => 'TAG_ACTIVE',
                 'created_by' => auth('admin')->id(),
             ]);
