@@ -45,5 +45,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         require __DIR__ . '/admin/pages_routes.php';
         require __DIR__ . '/admin/admin-notifications.php';
         require __DIR__ . '/admin/translations_routes.php';
+        require __DIR__ .'/admin/contact_routes.php';
     });
 });
