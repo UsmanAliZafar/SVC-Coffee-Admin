@@ -707,7 +707,7 @@ class CategoriesController extends Controller
             $query = $category->products()
                 ->active()
                 ->available()
-                ->with(['category', 'images']);
+                ->with(['category', 'images','variants']);
 
             // Filter by featured
             if ($request->has('is_featured')) {
