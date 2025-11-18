@@ -21,7 +21,7 @@ class ProductsController extends Controller
             $query = Product::query()
                 ->active()
                 ->available()
-                ->with(['category', 'images']);
+                ->with(['category', 'images','variants']);
 
             // Filter by category
             if ($request->has('category_id')) {
