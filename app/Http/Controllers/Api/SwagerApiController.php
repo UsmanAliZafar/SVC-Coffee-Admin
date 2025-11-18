@@ -1398,4 +1398,65 @@ class SwagerApiController extends Controller
      * )
      */
     public function formatCurrency() {}
+
+    /**
+     * @OA\Post(
+     *     path="/api/contact-us",
+     *     operationId="submitContactForm",
+     *     tags={"Contact Us"},
+     *     summary="Submit contact form",
+     *     description="Submit a new contact message to the store. No authentication required.",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name", "email", "subject", "message"},
+     *             @OA\Property(property="name", type="string", maxLength=255, example="John Doe", description="Full name of the person contacting"),
+     *             @OA\Property(property="email", type="string", format="email", maxLength=255, example="john.doe@example.com", description="Email address for response"),
+     *             @OA\Property(property="phone", type="string", maxLength=20, nullable=true, example="+1234567890", description="Phone number (optional)"),
+     *             @OA\Property(property="subject", type="string", maxLength=500, example="Product Inquiry - Coffee Machine", description="Subject of the message"),
+     *             @OA\Property(property="message", type="string", maxLength=5000, example="I'm interested in your professional espresso machine. Can you provide more details about warranty and shipping options?", description="Detailed message"),
+     *             @OA\Property(property="priority", type="string", enum={"low", "normal", "high", "urgent"}, example="normal", description="Message priority level")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Message sent successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Your message has been sent successfully! We will get back to you soon."),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="string", format="uuid", example="9d4f5678-1234-5678-9abc-def123456789"),
+     *                 @OA\Property(property="name", type="string", example="John Doe"),
+     *                 @OA\Property(property="email", type="string", example="john.doe@example.com"),
+     *                 @OA\Property(property="subject", type="string", example="Product Inquiry - Coffee Machine"),
+     *                 @OA\Property(property="created_at", type="string", format="date-time")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(property="errors", type="object",
+     *                 @OA\Property(property="name", type="array", @OA\Items(type="string", example="The name field is required.")),
+     *                 @OA\Property(property="email", type="array", @OA\Items(type="string", example="The email must be a valid email address.")),
+     *                 @OA\Property(property="subject", type="array", @OA\Items(type="string", example="The subject field is required.")),
+     *                 @OA\Property(property="message", type="array", @OA\Items(type="string", example="The message field is required."))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to send message. Please try again later."),
+     *             @OA\Property(property="error", type="string", nullable=true, example="Database connection failed")
+     *         )
+     *     )
+     * )
+     */
+    public function ContactUs() {}
 }

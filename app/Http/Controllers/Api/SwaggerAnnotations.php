@@ -78,6 +78,10 @@ namespace App\Http\Controllers\Api;
  *    name="Store Settings",
  *    description="Store settings and configuration endpoints"
  * )
+ *  @OA\Tag(
+ *     name="Contact Us",
+ *     description="Contact form submissions - Submit inquiries and messages to the store"
+ * )
  *
  * @OA\Response(
  *     response="Success",
@@ -793,6 +797,49 @@ namespace App\Http\Controllers\Api;
  *         @OA\Property(property="close", type="string", example="18:00")
  *     ),
  *     @OA\Property(property="timezone", type="string", example="Asia/Karachi")
+ * )
+ */
+/*
+* @OA\Schema(
+ *     schema="ContactForm",
+ *     type="object",
+ *     title="Contact Form",
+ *     description="Contact form submission data",
+ *     required={"name", "email", "subject", "message"},
+ *     @OA\Property(property="name", type="string", maxLength=255, example="John Doe"),
+ *     @OA\Property(property="email", type="string", format="email", maxLength=255, example="john.doe@example.com"),
+ *     @OA\Property(property="phone", type="string", maxLength=20, nullable=true, example="+1234567890"),
+ *     @OA\Property(property="subject", type="string", maxLength=500, example="Product Inquiry - Coffee Machine"),
+ *     @OA\Property(property="message", type="string", maxLength=5000, example="I'm interested in your professional espresso machine..."),
+ *     @OA\Property(property="priority", type="string", enum={"low", "normal", "high", "urgent"}, example="normal")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="ContactResponse",
+ *     type="object",
+ *     title="Contact Response",
+ *     description="Successful contact form submission response",
+ *     @OA\Property(property="success", type="boolean", example=true),
+ *     @OA\Property(property="message", type="string", example="Your message has been sent successfully! We will get back to you soon."),
+ *     @OA\Property(property="data", type="object",
+ *         @OA\Property(property="id", type="string", format="uuid", example="9d4f5678-1234-5678-9abc-def123456789"),
+ *         @OA\Property(property="name", type="string", example="John Doe"),
+ *         @OA\Property(property="email", type="string", example="john.doe@example.com"),
+ *         @OA\Property(property="subject", type="string", example="Product Inquiry - Coffee Machine"),
+ *         @OA\Property(property="created_at", type="string", format="date-time")
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="ContactValidationError",
+ *     type="object",
+ *     title="Contact Validation Error",
+ *     description="Contact form validation error response",
+ *     @OA\Property(property="success", type="boolean", example=false),
+ *     @OA\Property(property="message", type="string", example="Validation failed"),
+ *     @OA\Property(property="errors", type="object",
+ *         @OA\Property(property="field_name", type="array", @OA\Items(type="string", example="The field is required"))
+ *     )
  * )
  */
 class SwaggerAnnotations

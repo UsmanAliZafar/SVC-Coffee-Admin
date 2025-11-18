@@ -53,5 +53,6 @@ Route::prefix('api')->name('api.')->group(function () {
         require __DIR__ . '/apis/checkout_routes.php';
         require __DIR__ . '/apis/customers_routes.php';
         require __DIR__ . '/apis/settings_routes.php';
+        require __DIR__ . '/apis/contact_routes.php';
     });
 });

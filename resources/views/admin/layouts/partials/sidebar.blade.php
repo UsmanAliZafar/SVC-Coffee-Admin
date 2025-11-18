@@ -500,6 +500,24 @@
             <li class="section-divider">
                 <span class="section-title">System</span>
             </li>
+            {{-- Contact Us Management --}}
+            @if(auth('admin')->user()->hasPermission('contact_us.read'))
+                <li class="nav-item {{ request()->routeIs('admin.contact-us.*') ? 'active' : '' }}">
+                    <a class="nav-link {{ request()->routeIs('admin.contact-us.*') ? 'active' : '' }}"
+                    href="{{ route('admin.contact-us.index') }}"
+                    data-tooltip="Contact Us">
+                        <i class="bi bi-envelope-fill"></i>
+                        <span class="nav-text">Contact & Queries</span>
+                        @php
+                            $unreadCount = \App\Models\ContactUs::whereNull('read_at')->count();
+                        @endphp
+                        @if($unreadCount > 0)
+                            <span class="badge bg-danger rounded-pill ms-2">{{ $unreadCount }}</span>
+                        @endif
+                    </a>
+                </li>
+            @endif
+            {{-- End Contact Us Management --}}
 
             {{-- Notifications Management --}}
             @if(auth('admin')->user()->hasPermission('notifications.read'))
