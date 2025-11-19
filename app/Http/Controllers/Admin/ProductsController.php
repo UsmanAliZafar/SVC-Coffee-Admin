@@ -247,7 +247,7 @@ class ProductsController extends Controller
 
                     if ($stock <= 0) {
                         $badge = '<span class="badge bg-danger">Out of Stock (' . $stock . ')</span>';
-                    } elseif ($stock < 10) {
+                    } elseif ($stock < $product->low_stock_threshold) {
                         $badge = '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
                     } else {
                         $badge = '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
@@ -664,6 +664,9 @@ class ProductsController extends Controller
                         return !empty($tag) && is_string($tag);
                     });
 
+                    // ✅ ADD THIS LINE: Remove duplicates
+                    $tags = array_unique($tags);
+
                     if (!empty($tags)) {
                         $product->tags()->attach($tags);
                     }
@@ -910,7 +913,7 @@ class ProductsController extends Controller
                 'name', 'slug', 'sku', 'barcode', 'short_description', 'description',
                 'category_id', 'vendor_id', 'product_type', 'curency',
                 'price', 'sale_price', 'cost_price', 'status_key_code',
-                'is_featured', 'show_on_home', 'is_available', 'track_inventory',
+                'is_featured', 'show_on_home', 'is_available', 'track_inventory','low_stock_threshold',
                 'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
                 'is_taxable', 'tax_type', 'tax_percentage', 'tax_class',
                 'weight', 'length', 'width', 'height', 'has_variants'
@@ -987,6 +990,9 @@ class ProductsController extends Controller
                     $tags = array_filter($tags, function($tag) {
                         return !empty($tag) && is_string($tag);
                     });
+
+                    // ✅ ADD THIS LINE: Remove duplicates
+                    $tags = array_unique($tags);
 
                     $product->tags()->sync($tags);
                 } else {

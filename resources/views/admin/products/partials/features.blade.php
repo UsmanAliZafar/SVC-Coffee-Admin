@@ -8,12 +8,12 @@
     <div class="alert alert-info">
         <i class="bi bi-info-circle"></i>
         <strong>Dynamic Features:</strong> Add unlimited custom sections to your product. Each section type can be added multiple times.
-        {{-- <ul class="mb-0 mt-2">
+        <ul class="mb-0 mt-2">
             <li><strong>Rich Text:</strong> Full editor for formatted content</li>
             <li><strong>Multiline Text:</strong> Simple textarea for long content</li>
             <li><strong>Single Line Fields:</strong> Multiple label+value pairs in one section</li>
             <li><strong>Links List:</strong> Multiple links with titles in one section</li>
-        </ul> --}}
+        </ul>
     </div>
 
     <!-- Features Container -->
@@ -757,6 +757,92 @@ window.beforeProductFormSubmit = function() {
             updateFeatureValue(featureId, editor.getData());
         }
     });
+};
+//featur validation
+/**
+ * Validate features before form submission
+ * Returns true if valid, false if invalid
+ */
+window.validateProductFeatures = function() {
+    if (productFeatures.length === 0) {
+        return true; // No features added, validation passes
+    }
+
+    let errors = [];
+
+    productFeatures.forEach((feature, index) => {
+        const featureName = getFeatureTypeName(feature.type);
+        const sectionNumber = index + 1;
+
+        // Check if label is empty
+        if (!feature.label || feature.label.trim() === '') {
+            errors.push(`Feature #${sectionNumber} (${featureName}): Section Label is required`);
+        }
+
+        // Check value based on feature type
+        switch(feature.type) {
+            case 'rich_text':
+            case 'multiline_text':
+                if (!feature.value || feature.value.trim() === '' || feature.value === '<p></p>' || feature.value === '<p><br></p>') {
+                    errors.push(`Feature #${sectionNumber} (${featureName}): Content is required`);
+                }
+                break;
+
+            case 'single_line':
+                if (!Array.isArray(feature.value) || feature.value.length === 0) {
+                    errors.push(`Feature #${sectionNumber} (${featureName}): At least one text field is required`);
+                } else {
+                    // Check if any item has empty label or value
+                    feature.value.forEach((item, itemIndex) => {
+                        if (!item.label || item.label.trim() === '') {
+                            errors.push(`Feature #${sectionNumber} (${featureName}), Item #${itemIndex + 1}: Label is required`);
+                        }
+                        if (!item.value || item.value.trim() === '') {
+                            errors.push(`Feature #${sectionNumber} (${featureName}), Item #${itemIndex + 1}: Value is required`);
+                        }
+                    });
+                }
+                break;
+
+            case 'links_list':
+                if (!Array.isArray(feature.value) || feature.value.length === 0) {
+                    errors.push(`Feature #${sectionNumber} (${featureName}): At least one link is required`);
+                } else {
+                    // Check if any link has empty title or URL
+                    feature.value.forEach((link, linkIndex) => {
+                        if (!link.title || link.title.trim() === '') {
+                            errors.push(`Feature #${sectionNumber} (${featureName}), Link #${linkIndex + 1}: Title is required`);
+                        }
+                        if (!link.url || link.url.trim() === '') {
+                            errors.push(`Feature #${sectionNumber} (${featureName}), Link #${linkIndex + 1}: URL is required`);
+                        }
+                    });
+                }
+                break;
+        }
+    });
+
+    if (errors.length > 0) {
+        // Show errors in a SweetAlert
+        Swal.fire({
+            icon: 'error',
+            title: 'Feature Validation Failed',
+            html: '<div style="text-align: left;"><strong>Please fix the following issues:</strong><ul class="mt-2">' +
+                  errors.map(err => `<li>${err}</li>`).join('') +
+                  '</ul></div>',
+            confirmButtonColor: '#5B914C',
+            width: '600px'
+        });
+
+        // Scroll to features section
+        $('html, body').animate({
+            scrollTop: $('#featuresContainer').offset().top - 100
+        }, 500);
+
+        return false;
+    }
+
+    return true;
 };
 </script>
 @endpush

@@ -1052,11 +1052,11 @@
                             <i class="bi bi-star{{ $product->is_featured ? '-fill' : '' }}"></i>
                             {{ $product->is_featured ? 'Remove from Featured' : 'Mark as Featured' }}
                         </button>
-
+{{--
                         <button type="button" class="btn btn-outline-info" onclick="togglePublish()">
                             <i class="bi bi-{{ $product->published_at ? 'eye-slash' : 'eye' }}"></i>
                             {{ $product->published_at ? 'Unpublish' : 'Publish' }}
-                        </button>
+                        </button> --}}
 
                         <button type="button" class="btn btn-outline-secondary" onclick="duplicateProduct()">
                             <i class="bi bi-files"></i> Duplicate Product
@@ -1796,6 +1796,13 @@ $(document).ready(function() {
         // Update all feature editors before submit
         if (typeof beforeProductFormSubmit === 'function') {
             beforeProductFormSubmit();
+        }
+
+        // Validate features before submission
+        if (typeof validateProductFeatures === 'function') {
+            if (!validateProductFeatures()) {
+                return false; // Stop submission if validation fails
+            }
         }
 
         let formData = new FormData(this);

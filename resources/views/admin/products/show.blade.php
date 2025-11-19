@@ -366,11 +366,11 @@
                         <span class="badge bg-secondary">{{ ucfirst($product->product_type) }}</span>
                     @endif
 
-                    @if($product->isPublished())
+                    {{-- @if($product->isPublished())
                         <span class="badge bg-success"><i class="bi bi-check-circle"></i> Published</span>
                     @else
                         <span class="badge bg-warning"><i class="bi bi-clock"></i> Unpublished</span>
-                    @endif
+                    @endif --}}
 
                     @if($product->track_inventory)
                         {!! $product->getStockBadge() !!}
@@ -939,11 +939,11 @@
                     {{ $product->is_taxable ? 'Yes' : 'No' }}
                 </div>
 
-                <div class="mb-2">
+                {{-- <div class="mb-2">
                     <i class="bi bi-{{ $product->requires_login ? 'check-circle text-warning' : 'x-circle text-muted' }}"></i>
                     <strong>Requires Login:</strong>
                     {{ $product->requires_login ? 'Yes' : 'No' }}
-                </div>
+                </div> --}}
 
                 @if($product->available_from)
                 <div class="mb-2">
@@ -1003,9 +1003,9 @@
                     <button type="button" class="btn btn-outline-info" onclick="toggleHomepage()">
                         <i class="bi bi-house"></i> Toggle Homepage
                     </button>
-                    <button type="button" class="btn btn-outline-success" onclick="togglePublish()">
+                    {{-- <button type="button" class="btn btn-outline-success" onclick="togglePublish()">
                         <i class="bi bi-upload"></i> Toggle Publish
-                    </button>
+                    </button> --}}
                     @if($product->track_inventory)
                     <button type="button" class="btn btn-outline-warning" onclick="updateStock()">
                         <i class="bi bi-boxes"></i> Update Stock

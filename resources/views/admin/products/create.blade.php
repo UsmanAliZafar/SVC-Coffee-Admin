@@ -1260,6 +1260,13 @@
             beforeProductFormSubmit();
         }
 
+        // Validate features before submission
+        if (typeof validateProductFeatures === 'function') {
+            if (!validateProductFeatures()) {
+                return false; // Stop submission if validation fails
+            }
+        }
+
         let formData = new FormData(this);
 
         $.ajax({
