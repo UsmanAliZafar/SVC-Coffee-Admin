@@ -309,7 +309,13 @@
                     </div>
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i>
-                        <a href="{{ asset('templates/products_import_template.csv') }}" target="_blank">Download CSV Template</a>
+                        <strong>Need help? <i class="fa fa-info" title="For Fast imports keep numbers low."></i></strong>
+                        <a href="{{ route('admin.products.import-template') }}" class="alert-link" target="_blank">
+                            <i class="bi bi-download"></i> Download CSV Template
+                        </a>
+                        <div class="mt-2 small">
+                            The template includes sample data showing the correct format for all fields.
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -766,9 +772,10 @@ $(document).ready(function() {
             contentType: false,
             beforeSend: function() {
                 Swal.fire({
-                    title: 'Importing...',
-                    text: 'Please wait while we import your products',
+                    title: 'Importing Products...',
+                    html: '<div class="text-center"><div class="spinner-border text-success mb-3" role="status"></div><p>Please wait while we process your file</p><small class="text-muted">Do not close this window</small></div>',
                     allowOutsideClick: false,
+                    showConfirmButton: false,
                     didOpen: () => {
                         Swal.showLoading();
                     }
@@ -778,84 +785,311 @@ $(document).ready(function() {
                 $('#importModal').modal('hide');
                 $('#importForm')[0].reset();
 
-                let html = response.message;
-                if (response.errors && response.errors.length > 0) {
-                    html += '<br><br><strong>Errors:</strong><br>' + response.errors.slice(0, 10).join('<br>');
-                    if (response.errors.length > 10) {
-                        html += '<br>...and ' + (response.errors.length - 10) + ' more';
+                // Determine icon based on results
+                let icon = 'success';
+                let title = 'Import Successful!';
+
+                if (response.failed > 0 && response.imported === 0) {
+                    icon = 'error';
+                    title = 'Import Failed';
+                } else if (response.failed > 0) {
+                    icon = 'warning';
+                    title = 'Import Completed with Issues';
+                }
+
+                // Build HTML content
+                let html = `
+                    <div class="import-results">
+                        <!-- Summary Stats -->
+                        <div class="alert alert-${icon === 'error' ? 'danger' : icon === 'warning' ? 'warning' : 'success'} mb-3">
+                            <div class="d-flex justify-content-around text-center">
+                                <div>
+                                    <h4 class="mb-0">${response.total_processed || (response.imported + response.failed)}</h4>
+                                    <small>Total Rows</small>
+                                </div>
+                                <div>
+                                    <h4 class="mb-0 text-success">${response.imported}</h4>
+                                    <small>✓ Imported</small>
+                                </div>
+                                <div>
+                                    <h4 class="mb-0 text-danger">${response.failed}</h4>
+                                    <small>✗ Failed</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Success Message -->
+                        ${response.imported > 0 ? `
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <strong>${response.imported}</strong> product(s) imported successfully
+                            </div>
+                        ` : ''}
+
+                        <!-- Warnings Section -->
+                        ${response.warnings && response.warnings.length > 0 ? `
+                            <div class="alert alert-warning mb-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                    <strong>Warnings (${response.warnings.length})</strong>
+                                </div>
+                                <div class="warnings-list" style="max-height: 150px; overflow-y: auto; font-size: 0.9rem;">
+                                    <ul class="mb-0 text-start">
+                                        ${response.warnings.map(warn => `<li>${warn}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <!-- Errors Section -->
+                        ${response.errors && response.errors.length > 0 ? `
+                            <div class="alert alert-danger mb-0">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div>
+                                        <i class="bi bi-x-circle-fill me-2"></i>
+                                        <strong>Errors (${response.errors.length})</strong>
+                                    </div>
+                                    ${response.errors.length > 5 ? `
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="downloadErrorLog()">
+                                            <i class="bi bi-download"></i> Download Full Log
+                                        </button>
+                                    ` : ''}
+                                </div>
+                                <div class="errors-list" style="max-height: 250px; overflow-y: auto; font-size: 0.9rem; background: #fff; padding: 10px; border-radius: 4px;">
+                                    <ul class="mb-0 text-start" style="color: #721c24;">
+                                        ${response.errors.slice(0, 20).map(err => `<li>${err}</li>`).join('')}
+                                        ${response.errors.length > 20 ? `
+                                            <li class="text-muted mt-2">
+                                                <em>...and ${response.errors.length - 20} more errors. Click "Download Full Log" to see all.</em>
+                                            </li>
+                                        ` : ''}
+                                    </ul>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                // Store errors in global variable for download
+                window.importErrors = response.errors || [];
+
+                Swal.fire({
+                    icon: icon,
+                    title: title,
+                    html: html,
+                    confirmButtonText: icon === 'error' ? 'Close' : 'Got it',
+                    confirmButtonColor: icon === 'error' ? '#dc3545' : '#5B914C',
+                    width: '700px',
+                    customClass: {
+                        htmlContainer: 'text-start',
+                        popup: 'import-results-popup'
+                    },
+                    didOpen: () => {
+                        // Add custom styles
+                        const style = document.createElement('style');
+                        style.textContent = `
+                            .import-results-popup .swal2-html-container {
+                                overflow: visible !important;
+                            }
+                            .import-results ul {
+                                padding-left: 20px;
+                            }
+                            .import-results ul li {
+                                margin-bottom: 5px;
+                                line-height: 1.5;
+                            }
+                            .errors-list::-webkit-scrollbar,
+                            .warnings-list::-webkit-scrollbar {
+                                width: 6px;
+                            }
+                            .errors-list::-webkit-scrollbar-track,
+                            .warnings-list::-webkit-scrollbar-track {
+                                background: #f1f1f1;
+                            }
+                            .errors-list::-webkit-scrollbar-thumb,
+                            .warnings-list::-webkit-scrollbar-thumb {
+                                background: #888;
+                                border-radius: 3px;
+                            }
+                        `;
+                        document.head.appendChild(style);
                     }
+                }).then(() => {
+                    // Reload DataTable after user closes the modal
+                    if (typeof table !== 'undefined') {
+                        table.ajax.reload(null, false);
+                    } else if (typeof $('#productsTable').DataTable === 'function') {
+                        $('#productsTable').DataTable().ajax.reload(null, false);
+                    }
+                });
+            },
+            error: function(xhr) {
+                $('#importModal').modal('hide');
+
+                let errorTitle = 'Import Failed';
+                let errorMessage = 'An unexpected error occurred while importing products.';
+                let errorHtml = '';
+
+                if (xhr.responseJSON) {
+                    errorMessage = xhr.responseJSON.message || errorMessage;
+
+                    // Handle validation errors
+                    if (xhr.responseJSON.errors) {
+                        errorTitle = 'Validation Error';
+                        errorHtml = `
+                            <div class="alert alert-danger text-start mb-0">
+                                <strong>Please fix the following issues:</strong>
+                                <ul class="mt-2 mb-0">
+                        `;
+
+                        $.each(xhr.responseJSON.errors, function(field, messages) {
+                            if (Array.isArray(messages)) {
+                                messages.forEach(msg => {
+                                    errorHtml += `<li>${msg}</li>`;
+                                });
+                            } else {
+                                errorHtml += `<li>${messages}</li>`;
+                            }
+                        });
+
+                        errorHtml += `</ul></div>`;
+                    }
+
+                    // Show technical details in debug mode
+                    if (xhr.responseJSON.technical_details) {
+                        errorHtml += `
+                            <details class="mt-3">
+                                <summary class="text-muted" style="cursor: pointer;">
+                                    <small>Technical Details (for developers)</small>
+                                </summary>
+                                <pre class="text-start mt-2 p-2 bg-light" style="font-size: 0.75rem; max-height: 200px; overflow-y: auto;">
+    ${xhr.responseJSON.technical_details}
+                                </pre>
+                            </details>
+                        `;
+                    }
+                } else if (xhr.status === 0) {
+                    errorMessage = 'Network error. Please check your internet connection and try again.';
+                } else if (xhr.status === 404) {
+                    errorMessage = 'Import endpoint not found. Please contact support.';
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error occurred. Please try again or contact support.';
+                } else if (xhr.status === 413) {
+                    errorMessage = 'File is too large. Please reduce the file size and try again.';
+                } else if (xhr.status === 422) {
+                    errorMessage = 'Validation failed. Please check your file format.';
                 }
 
                 Swal.fire({
-                    title: 'Import Complete',
-                    html: html,
-                    icon: response.failed > 0 ? 'warning' : 'success'
+                    icon: 'error',
+                    title: errorTitle,
+                    html: errorHtml || `<p>${errorMessage}</p>`,
+                    confirmButtonColor: '#dc3545',
+                    width: errorHtml ? '600px' : '500px',
+                    customClass: {
+                        htmlContainer: 'text-start'
+                    },
+                    footer: xhr.status >= 500 ?
+                        '<small class="text-muted">If this problem persists, please contact your administrator with error code: ' + xhr.status + '</small>' :
+                        null
                 });
-
-                table.draw();
-            },
-            error: function(xhr) {
-                Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to import products', 'error');
             }
         });
     });
 
-    // Update statistics
-    function updateStatistics() {
-        $.ajax({
-            url: '{{ route("admin.products.statistics") }}',
-            success: function(response) {
-                $('#totalProducts').text(response.total);
-                $('#activeProducts').text(response.active);
-                $('#draftProducts').text(response.draft);
-                $('#featuredProducts').text(response.featured);
-                $('#outOfStock').text(response.out_of_stock);
-                $('#lowStock').text(response.low_stock);
+        // Function to download error log
+        function downloadErrorLog() {
+            if (!window.importErrors || window.importErrors.length === 0) {
+                Swal.fire('No Errors', 'No errors to download', 'info');
+                return;
             }
-        });
-    }
 
-    // Filter by clicking stats
-    window.filterByStatus = function(status) {
-        $('#searchFilter').val('');
-        $('#categoryFilter').val('');
-        $('#vendorFilter').val('');
-        $('#stockFilter').val('');
+            // Create error log content
+            let logContent = '=== PRODUCT IMPORT ERROR LOG ===\n';
+            logContent += 'Generated: ' + new Date().toLocaleString() + '\n';
+            logContent += 'Total Errors: ' + window.importErrors.length + '\n';
+            logContent += '='.repeat(50) + '\n\n';
 
-        if (status === 'all') {
-            $('#statusFilter').val('');
-        } else if (status === 'active') {
-            $('#statusFilter').val('PRODUCT_ACTIVE');
-        } else if (status === 'draft') {
-            $('#statusFilter').val('PRODUCT_DRAFT');
+            window.importErrors.forEach((error, index) => {
+                logContent += `${index + 1}. ${error}\n`;
+            });
+
+            // Create blob and download
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'import-errors-' + Date.now() + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Downloaded!',
+                text: 'Error log has been downloaded',
+                timer: 2000,
+                showConfirmButton: false
+            });
         }
 
-        table.draw();
-    };
+        // Update statistics
+        function updateStatistics() {
+            $.ajax({
+                url: '{{ route("admin.products.statistics") }}',
+                success: function(response) {
+                    $('#totalProducts').text(response.total);
+                    $('#activeProducts').text(response.active);
+                    $('#draftProducts').text(response.draft);
+                    $('#featuredProducts').text(response.featured);
+                    $('#outOfStock').text(response.out_of_stock);
+                    $('#lowStock').text(response.low_stock);
+                }
+            });
+        }
 
-    window.filterByStock = function(type) {
-        $('#searchFilter').val('');
-        $('#statusFilter').val('');
-        $('#categoryFilter').val('');
-        $('#vendorFilter').val('');
-
-        if (type === 'featured') {
-            $('#featuredFilter').val('1');
+        // Filter by clicking stats
+        window.filterByStatus = function(status) {
+            $('#searchFilter').val('');
+            $('#categoryFilter').val('');
+            $('#vendorFilter').val('');
             $('#stockFilter').val('');
-        } else if (type === 'out') {
-            $('#stockFilter').val('out_of_stock');
-            $('#featuredFilter').val('');
-        } else if (type === 'low') {
-            $('#stockFilter').val('low_stock');
-            $('#featuredFilter').val('');
-        }
 
-        table.draw();
-    };
+            if (status === 'all') {
+                $('#statusFilter').val('');
+            } else if (status === 'active') {
+                $('#statusFilter').val('PRODUCT_ACTIVE');
+            } else if (status === 'draft') {
+                $('#statusFilter').val('PRODUCT_DRAFT');
+            }
 
-    // Initial statistics load
-    updateStatistics();
-});
+            table.draw();
+        };
+
+        window.filterByStock = function(type) {
+            $('#searchFilter').val('');
+            $('#statusFilter').val('');
+            $('#categoryFilter').val('');
+            $('#vendorFilter').val('');
+
+            if (type === 'featured') {
+                $('#featuredFilter').val('1');
+                $('#stockFilter').val('');
+            } else if (type === 'out') {
+                $('#stockFilter').val('out_of_stock');
+                $('#featuredFilter').val('');
+            } else if (type === 'low') {
+                $('#stockFilter').val('low_stock');
+                $('#featuredFilter').val('');
+            }
+
+            table.draw();
+        };
+
+        // Initial statistics load
+        updateStatistics();
+    });
 
 // Quick Stock Management
 // Quick Stock Management

@@ -374,9 +374,20 @@ class WarehouseController extends Controller
         return DataTables::of($query)
             ->addColumn('product_info', function($stock) {
                 $product = $stock->product;
+
+                // Check if product exists
+                if (!$product) {
+                    return '<div>
+                        <span class="badge bg-danger">
+                            <i class="bi bi-trash"></i> Product Deleted
+                        </span><br>
+                        <small class="text-muted">Product ID: ' . $stock->product_id . '</small>
+                    </div>';
+                }
+
                 return '<div>
-                    <strong>' . $product->name . '</strong><br>
-                    <small class="text-muted">SKU: ' . $product->sku . '</small>
+                    <strong>' . htmlspecialchars($product->name) . '</strong><br>
+                    <small class="text-muted">SKU: ' . htmlspecialchars($product->sku) . '</small>
                 </div>';
             })
             ->addColumn('quantity', function($stock) {
@@ -396,11 +407,25 @@ class WarehouseController extends Controller
                 return $stock->location ?? '<span class="text-muted">—</span>';
             })
             ->addColumn('value', function($stock) {
+                // Check if product exists before calculating value
+                if (!$stock->product) {
+                    return '<span class="text-muted">—</span>';
+                }
+
                 $value = $stock->quantity * $stock->product->price;
                 return '<span class="text-success">'. store_currency_symbol() . number_format($value, 2) . '</span>';
             })
             ->addColumn('actions', function($stock) use ($warehouse) {
                 $actions = '<div class="btn-group" role="group">';
+
+                // Check if product exists
+                if (!$stock->product) {
+                    $actions .= '<button type="button" class="btn btn-sm btn-danger" disabled title="Product deleted">
+                        <i class="bi bi-x-circle"></i>
+                    </button>';
+                    $actions .= '</div>';
+                    return $actions;
+                }
 
                 if (auth('admin')->user()->hasPermission('inventory.update')) {
                     $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-stock"

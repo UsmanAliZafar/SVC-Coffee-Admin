@@ -1557,16 +1557,22 @@ class ProductsController extends Controller
     {
         // Check permission
         if (!auth('admin')->user()->hasPermission('products.create')) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
         }
 
         $validator = Validator::make($request->all(), [
             'csv_file' => 'required|file|mimes:csv,txt|max:10240',
+        ], [
+            'csv_file.required' => 'Please select a CSV file to upload',
+            'csv_file.file' => 'The uploaded file is not valid',
+            'csv_file.mimes' => 'Only CSV or TXT files are allowed',
+            'csv_file.max' => 'File size cannot exceed 10MB',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
+                'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
         }
@@ -1575,34 +1581,163 @@ class ProductsController extends Controller
 
         try {
             $file = $request->file('csv_file');
-            $csvData = array_map('str_getcsv', file($file->getRealPath()));
-            $headers = array_shift($csvData);
+
+            // Validate file exists
+            if (!$file || !$file->isValid()) {
+                throw new \Exception('Invalid file upload. Please try again.');
+            }
+
+            // Check if file is readable
+            if (!is_readable($file->getRealPath())) {
+                throw new \Exception('Unable to read the uploaded file. Please check file permissions.');
+            }
+
+            // Read CSV with proper encoding handling
+            $handle = fopen($file->getRealPath(), 'r');
+
+            if (!$handle) {
+                throw new \Exception('Failed to open CSV file. The file might be corrupted.');
+            }
+
+            // Skip BOM if present (Excel compatibility)
+            $bom = fread($handle, 3);
+            if ($bom !== "\xEF\xBB\xBF") {
+                rewind($handle);
+            }
+
+            // Read headers
+            $headers = fgetcsv($handle);
+
+            // Validate headers exist
+            if (!$headers || empty($headers)) {
+                fclose($handle);
+                throw new \Exception('CSV file is empty or has no headers. Please use the template format.');
+            }
+
+            // Normalize headers (trim whitespace and handle encoding)
+            $headers = array_map(function($header) {
+                return trim($header);
+            }, $headers);
+
+            // Validate required headers
+            $requiredHeaders = ['Name', 'SKU', 'Price'];
+            $missingHeaders = array_diff($requiredHeaders, $headers);
+
+            if (!empty($missingHeaders)) {
+                fclose($handle);
+                throw new \Exception('Missing required columns: ' . implode(', ', $missingHeaders) . '. Please use the template format.');
+            }
 
             $imported = 0;
             $failed = 0;
             $errors = [];
+            $warnings = [];
+            $rowNumber = 1; // Start from 1 (header is row 0)
 
-            foreach ($csvData as $row) {
+            // Read data rows
+            while (($row = fgetcsv($handle)) !== false) {
+                $rowNumber++;
+
+                // Skip empty rows
+                if (empty(array_filter($row))) {
+                    continue;
+                }
+
                 try {
+                    // Check if row has correct number of columns
+                    if (count($row) !== count($headers)) {
+                        throw new \Exception('Column count mismatch. Expected ' . count($headers) . ' columns, found ' . count($row));
+                    }
+
+                    // Combine headers with row data
                     $data = array_combine($headers, $row);
+
+                    if ($data === false) {
+                        throw new \Exception('Failed to parse row data. Check for formatting issues.');
+                    }
+
+                    // Validate required fields
+                    $missingFields = [];
+                    if (empty($data['Name']) || trim($data['Name']) === '') {
+                        $missingFields[] = 'Name';
+                    }
+                    if (empty($data['SKU']) || trim($data['SKU']) === '') {
+                        $missingFields[] = 'SKU';
+                    }
+                    if (empty($data['Price']) || trim($data['Price']) === '') {
+                        $missingFields[] = 'Price';
+                    }
+
+                    if (!empty($missingFields)) {
+                        throw new \Exception('Missing required fields: ' . implode(', ', $missingFields));
+                    }
+
+                    // Validate price is numeric
+                    $priceValue = str_replace(',', '', trim($data['Price']));
+                    if (!is_numeric($priceValue) || $priceValue < 0) {
+                        throw new \Exception('Invalid price format. Price must be a positive number (found: "' . $data['Price'] . '")');
+                    }
+
+                    // Validate sale price if provided
+                    if (!empty($data['Sale Price'])) {
+                        $salePriceValue = str_replace(',', '', trim($data['Sale Price']));
+                        if (!is_numeric($salePriceValue) || $salePriceValue < 0) {
+                            throw new \Exception('Invalid sale price format. Must be a positive number (found: "' . $data['Sale Price'] . '")');
+                        }
+                        if ($salePriceValue >= $priceValue) {
+                            throw new \Exception('Sale price (' . $salePriceValue . ') must be less than regular price (' . $priceValue . ')');
+                        }
+                    }
+
+                    // Validate stock quantity if provided
+                    if (!empty($data['Stock Quantity'])) {
+                        $stockValue = trim($data['Stock Quantity']);
+                        if (!is_numeric($stockValue) || $stockValue < 0) {
+                            throw new \Exception('Invalid stock quantity. Must be a positive number (found: "' . $data['Stock Quantity'] . '")');
+                        }
+                    }
+
+                    // Check if SKU already exists
+                    $trimmedSku = trim($data['SKU']);
+                    if (Product::where('sku', $trimmedSku)->exists()) {
+                        throw new \Exception('SKU "' . $trimmedSku . '" already exists in database');
+                    }
+
+                    // Check if barcode already exists (if provided)
+                    if (!empty($data['Barcode'])) {
+                        $trimmedBarcode = trim($data['Barcode']);
+                        if (Product::where('barcode', $trimmedBarcode)->exists()) {
+                            throw new \Exception('Barcode "' . $trimmedBarcode . '" already exists in database');
+                        }
+                    }
 
                     // Find category by name
                     $category = null;
                     if (!empty($data['Category'])) {
-                        $category = ProductsCategories::where('title', $data['Category'])->first();
+                        $categoryName = trim($data['Category']);
+                        $category = ProductsCategories::where('title', $categoryName)->first();
+
+                        if (!$category) {
+                            $warnings[] = "Row {$rowNumber}: Category '{$categoryName}' not found. Product created without category.";
+                        }
                     }
 
-                    Product::create([
-                        'name' => $data['Name'],
-                        'sku' => $data['SKU'],
-                        'barcode' => $data['Barcode'] ?? null,
+                    // Create product
+                    $product = Product::create([
+                        'name' => trim($data['Name']),
+                        'slug' => Str::slug($data['Name']),
+                        'sku' => $trimmedSku,
+                        'barcode' => !empty($data['Barcode']) ? trim($data['Barcode']) : null,
                         'category_id' => $category ? $category->id : null,
-                        'product_type' => $data['Type'] ?? 'simple',
-                        'price' => $data['Price'],
-                        'sale_price' => $data['Sale Price'] ?? null,
-                        'short_description' => $data['Short Description'] ?? null,
-                        'description' => $data['Description'] ?? null,
+                        'product_type' => 'simple',
+                        'price' => (float) $priceValue,
+                        'sale_price' => !empty($data['Sale Price']) ? (float) str_replace(',', '', $data['Sale Price']) : null,
+                        'stock_quantity' => !empty($data['Stock Quantity']) ? (int) $data['Stock Quantity'] : 0,
+                        'description' => !empty($data['Description']) ? trim($data['Description']) : null,
                         'status_key_code' => 'PRODUCT_DRAFT',
+                        'track_inventory' => true,
+                        'is_available' => true,
+                        'low_stock_threshold' => 10,
                         'created_by' => auth('admin')->id(),
                     ]);
 
@@ -1610,26 +1745,79 @@ class ProductsController extends Controller
 
                 } catch (\Exception $e) {
                     $failed++;
-                    $errors[] = 'Row ' . ($imported + $failed + 1) . ': ' . $e->getMessage();
+                    $errorMessage = $e->getMessage();
+
+                    // Make error messages more user-friendly
+                    if (strpos($errorMessage, 'SQLSTATE') !== false) {
+                        if (strpos($errorMessage, 'Duplicate entry') !== false) {
+                            $errorMessage = 'Duplicate entry detected in database';
+                        } else {
+                            $errorMessage = 'Database error: ' . $errorMessage;
+                        }
+                    }
+
+                    $errors[] = "Row {$rowNumber}: " . $errorMessage;
                 }
+            }
+
+            fclose($handle);
+
+            // Check if any products were imported
+            if ($imported === 0 && $failed === 0) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No valid data found in CSV file. Please check the file format and try again.'
+                ], 400);
             }
 
             DB::commit();
 
+            $message = "Import completed successfully!";
+            if ($imported > 0) {
+                $message .= " {$imported} product(s) imported.";
+            }
+            if ($failed > 0) {
+                $message .= " {$failed} product(s) failed.";
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => "Import completed. Imported: {$imported}, Failed: {$failed}",
+                'message' => $message,
                 'imported' => $imported,
                 'failed' => $failed,
-                'errors' => $errors
+                'errors' => $errors,
+                'warnings' => $warnings,
+                'total_processed' => $imported + $failed
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
 
+            // Log the error for debugging
+            \Log::error('Product import failed', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Return user-friendly error message
+            $errorMessage = $e->getMessage();
+
+            // Check for common error patterns and provide helpful messages
+            if (strpos($errorMessage, 'memory') !== false) {
+                $errorMessage = 'File is too large to process. Please split into smaller files and try again.';
+            } elseif (strpos($errorMessage, 'disk') !== false || strpos($errorMessage, 'storage') !== false) {
+                $errorMessage = 'Server storage issue. Please contact administrator.';
+            } elseif (strpos($errorMessage, 'permission') !== false) {
+                $errorMessage = 'File permission error. Please contact administrator.';
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to import products: ' . $e->getMessage()
+                'message' => 'Import failed: ' . $errorMessage,
+                'technical_details' => config('app.debug') ? $e->getTraceAsString() : null
             ], 500);
         }
     }
@@ -3043,5 +3231,96 @@ class ProductsController extends Controller
             'success' => false,
             'message' => 'Failed to delete variant'
         ], 500);
+    }
+
+    /**
+     * Download CSV import template
+     */
+    public function downloadTemplate()
+    {
+        // Check permission
+        if (!auth('admin')->user()->hasPermission('products.create')) {
+            abort(403, 'Unauthorized access');
+        }
+
+        // Define CSV headers (8 fields only)
+        $headers = [
+            'Name',
+            'SKU',
+            'Price',
+            'Barcode',
+            'Category',
+            'Sale Price',
+            'Stock Quantity',
+            'Description',
+        ];
+
+        // Create CSV content
+        $csvContent = [];
+
+        // Add headers
+        $csvContent[] = $headers;
+
+        // Sample data row 1 - Coffee Machine
+        $csvContent[] = [
+            'Premium Coffee Maker',
+            'PRD-CM-001',
+            '299.99',
+            '1234567890123',
+            'Coffee Machines',
+            '249.99',
+            '50',
+            'High-quality coffee maker with advanced features and stainless steel design',
+        ];
+
+        // Sample data row 2 - Coffee Beans
+        $csvContent[] = [
+            'Arabica Coffee Beans 1kg',
+            'PRD-CB-001',
+            '24.99',
+            '9876543210987',
+            'Coffee Beans',
+            '',
+            '100',
+            'Premium Arabica coffee beans sourced from Colombia',
+        ];
+
+        // Sample data row 3 - Spare Parts
+        $csvContent[] = [
+            'Coffee Machine Filter',
+            'PRD-SP-001',
+            '9.99',
+            '5555555555555',
+            'Spare Parts',
+            '7.99',
+            '200',
+            'Replacement filter compatible with multiple coffee machine models',
+        ];
+
+        // Generate filename with timestamp
+        $filename = 'products_import_template_' . date('Y-m-d_His') . '.csv';
+
+        // Create callback for streaming
+        $callback = function() use ($csvContent) {
+            $file = fopen('php://output', 'w');
+
+            // Add UTF-8 BOM for Excel compatibility
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            foreach ($csvContent as $row) {
+                fputcsv($file, $row);
+            }
+
+            fclose($file);
+        };
+
+        // Return streaming response
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0'
+        ]);
     }
 }

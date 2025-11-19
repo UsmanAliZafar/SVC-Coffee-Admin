@@ -36,6 +36,7 @@ Route::prefix('products')->name('products.')->group(function () {
 
         // Generate session ID
         Route::get('/generate-session-id', [ProductsController::class, 'generateSessionId'])->name('generate-session-id');
+        Route::get('/import-template', [ProductsController::class, 'downloadTemplate'])->name('import-template');
     });
 
     // List and filter routes (specific paths before /{id})
