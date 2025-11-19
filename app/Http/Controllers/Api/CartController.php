@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Coupon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -100,20 +101,58 @@ class CartController extends Controller
             if (isset($cart[$itemKey])) {
                 $cart[$itemKey]['quantity'] += $validated['quantity'];
             } else {
+                // ✅ Load variant if provided
+                $variant = null;
+                if (!empty($validated['variant_id'])) {
+                    $variant = ProductVariant::find($validated['variant_id']);
+
+                    if (!$variant || $variant->product_id !== $product->id) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Invalid variant for this product',
+                        ], 400);
+                    }
+                }
+
+                // ✅ Check stock (variant takes priority)
+                if ($variant) {
+                    // Check variant stock
+                    if ($product->track_inventory && $variant->stock_quantity < $validated['quantity']) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Insufficient stock available for this variant',
+                            'available_quantity' => $variant->stock_quantity,
+                        ], 400);
+                    }
+                } else {
+                    // Check main product stock (existing code)
+                    if ($product->track_inventory && $product->stock_quantity < $validated['quantity']) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Insufficient stock available',
+                            'available_quantity' => $product->stock_quantity,
+                        ], 400);
+                    }
+                }
+
+                // ✅ Use variant data if available, otherwise use product data
                 $cart[$itemKey] = [
                     'product_id' => $product->id,
-                    'variant_id' => $validated['variant_id'] ?? null,
-                    'name' => $product->name,
+                    'variant_id' => $variant ? $variant->id : null,
+                    'name' => $variant ? "{$product->name} - {$variant->getFullName()}" : $product->name,
                     'slug' => $product->slug,
-                    'sku' => $product->sku,
-                    'image' => $product->getMainImageUrl(),
-                    'price' => $product->getFinalPrice(),
-                    'regular_price' => (float) $product->price,
-                    'product_currency' => $product->curency ?? 'USD', // Get from config
+                    'sku' => $variant ? $variant->sku : $product->sku,
+                    'image' => $variant ? $variant->getImageUrl() : $product->getMainImageUrl(),
+                    'price' => $variant ? $variant->getFinalPrice() : $product->getFinalPrice(),
+                    'regular_price' => $variant ? (float) $variant->price : (float) $product->price,
+                    'product_currency' => $product->curency ?? 'USD',
                     'quantity' => $validated['quantity'],
                     'is_taxable' => $product->is_taxable,
                     'tax_rate' => $product->tax_percentage ?? 0,
-                    'max_quantity' => $product->track_inventory ? $product->stock_quantity : 999,
+                    'max_quantity' => $variant
+                        ? ($product->track_inventory ? $variant->stock_quantity : 999)
+                        : ($product->track_inventory ? $product->stock_quantity : 999),
+                    'variant_name' => $variant ? $variant->getFullName() : null, // ← NEW
                     'added_at' => now()->toIso8601String(),
                 ];
             }
@@ -179,12 +218,26 @@ class CartController extends Controller
             } else {
                 // Check stock
                 $product = Product::find($validated['product_id']);
-                if ($product->track_inventory && $product->stock_quantity < $validated['quantity']) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Insufficient stock available',
-                        'available_quantity' => $product->stock_quantity,
-                    ], 400);
+                $variant = !empty($validated['variant_id']) ? ProductVariant::find($validated['variant_id']) : null;
+
+                if ($variant) {
+                    // Check variant stock
+                    if ($product->track_inventory && $variant->stock_quantity < $validated['quantity']) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Insufficient stock available for this variant',
+                            'available_quantity' => $variant->stock_quantity,
+                        ], 400);
+                    }
+                } else {
+                    // Check main product stock
+                    if ($product->track_inventory && $product->stock_quantity < $validated['quantity']) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Insufficient stock available',
+                            'available_quantity' => $product->stock_quantity,
+                        ], 400);
+                    }
                 }
 
                 $cart[$itemKey]['quantity'] = $validated['quantity'];
@@ -567,16 +620,33 @@ class CartController extends Controller
             $product = $products->get($item['product_id']);
 
             if (!$product || !$product->isAvailableForPurchase()) {
-                // Remove unavailable products
                 unset($cart[$key]);
                 continue;
             }
 
-            // Update price and stock info
-            $item['price'] = $product->getFinalPrice();
-            $item['regular_price'] = (float) $product->price;
-            $item['max_quantity'] = $product->track_inventory ? $product->stock_quantity : 999;
-            $item['is_in_stock'] = $product->isInStock();
+            // ✅ Load variant if exists
+            $variant = null;
+            if (!empty($item['variant_id'])) {
+                $variant = ProductVariant::find($item['variant_id']);
+
+                // Remove if variant no longer exists or inactive
+                if (!$variant || !$variant->isActive()) {
+                    unset($cart[$key]);
+                    continue;
+                }
+            }
+
+            // ✅ Update with variant data if available
+            $item['name'] = $variant ? "{$product->name} - {$variant->getFullName()}" : $product->name;
+            $item['sku'] = $variant ? $variant->sku : $product->sku;
+            $item['image'] = $variant ? $variant->getImageUrl() : $product->getMainImageUrl();
+            $item['price'] = $variant ? $variant->getFinalPrice() : $product->getFinalPrice();
+            $item['regular_price'] = $variant ? (float) $variant->price : (float) $product->price;
+            $item['max_quantity'] = $variant
+                ? ($product->track_inventory ? $variant->stock_quantity : 999)
+                : ($product->track_inventory ? $product->stock_quantity : 999);
+            $item['is_in_stock'] = $variant ? $variant->isInStock() : $product->isInStock();
+            $item['variant_name'] = $variant ? $variant->getFullName() : null;
         }
 
         return $cart;

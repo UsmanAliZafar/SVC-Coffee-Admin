@@ -1735,8 +1735,9 @@ class ProductsController extends Controller
                         'stock_quantity' => !empty($data['Stock Quantity']) ? (int) $data['Stock Quantity'] : 0,
                         'description' => !empty($data['Description']) ? trim($data['Description']) : null,
                         'status_key_code' => 'PRODUCT_DRAFT',
-                        'track_inventory' => true,
+                        'track_inventory' => false,
                         'is_available' => true,
+                        'is_taxable'=> false,
                         'low_stock_threshold' => 10,
                         'created_by' => auth('admin')->id(),
                     ]);
