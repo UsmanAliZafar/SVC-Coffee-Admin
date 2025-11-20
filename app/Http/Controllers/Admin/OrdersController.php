@@ -21,6 +21,7 @@ use App\Models\SystemStatus;
 use App\Models\Transaction;
 use App\Models\ProductVariant;
 use App\Models\Warehouse;
+use App\Models\ProductWarehouseStock;
 
 class OrdersController extends Controller
 {
@@ -502,68 +503,181 @@ class OrdersController extends Controller
             }
 
             // ============================================================
-            // STEP 5: DEDUCT STOCK IF ORDER IS CONFIRMED (WITH VARIANT SUPPORT)
+            // STEP 5: HANDLE STOCK BASED ON ORDER STATUS (NO PAYMENT CHECKS)
             // ============================================================
-            if ($order->status_key_code === 'ORDER_CONFIRMED') {
-                foreach ($validated['items'] as $itemData) {
-                    $product = Product::find($itemData['product_id']);
+            $orderStatus = $order->status_key_code;
 
-                    if ($product->track_inventory) {
-                        // ✅ NEW: Handle variant stock
-                        if (!empty($itemData['variant_id'])) {
-                            $variant = ProductVariant::find($itemData['variant_id']);
+            // Get default warehouse
+            $defaultWarehouse = Warehouse::where('is_default', true)->first();
 
-                            // Get default warehouse
-                            $defaultWarehouse = Warehouse::where('is_default', true)->first();
+            if (!$defaultWarehouse) {
+                DB::rollBack();
+                \Log::error('❌ No default warehouse configured');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'System error: No default warehouse found. Please contact administrator.'
+                ], 500);
+            }
 
-                            if ($defaultWarehouse && $variant) {
-                                // Reduce variant warehouse stock
-                                $variant->reduceWarehouseStock(
-                                    $defaultWarehouse->id,
-                                    $itemData['quantity'],
-                                    "Stock deducted for order #{$order->order_number}"
-                                );
+            \Log::info('📦 Processing stock for order', [
+                'order' => $order->order_number,
+                'status' => $orderStatus,
+                'items_count' => count($validated['items']),
+            ]);
 
-                                // Mark as deducted
-                                OrderItem::where('order_id', $order->id)
-                                    ->where('product_id', $product->id)
-                                    ->whereNull('product_variant_id')
-                                    ->update([
-                                        'stock_deducted' => true,
-                                        'stock_deducted_at' => now(),
-                                    ]);
+            // ============================================================
+            // DETERMINE STOCK ACTION BASED ON STATUS ONLY
+            // ============================================================
+            $shouldReserve = ($orderStatus === 'ORDER_PENDING');
+            $shouldDeduct = in_array($orderStatus, ['ORDER_CONFIRMED', 'ORDER_PROCESSING', 'ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_DELIVERED']);
+            $shouldSkip = in_array($orderStatus, ['ORDER_CANCELLED', 'ORDER_RETURNED']);
 
-                                \Log::info('Variant stock deducted for confirmed order', [
-                                    'order' => $order->order_number,
-                                    'product' => $product->name,
-                                    'variant' => $variant->getFullName(),
-                                    'quantity' => $itemData['quantity'],
-                                    'remaining_stock' => $variant->fresh()->stock_quantity
-                                ]);
-                            }
-                        } else {
-                            // ⚡ DEDUCT MAIN PRODUCT STOCK
-                            $product->decrement('stock_quantity', $itemData['quantity']);
+            if ($shouldSkip) {
+                \Log::info('⏭️  Skipping stock (order cancelled/returned)', [
+                    'order' => $order->order_number,
+                ]);
+                DB::commit();
+                return response()->json([
+                    'success' => true,
+                    'message' => "Order #{$order->order_number} created successfully!",
+                    'redirect' => route('admin.orders.show', $order->id)
+                ]);
+            }
 
-                            // Mark as deducted
-                            OrderItem::where('order_id', $order->id)
-                                    ->where('product_id', $product->id)
-                                    ->whereNull('variant_id')
-                                    ->update([
-                                        'stock_deducted' => true,
-                                        'stock_deducted_at' => now(),
-                                    ]);
+            // ============================================================
+            // PROCESS EACH ORDER ITEM
+            // ============================================================
+            foreach ($validated['items'] as $itemData) {
+                $product = Product::find($itemData['product_id']);
 
-                            \Log::info('Product stock deducted for confirmed order', [
-                                'order' => $order->order_number,
-                                'product' => $product->name,
-                                'quantity' => $itemData['quantity'],
-                                'remaining_stock' => $product->fresh()->stock_quantity
+                if (!$product || !$product->track_inventory) {
+                    continue;
+                }
+
+                $quantity = $itemData['quantity'];
+                $variant = !empty($itemData['variant_id']) ? ProductVariant::find($itemData['variant_id']) : null;
+
+                // Get or create warehouse stock record
+                $warehouseStock = ProductWarehouseStock::firstOrCreate(
+                    [
+                        'product_id' => $product->id,
+                        'variant_id' => $variant ? $variant->id : null,
+                        'warehouse_id' => $defaultWarehouse->id,
+                    ],
+                    [
+                        'quantity' => 0,
+                        'reserved_quantity' => 0,
+                        'available_quantity' => 0,
+                    ]
+                );
+
+                $itemName = $variant ? "{$product->name} ({$variant->getFullName()})" : $product->name;
+
+                // ============================================================
+                // SCENARIO 1: PENDING → RESERVE STOCK
+                // ============================================================
+                if ($shouldReserve) {
+                    // Check available stock
+                    if ($warehouseStock->available_quantity < $quantity) {
+                        DB::rollBack();
+
+                        \Log::error('❌ Insufficient stock for reservation', [
+                            'product' => $product->name,
+                            'variant' => $variant ? $variant->getFullName() : null,
+                            'requested' => $quantity,
+                            'available' => $warehouseStock->available_quantity,
+                        ]);
+
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Insufficient stock for {$itemName}.\nAvailable: {$warehouseStock->available_quantity}\nRequested: {$quantity}"
+                        ], 400);
+                    }
+
+                    // RESERVE STOCK
+                    if ($warehouseStock->reserveStock($quantity)) {
+                        OrderItem::where('order_id', $order->id)
+                            ->where('product_id', $product->id)
+                            ->where('product_variant_id', $variant ? $variant->id : null)
+                            ->update([
+                                'warehouse_id' => $defaultWarehouse->id,
+                                'stock_reserved' => true,
+                                'stock_reserved_at' => now(),
+                                'stock_deducted' => false,
                             ]);
-                        }
+
+                        \Log::info('🔒 RESERVED (Stage 1 - PENDING)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                            'quantity' => $quantity,
+                            'warehouse' => $defaultWarehouse->name,
+                            'warehouse_qty' => $warehouseStock->fresh()->quantity,
+                            'warehouse_reserved' => $warehouseStock->fresh()->reserved_quantity,
+                            'warehouse_available' => $warehouseStock->fresh()->available_quantity,
+                        ]);
+                    } else {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Failed to reserve stock for {$itemName}"
+                        ], 500);
                     }
                 }
+
+                // ============================================================
+                // SCENARIO 2: CONFIRMED/PROCESSING/SHIPPED → DEDUCT STOCK
+                // ============================================================
+                elseif ($shouldDeduct) {
+                    // Check if enough stock (use total quantity, not available)
+                    if ($warehouseStock->quantity < $quantity) {
+                        DB::rollBack();
+
+                        \Log::error('❌ Insufficient stock for deduction', [
+                            'product' => $product->name,
+                            'variant' => $variant ? $variant->getFullName() : null,
+                            'requested' => $quantity,
+                            'available' => $warehouseStock->quantity,
+                        ]);
+
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Insufficient warehouse stock for {$itemName}.\nAvailable: {$warehouseStock->quantity}\nRequested: {$quantity}"
+                        ], 400);
+                    }
+
+                    // DEDUCT STOCK DIRECTLY (Stage 2)
+                    $warehouseStock->reduceStock($quantity);
+
+                    OrderItem::where('order_id', $order->id)
+                        ->where('product_id', $product->id)
+                        ->where('product_variant_id', $variant ? $variant->id : null)
+                        ->update([
+                            'warehouse_id' => $defaultWarehouse->id,
+                            'stock_reserved' => false,
+                            'stock_reserved_at' => null,
+                            'stock_deducted' => true,
+                            'stock_deducted_at' => now(),
+                        ]);
+
+                    \Log::info('⚡ DEDUCTED (Stage 2 - CONFIRMED/PROCESSING)', [
+                        'order' => $order->order_number,
+                        'status' => $orderStatus,
+                        'product' => $itemName,
+                        'quantity' => $quantity,
+                        'warehouse' => $defaultWarehouse->name,
+                        'warehouse_qty_before' => $warehouseStock->quantity + $quantity,
+                        'warehouse_qty_after' => $warehouseStock->fresh()->quantity,
+                    ]);
+                }
             }
+
+            \Log::info('✅ Stock operations completed', [
+                'order' => $order->order_number,
+                'status' => $orderStatus,
+                'action' => $shouldReserve ? 'RESERVED' : ($shouldDeduct ? 'DEDUCTED' : 'NONE'),
+            ]);
+
+            // Stock operations ends here................
 
             DB::commit();
 
@@ -721,8 +835,8 @@ class OrdersController extends Controller
     }
 
     /**
-     * Handle status change with stock management
-     * SIMPLIFIED VERSION - Much cleaner!
+     * Handle status change with 2-stage stock management
+     * NO PAYMENT CHECKS - Pure status-based
      */
     private function handleStatusChange($order, $oldStatus, $newStatus)
     {
@@ -730,112 +844,203 @@ class OrdersController extends Controller
             return;
         }
 
+        \Log::info('🔄 Status transition', [
+            'order' => $order->order_number,
+            'from' => $oldStatus,
+            'to' => $newStatus,
+        ]);
+
         foreach ($order->items as $item) {
-            // Skip if product doesn't track inventory
             if (!$item->product || !$item->product->track_inventory) {
                 continue;
             }
 
             $product = $item->product;
+            $variant = $item->variant;
             $quantity = $item->quantity;
+            $warehouseId = $item->warehouse_id;
+
+            // Ensure warehouse is set
+            if (!$warehouseId) {
+                $defaultWarehouse = Warehouse::where('is_default', true)->first();
+                if (!$defaultWarehouse) {
+                    \Log::error('❌ No warehouse', ['order_item' => $item->id]);
+                    continue;
+                }
+                $warehouseId = $defaultWarehouse->id;
+                $item->update(['warehouse_id' => $warehouseId]);
+            }
+
+            // Get warehouse stock
+            $warehouseStock = ProductWarehouseStock::where('product_id', $product->id)
+                ->where('variant_id', $variant ? $variant->id : null)
+                ->where('warehouse_id', $warehouseId)
+                ->first();
+
+            if (!$warehouseStock) {
+                \Log::error('❌ Warehouse stock not found', [
+                    'product' => $product->name,
+                    'warehouse_id' => $warehouseId,
+                ]);
+                continue;
+            }
+
+            $itemName = $variant ? "{$product->name} ({$variant->getFullName()})" : $product->name;
 
             // ============================================================
-            // CONFIRMED - DEDUCT STOCK IMMEDIATELY (PREVENTS OVERSELLING)
+            // TRANSITION 1: ANY → PENDING (Reserve stock)
             // ============================================================
-            if ($newStatus === 'ORDER_CONFIRMED' && $oldStatus === 'ORDER_PENDING') {
-
-                    $this->notificationService->notify('order_requires_action', [
-                        'order_id' => $order->id,
-                        'order_number' => $order->order_number,
-                        'action_required' => 'Payment verification needed',
-                        'customer_name' => $order->getCustomerName(),
-                        'total_amount' => $order->getFormattedTotal(),
-                    ]);
-
-                    if (!$item->stock_deducted) {
-                    // Check if enough stock available
-                    if ($product->stock_quantity >= $quantity) {
-                        // ⚡ DEDUCT STOCK NOW - PREVENTS OVERSELLING
-                        $product->decrement('stock_quantity', $quantity);
-
+            if ($newStatus === 'ORDER_PENDING') {
+                if (!$item->stock_reserved && !$item->stock_deducted) {
+                    if ($warehouseStock->reserveStock($quantity)) {
                         $item->update([
-                            'stock_deducted' => true,
-                            'stock_deducted_at' => now(),
+                            'stock_reserved' => true,
+                            'stock_reserved_at' => now(),
                         ]);
 
-                        \Log::info("Stock deducted on confirmation", [
+                        \Log::info('🔒 Reserved (→ PENDING)', [
                             'order' => $order->order_number,
-                            'product' => $product->name,
-                            'quantity' => $quantity,
-                            'remaining_stock' => $product->fresh()->stock_quantity
-                        ]);
-                    } else {
-                        // Not enough stock - log warning
-                        \Log::warning("Insufficient stock for confirmed order", [
-                            'order' => $order->order_number,
-                            'product' => $product->name,
-                            'requested' => $quantity,
-                            'available' => $product->stock_quantity
+                            'product' => $itemName,
                         ]);
                     }
                 }
             }
 
             // ============================================================
-            // CANCELLED - RESTORE STOCK
+            // TRANSITION 2: PENDING → CONFIRMED (Deduct stock) ⚡
             // ============================================================
-            if ($newStatus === 'ORDER_CANCELLED') {
+            elseif ($newStatus === 'ORDER_CONFIRMED' && $oldStatus === 'ORDER_PENDING') {
+                if ($item->stock_reserved && !$item->stock_deducted) {
+                    // Release reservation
+                    $warehouseStock->releaseStock($quantity);
+
+                    // Deduct actual stock
+                    $warehouseStock->reduceStock($quantity);
+
+                    $item->update([
+                        'stock_reserved' => false,
+                        'stock_reserved_at' => null,
+                        'stock_deducted' => true,
+                        'stock_deducted_at' => now(),
+                    ]);
+
+                    \Log::info('⚡ DEDUCTED (PENDING → CONFIRMED)', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                        'quantity' => $quantity,
+                        'warehouse_qty' => $warehouseStock->fresh()->quantity,
+                    ]);
+                }
+            }
+
+            // ============================================================
+            // TRANSITION 3: ANY → CONFIRMED/PROCESSING (Direct deduct)
+            // ============================================================
+            elseif (in_array($newStatus, ['ORDER_CONFIRMED', 'ORDER_PROCESSING']) && !$item->stock_deducted) {
+                // If coming from PENDING with reservation
+                if ($item->stock_reserved) {
+                    $warehouseStock->releaseStock($quantity);
+                }
+
+                // Deduct stock
+                $warehouseStock->reduceStock($quantity);
+
+                $item->update([
+                    'stock_reserved' => false,
+                    'stock_reserved_at' => null,
+                    'stock_deducted' => true,
+                    'stock_deducted_at' => now(),
+                ]);
+
+                \Log::info('⚡ DEDUCTED (→ CONFIRMED/PROCESSING)', [
+                    'order' => $order->order_number,
+                    'product' => $itemName,
+                    'from' => $oldStatus,
+                ]);
+            }
+
+            // ============================================================
+            // TRANSITION 4: ANY → CANCELLED (Restore stock) 🔄
+            // ============================================================
+            elseif ($newStatus === 'ORDER_CANCELLED') {
+                // If stock was deducted, add it back
                 if ($item->stock_deducted) {
-                    // ✅ RESTORE STOCK (Add it back)
-                    $product->increment('stock_quantity', $quantity);
+                    $warehouseStock->addStock($quantity);
 
                     $item->update([
                         'stock_deducted' => false,
                         'stock_deducted_at' => null,
+                        'status_key_code' => 'ITEM_CANCELLED',
                     ]);
 
-                    \Log::info("Stock restored on cancellation", [
+                    \Log::info('✅ RESTORED (was deducted)', [
                         'order' => $order->order_number,
-                        'product' => $product->name,
+                        'product' => $itemName,
                         'quantity' => $quantity,
-                        'new_stock' => $product->fresh()->stock_quantity
+                        'new_qty' => $warehouseStock->fresh()->quantity,
                     ]);
                 }
-            }
-
-            // ============================================================
-            // UNCANCELLED - DEDUCT STOCK AGAIN
-            // ============================================================
-            if ($oldStatus === 'ORDER_CANCELLED' && $newStatus === 'ORDER_CONFIRMED') {
-                if (!$item->stock_deducted && $product->stock_quantity >= $quantity) {
-                    // Deduct stock again when reactivating cancelled order
-                    $product->decrement('stock_quantity', $quantity);
+                // If stock was only reserved, release it
+                elseif ($item->stock_reserved) {
+                    $warehouseStock->releaseStock($quantity);
 
                     $item->update([
-                        'stock_deducted' => true,
-                        'stock_deducted_at' => now(),
+                        'stock_reserved' => false,
+                        'stock_reserved_at' => null,
+                        'status_key_code' => 'ITEM_CANCELLED',
+                    ]);
+
+                    \Log::info('✅ RELEASED (was reserved)', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
                     ]);
                 }
             }
 
             // ============================================================
-            // SHIPPED - Just update tracking (stock already deducted)
+            // TRANSITION 5: CANCELLED → ANY (Re-apply stock logic)
             // ============================================================
-            if ($newStatus === 'ORDER_SHIPPED') {
-                // Stock was already deducted on confirmation
-                // Just mark as shipped for tracking purposes
-                $item->update([
-                    'shipped_at' => now(), // You may need to add this column
-                ]);
+            elseif ($oldStatus === 'ORDER_CANCELLED') {
+                if ($newStatus === 'ORDER_PENDING') {
+                    // Re-reserve
+                    if ($warehouseStock->reserveStock($quantity)) {
+                        $item->update([
+                            'stock_reserved' => true,
+                            'stock_reserved_at' => now(),
+                            'status_key_code' => 'ITEM_PENDING',
+                        ]);
+                    }
+                } else {
+                    // Re-deduct
+                    if ($warehouseStock->quantity >= $quantity) {
+                        $warehouseStock->reduceStock($quantity);
 
-                \Log::info("Order shipped", [
+                        $item->update([
+                            'stock_deducted' => true,
+                            'stock_deducted_at' => now(),
+                            'status_key_code' => 'ITEM_PROCESSING',
+                        ]);
+                    }
+                }
+            }
+
+            // ============================================================
+            // TRANSITIONS 6-8: CONFIRMED → PROCESSING → PACKED → SHIPPED
+            // NO STOCK CHANGES (already deducted at CONFIRMED)
+            // ============================================================
+            elseif (in_array($newStatus, ['ORDER_PROCESSING', 'ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_DELIVERED'])) {
+                \Log::info('→ No stock change (already deducted)', [
                     'order' => $order->order_number,
-                    'product' => $product->name,
-                    'quantity' => $quantity,
-                    'note' => 'Stock was already deducted on confirmation'
+                    'new_status' => $newStatus,
                 ]);
             }
         }
+
+        \Log::info('✅ Status transition completed', [
+            'order' => $order->order_number,
+            'from' => $oldStatus,
+            'to' => $newStatus,
+        ]);
     }
 
     /**
@@ -995,18 +1200,19 @@ class OrdersController extends Controller
         }
     }
 
-    /**
-     * Update order status
-     */
     public function updateStatus(Request $request, $id)
     {
-        $order = Order::with('items.product')->findOrFail($id);
-        Log::info("Updating status for order #{$order->order_number} (Current status: {$order->status_key_code})");
+        $order = Order::with([
+            'items.product',
+            'items.variant',
+            'items.warehouse'
+        ])->findOrFail($id);
+
         $validated = $request->validate([
             'status_key_code' => 'required|string|exists:system_statuses,key_code',
             'tracking_number' => 'nullable|string|max:100',
             'carrier' => 'nullable|string|max:100',
-            'notes' => 'nullable|string',
+            'notes' => 'nullable|string|max:5000',
         ]);
 
         DB::beginTransaction();
@@ -1014,82 +1220,77 @@ class OrdersController extends Controller
             $oldStatus = $order->status_key_code;
             $newStatus = $validated['status_key_code'];
 
-            // Handle status-specific logic
-            if ($newStatus === 'ORDER_CONFIRMED' && $oldStatus !== 'ORDER_CONFIRMED') {
-                // Reserve stock for all items
-                foreach ($order->items as $item) {
-                    if ($item->product && $item->product->track_inventory) {
-                        $item->reserveStock();
-                    }
-                }
+            // Check if already in target status
+            if ($oldStatus === $newStatus) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order is already in ' . $order->getStatusLabel() . ' status.'
+                ], 400);
+            }
+
+            // Check if can update
+            if (!$order->canUpdateStatus()) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order cannot be updated. Current status: ' . $order->getStatusLabel()
+                ], 400);
+            }
+
+            // ============================================================
+            // STATUS-SPECIFIC ACTIONS (NO PAYMENT CHECKS) ✅
+            // ============================================================
+
+            if ($newStatus === 'ORDER_CONFIRMED') {
                 $order->confirm();
-                // ✅ TRIGGER: Order Confirmed Notification
                 $this->notificationService->notify('order_confirmed', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
-                    'total_amount' => $order->getFormattedTotal(),
                 ]);
-
-                //Send email to customer
                 $this->notificationService->notifyCustomer('order_confirmed', $order);
             }
 
-            if ($newStatus === 'ORDER_PROCESSING' && $oldStatus !== 'ORDER_PROCESSING') {
+            elseif ($newStatus === 'ORDER_PROCESSING') {
                 $order->markAsProcessing();
-                // ✅ CORRECT
                 $this->notificationService->notify('order_processing', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
-                    'customer_name' => $order->getCustomerName(),
-                    'customer_email' => $order->getCustomerEmail(),
-                    'total_amount' => $order->getFormattedTotal(),
                 ]);
-
-                //Send email to customer
                 $this->notificationService->notifyCustomer('order_processing', $order);
             }
 
-            if ($newStatus === 'ORDER_PACKED' && $oldStatus !== 'ORDER_PACKED') {
+            elseif ($newStatus === 'ORDER_PACKED') {
                 $order->markAsPacked();
                 $this->notificationService->notify('order_packed', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
-                    'customer_name' => $order->getCustomerName(),
-                    'items_count' => $order->getTotalItemsCount(),
                 ]);
                 $this->notificationService->notifyCustomer('order_packed', $order);
             }
 
-            if ($newStatus === 'ORDER_SHIPPED' && $oldStatus !== 'ORDER_SHIPPED') {
-                // Deduct stock for all items
-                foreach ($order->items as $item) {
-                    if ($item->product && $item->product->track_inventory) {
-                        $item->deductStock();
-                    }
-                    $item->markAsFulfilled();
-                }
-
+            elseif ($newStatus === 'ORDER_SHIPPED') {
                 $order->markAsShipped(
                     $validated['tracking_number'] ?? null,
                     $validated['carrier'] ?? null
                 );
-                // ✅ TRIGGER: Order Shipped Notification
+
+                foreach ($order->items as $item) {
+                    $item->markAsFulfilled();
+                }
+
                 $this->notificationService->notify('order_shipped', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'tracking_number' => $order->shipping_tracking_number,
-                    'carrier' => $order->shipping_carrier,
                 ]);
-                // ✅ ADD THIS - Send email to customer with tracking
                 $this->notificationService->notifyCustomer('order_shipped', $order, [
                     'tracking_number' => $order->shipping_tracking_number,
-                    'carrier' => $order->shipping_carrier,
                 ]);
             }
 
-            if ($newStatus === 'ORDER_DELIVERED' && $oldStatus !== 'ORDER_DELIVERED') {
+            elseif ($newStatus === 'ORDER_DELIVERED') {
                 $order->markAsDelivered();
-                // ✅ TRIGGER: Order Delivered Notification
                 $this->notificationService->notify('order_delivered', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
@@ -1097,52 +1298,30 @@ class OrdersController extends Controller
                 $this->notificationService->notifyCustomer('order_delivered', $order);
             }
 
-            if ($newStatus === 'ORDER_CANCELLED') {
-                // Release/restore stock
-                foreach ($order->items as $item) {
-                    if ($item->product && $item->product->track_inventory) {
-                        if ($item->stock_deducted) {
-                            // Restore stock if already deducted
-                            $item->product->addWarehouseStock(
-                                $item->warehouse_id,
-                                $item->quantity,
-                                'Restored from cancelled order #' . $order->order_number
-                            );
-                            $item->update([
-                                'stock_deducted' => false,
-                                'stock_deducted_at' => null,
-                            ]);
-                        } elseif ($item->stock_reserved) {
-                            // Release reserved stock
-                            $item->releaseStock();
-                        }
-                    }
-                    $item->update(['status_key_code' => 'ITEM_CANCELLED']);
-                }
-
+            elseif ($newStatus === 'ORDER_CANCELLED') {
                 $order->cancel($validated['notes'] ?? 'Cancelled by admin');
-
-                // ✅ TRIGGER: Order Cancelled Notification
                 $this->notificationService->notify('order_cancelled', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                 ]);
-
                 $this->notificationService->notifyCustomer('order_cancelled', $order, [
                     'reason' => $validated['notes'] ?? 'Cancelled by admin',
                 ]);
             }
 
-            // Add status change note
+            // ============================================================
+            // HANDLE STOCK OPERATIONS
+            // ============================================================
+            $this->handleStatusChange($order, $oldStatus, $newStatus);
+
+            // Add admin note
             if (!empty($validated['notes'])) {
                 $currentNotes = $order->admin_notes ?? '';
                 $timestamp = now()->format('Y-m-d H:i:s');
-                $adminName = auth('admin')->user()->name;
-                $newNote = "\n[{$timestamp}] {$adminName}: Status changed from {$oldStatus} to {$newStatus}. {$validated['notes']}";
+                $adminName = auth('admin')->user()->name ?? 'System';
+                $newNote = "\n[{$timestamp}] {$adminName}: {$oldStatus} → {$newStatus}. {$validated['notes']}";
 
-                $order->update([
-                    'admin_notes' => $currentNotes . $newNote
-                ]);
+                $order->update(['admin_notes' => $currentNotes . $newNote]);
             }
 
             DB::commit();
@@ -1150,8 +1329,10 @@ class OrdersController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Order status updated successfully!',
-                'new_status' => $newStatus,
-                'status_badge' => $order->fresh()->getStatusBadge()
+                'order' => [
+                    'id' => $order->id,
+                    'status_badge' => $order->fresh()->getStatusBadge(),
+                ]
             ]);
 
         } catch (\Exception $e) {
@@ -1851,9 +2032,6 @@ class OrdersController extends Controller
         }
     }
 
-    /**
-     * Quick update status from index page (single order)
-     */
     public function quickUpdateStatus(Request $request, $id)
     {
         try {
@@ -1862,60 +2040,61 @@ class OrdersController extends Controller
                 'payment_status_key_code' => 'nullable|string|exists:system_statuses,key_code',
             ]);
 
-            $order = Order::with('items.product')->findOrFail($id); // ✅ Load relationships
+            $order = Order::with([
+                'items.product',
+                'items.variant',
+                'items.warehouse'
+            ])->findOrFail($id);
 
             DB::beginTransaction();
 
-            // ✅ CAPTURE OLD STATUS for notification comparison
             $oldStatus = $order->status_key_code;
             $oldPaymentStatus = $order->payment_status_key_code;
 
-            // Update order status if provided
+            \Log::info('📊 Quick update', [
+                'order' => $order->order_number,
+                'old_status' => $oldStatus,
+                'new_status' => $validated['status_key_code'] ?? 'unchanged',
+            ]);
+
+            // ============================================================
+            // UPDATE ORDER STATUS (NO PAYMENT VALIDATION) ✅
+            // ============================================================
             if (isset($validated['status_key_code'])) {
+                $newStatus = $validated['status_key_code'];
+
                 if (!$order->canUpdateStatus()) {
+                    DB::rollBack();
                     return response()->json([
                         'success' => false,
                         'message' => 'Order cannot be updated (already ' . $order->getStatusLabel() . ')'
                     ], 400);
                 }
 
-                $newStatus = $validated['status_key_code'];
                 $order->status_key_code = $newStatus;
 
-                // Handle stock for shipped orders
-                if ($newStatus === 'ORDER_SHIPPED') {
-                    foreach ($order->items as $item) {
-                        if ($item->stock_reserved && !$item->stock_deducted) {
-                            $item->deductStock();
-                        }
-                    }
-                }
-
-                // ✅ TRIGGER NOTIFICATIONS based on new status
+                // Handle stock operations
                 if ($oldStatus !== $newStatus) {
+                    $this->handleStatusChange($order, $oldStatus, $newStatus);
                     $this->triggerStatusNotification($order, $newStatus);
                 }
             }
 
-            // Update payment status if provided
+            // ============================================================
+            // UPDATE PAYMENT STATUS (SEPARATE FROM STOCK)
+            // ============================================================
             if (isset($validated['payment_status_key_code'])) {
                 $newPaymentStatus = $validated['payment_status_key_code'];
                 $order->payment_status_key_code = $newPaymentStatus;
 
-                // ✅ TRIGGER PAYMENT NOTIFICATIONS
                 if ($oldPaymentStatus !== $newPaymentStatus && $newPaymentStatus === 'PAYMENT_PAID') {
                     $this->notificationService->notify('payment_received', [
                         'order_id' => $order->id,
                         'order_number' => $order->order_number,
                         'amount' => $order->getFormattedTotal(),
                         'payment_method' => $order->payment_method ?? 'N/A',
-                        'customer_name' => $order->getCustomerName(),
                     ]);
                 }
-
-                $this->notificationService->notifyCustomer('payment_received', $order, [
-                    'payment_method' => $order->payment_method ?? 'N/A',
-                ]);
             }
 
             $order->save();
@@ -1927,6 +2106,7 @@ class OrdersController extends Controller
                 'message' => 'Order updated successfully',
                 'order' => [
                     'id' => $order->id,
+                    'status' => $order->status_key_code,
                     'status_badge' => $order->getStatusBadge(),
                     'payment_badge' => $order->getPaymentStatusBadge(),
                 ]
@@ -1934,13 +2114,17 @@ class OrdersController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            \Log::error('❌ Quick update failed', [
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update order: ' . $e->getMessage()
             ], 500);
         }
     }
-
     /**
      * ✅ NEW HELPER METHOD: Trigger notifications based on status
      */

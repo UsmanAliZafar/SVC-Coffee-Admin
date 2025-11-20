@@ -19,7 +19,7 @@ class ProductWarehouseStock extends Model
 
     protected $fillable = [
         'product_id',
-        'variant_id',  // ← ADD THIS
+        'variant_id',
         'warehouse_id',
         'quantity',
         'reserved_quantity',
@@ -176,12 +176,11 @@ class ProductWarehouseStock extends Model
      */
     protected function syncParentStock(): void
     {
-        if ($this->isVariantStock()) {
-            // Update variant's stock (if variant has stock_quantity field)
-            // If not, variant uses getTotalStock() which sums warehouse stocks
-            // No action needed here
-        } else {
-            // Update product's total stock_quantity
+        if ($this->isVariantStock() && $this->variant) {
+            // ✅ Sync variant's total stock from all warehouses
+            $this->variant->updateTotalStock();
+        } elseif ($this->product) {
+            // ✅ Sync product's total stock from all warehouses
             $this->product->updateTotalStock();
         }
     }
