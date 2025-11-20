@@ -57,14 +57,15 @@ class CheckoutController extends Controller
 
                 // Order details
                 'shipping_method' => 'required|string',
-                'payment_method' => 'required|string|in:cod,online,bank_transfer', // ✅ UPDATED
-                'payment_gateway' => 'nullable|string|in:stripe,paypal,razorpay', // ✅ ADDED for online payments
+                'payment_method' => 'required|string|in:cod,online,bank_transfer',
+                'payment_gateway' => 'nullable|string|in:stripe,paypal,razorpay',
                 'customer_notes' => 'nullable|string',
                 'coupon_code' => 'nullable|string',
             ]);
 
             // Get cart
             $cart = Cache::get("cart:{$validated['cart_id']}", []);
+            $cartMeta = Cache::get("cart_meta:{$validated['cart_id']}", []);
 
             if (empty($cart)) {
                 return response()->json([
@@ -75,17 +76,26 @@ class CheckoutController extends Controller
 
             DB::beginTransaction();
 
-            // Verify stock availability
+            // ============================================================
+            // CALCULATE TOTALS FROM CART ITEMS (NOT FROM STORE SETTINGS)
+            // ============================================================
             $subtotal = 0;
+            $taxAmount = 0;
             $totalWeight = 0;
             $totalVolume = 0;
             $itemCount = 0;
 
             foreach ($cart as $item) {
-                $subtotal += $item['price'] * $item['quantity'];
+                $itemSubtotal = $item['price'] * $item['quantity'];
+                $subtotal += $itemSubtotal;
                 $itemCount += $item['quantity'];
 
-                // Get product for weight/volume (if tracked)
+                // ✅ Use item-level tax (from cart)
+                if ($item['is_taxable']) {
+                    $taxAmount += $itemSubtotal * ($item['tax_rate'] / 100);
+                }
+
+                // Get product for weight/volume
                 $product = Product::find($item['product_id']);
                 if ($product) {
                     $totalWeight += ($product->weight ?? 0) * $item['quantity'];
@@ -93,10 +103,7 @@ class CheckoutController extends Controller
                 }
             }
 
-            $taxRate = \App\Models\StoreSetting::get('tax_rate', 10);
-            $taxAmount = $subtotal * ($taxRate / 100);
-
-            // ✅ UPDATED SHIPPING CALCULATION with all parameters
+            // ✅ Calculate shipping
             try {
                 $shippingAmount = $this->calculateShipping(
                     $validated['shipping_method'],
@@ -114,10 +121,99 @@ class CheckoutController extends Controller
                 ], 400);
             }
 
-            $discountAmount = 0; // TODO: Calculate from coupon
+            // ✅ Apply coupon discount if exists
+            $discountAmount = 0;
+            $couponDetails = null;
+
+            if (isset($cartMeta['coupon'])) {
+                $discountAmount = $cartMeta['coupon']['discount_amount'] ?? 0;
+                $couponDetails = $cartMeta['coupon'];
+
+                // Free shipping from coupon
+                if ($cartMeta['coupon']['free_shipping'] ?? false) {
+                    $shippingAmount = 0;
+                }
+            }
+
             $totalAmount = $subtotal + $taxAmount + $shippingAmount - $discountAmount;
 
-            // Create order
+            // ============================================================
+            // VALIDATE STOCK AVAILABILITY BEFORE CREATING ORDER
+            // ============================================================
+            $defaultWarehouse = \App\Models\Warehouse::where('is_default', true)->first();
+
+            if (!$defaultWarehouse) {
+                DB::rollBack();
+                \Log::error('❌ No default warehouse configured');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'System error: No default warehouse configured. Please contact support.',
+                ], 500);
+            }
+
+            // Check stock for each item
+            foreach ($cart as $item) {
+                $product = Product::find($item['product_id']);
+
+                if (!$product || !$product->track_inventory) {
+                    continue;
+                }
+
+                $variant = !empty($item['variant_id'])
+                    ? \App\Models\ProductVariant::find($item['variant_id'])
+                    : null;
+
+                // Get warehouse stock
+                $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                    ->where('variant_id', $variant ? $variant->id : null)
+                    ->where('warehouse_id', $defaultWarehouse->id)
+                    ->first();
+
+                if (!$warehouseStock) {
+                    DB::rollBack();
+
+                    $itemName = $variant
+                        ? "{$product->name} ({$variant->getFullName()})"
+                        : $product->name;
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Stock record not found for {$itemName}",
+                    ], 400);
+                }
+
+                // ✅ Check available stock (considering reservations)
+                if ($warehouseStock->available_quantity < $item['quantity']) {
+                    DB::rollBack();
+
+                    $itemName = $variant
+                        ? "{$product->name} ({$variant->getFullName()})"
+                        : $product->name;
+
+                    \Log::error('❌ Insufficient stock', [
+                        'product' => $product->name,
+                        'variant' => $variant ? $variant->getFullName() : null,
+                        'requested' => $item['quantity'],
+                        'available' => $warehouseStock->available_quantity,
+                        'warehouse_qty' => $warehouseStock->quantity,
+                        'reserved' => $warehouseStock->reserved_quantity,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Insufficient stock for {$itemName}",
+                        'details' => [
+                            'product' => $itemName,
+                            'requested' => $item['quantity'],
+                            'available' => $warehouseStock->available_quantity,
+                        ],
+                    ], 400);
+                }
+            }
+
+            // ============================================================
+            // CREATE ORDER
+            // ============================================================
             $orderData = [
                 'customer_id' => $validated['customer_id'] ?? null,
                 'guest_email' => $validated['guest_email'] ?? null,
@@ -146,25 +242,21 @@ class CheckoutController extends Controller
 
                 'shipping_method' => $validated['shipping_method'],
                 'payment_method' => $validated['payment_method'],
-                'payment_gateway' => $validated['payment_gateway'] ?? null, // ✅ ADDED
+                'payment_gateway' => $validated['payment_gateway'] ?? null,
                 'customer_notes' => $validated['customer_notes'] ?? null,
 
                 'order_source' => 'web',
-                'currency' => 'USD',
+                'currency' => $cart[array_key_first($cart)]['product_currency'] ?? 'USD',
                 'subtotal' => $subtotal,
                 'tax_amount' => $taxAmount,
-                'tax_rate' => $taxRate,
                 'shipping_amount' => $shippingAmount,
                 'discount_amount' => $discountAmount,
-                'discount_code' => $validated['coupon_code'] ?? null,
+                'discount_code' => $couponDetails['code'] ?? null,
                 'total_amount' => $totalAmount,
 
+                // ✅ Status: Always start as PENDING (customer placed order)
                 'status_key_code' => 'ORDER_PENDING',
-
-                // ✅ UPDATED: Set payment status based on payment method
-                'payment_status_key_code' => $validated['payment_method'] === 'cod'
-                    ? 'PAYMENT_PENDING'  // COD - pending until delivery
-                    : 'PAYMENT_PENDING',  // Online - pending until payment confirmed
+                'payment_status_key_code' => 'PAYMENT_PENDING',
 
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
@@ -172,33 +264,91 @@ class CheckoutController extends Controller
 
             $order = Order::create($orderData);
 
-            // Create order items
+            // ============================================================
+            // CREATE ORDER ITEMS
+            // ============================================================
             foreach ($cart as $item) {
                 $product = Product::find($item['product_id']);
+                $variant = !empty($item['variant_id'])
+                    ? \App\Models\ProductVariant::find($item['variant_id'])
+                    : null;
 
                 $itemSubtotal = $item['price'] * $item['quantity'];
-                $itemTaxAmount = $item['is_taxable'] ? ($itemSubtotal * ($item['tax_rate'] / 100)) : 0;
+                $itemTaxAmount = $item['is_taxable']
+                    ? ($itemSubtotal * ($item['tax_rate'] / 100))
+                    : 0;
 
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $product->id,
-                    'product_name' => $product->name,
-                    'product_sku' => $product->sku,
+                    'product_variant_id' => $variant ? $variant->id : null,
+                    'product_name' => $item['name'],
+                    'product_sku' => $item['sku'],
                     'product_description' => $product->short_description,
-                    'product_image' => $product->main_image,
+                    'product_image' => $item['image'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['price'],
-                    'cost_price' => $product->cost_price,
+                    'cost_price' => $variant ? $variant->cost_price : $product->cost_price,
                     'subtotal' => $itemSubtotal,
                     'tax_amount' => $itemTaxAmount,
                     'tax_rate' => $item['tax_rate'],
                     'is_taxable' => $item['is_taxable'],
                     'total' => $itemSubtotal + $itemTaxAmount,
                     'status_key_code' => 'ITEM_PENDING',
+                    'warehouse_id' => $defaultWarehouse->id,
                 ]);
             }
 
-            // ✅ CREATE TRANSACTION ENTRY
+            // ============================================================
+            // RESERVE STOCK (STAGE 1) ✅
+            // ============================================================
+            \Log::info('📦 Reserving stock for web order', [
+                'order' => $order->order_number,
+                'items_count' => count($cart),
+            ]);
+
+            foreach ($cart as $item) {
+                $product = Product::find($item['product_id']);
+
+                if (!$product || !$product->track_inventory) {
+                    continue;
+                }
+
+                $variant = !empty($item['variant_id'])
+                    ? \App\Models\ProductVariant::find($item['variant_id'])
+                    : null;
+
+                $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                    ->where('variant_id', $variant ? $variant->id : null)
+                    ->where('warehouse_id', $defaultWarehouse->id)
+                    ->first();
+
+                if ($warehouseStock && $warehouseStock->reserveStock($item['quantity'])) {
+                    // Update order item
+                    OrderItem::where('order_id', $order->id)
+                        ->where('product_id', $product->id)
+                        ->where('product_variant_id', $variant ? $variant->id : null)
+                        ->update([
+                            'stock_reserved' => true,
+                            'stock_reserved_at' => now(),
+                        ]);
+
+                    $itemName = $variant
+                        ? "{$product->name} ({$variant->getFullName()})"
+                        : $product->name;
+
+                    \Log::info('🔒 RESERVED (Web Order)', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                        'quantity' => $item['quantity'],
+                        'warehouse' => $defaultWarehouse->name,
+                    ]);
+                }
+            }
+
+            // ============================================================
+            // CREATE TRANSACTION
+            // ============================================================
             $transaction = $this->createTransaction($order, $validated, $request);
 
             if (!$transaction) {
@@ -215,46 +365,34 @@ class CheckoutController extends Controller
 
             DB::commit();
 
-            // ✅ NOTIFICATIONS
+            // ============================================================
+            // NOTIFICATIONS
+            // ============================================================
             app(\App\Services\NotificationService::class)->notify('order_created', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
-                'customer_name' => $order->customer_id
-                    ? $order->customer->getFullName()
-                    : ($validated['guest_name'] ?? $validated['shipping_first_name'] . ' ' . $validated['shipping_last_name']),
-                'customer_email' => $order->customer_id
-                    ? $order->customer->email
-                    : ($validated['guest_email'] ?? ''),
-                'customer_phone' => $validated['guest_phone'] ?? $validated['shipping_phone'],
-                'customer_type' => $order->customer_id ? 'returning' : 'new',
+                'customer_name' => $order->getCustomerName(),
+                'customer_email' => $order->getCustomerEmail(),
                 'items_count' => count($cart),
                 'payment_method' => ucfirst($validated['payment_method']),
-                'payment_status' => 'pending',
-                'shipping_method' => ucfirst($validated['shipping_method']),
             ]);
 
-            // ✅ HIGH-VALUE ORDER NOTIFICATION
+            // High-value order notification
             if ($order->total_amount >= 500) {
                 app(\App\Services\NotificationService::class)->notify('customer_high_value_order', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
-                    'customer_name' => $order->customer_id
-                        ? $order->customer->getFullName()
-                        : ($validated['guest_name'] ?? ''),
+                    'customer_name' => $order->getCustomerName(),
                     'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
-                    'customer_id' => $order->customer_id,
                 ]);
             }
 
-            // ✅ NOTIFY CUSTOMER
-            app(\App\Services\NotificationService::class)->notifyCustomer('order_created', $order, [
-                'items_count' => count($cart),
-                'payment_method' => ucfirst($validated['payment_method']),
-                'shipping_method' => ucfirst($validated['shipping_method']),
-            ]);
+            app(\App\Services\NotificationService::class)->notifyCustomer('order_created', $order);
 
-            // ✅ PREPARE RESPONSE BASED ON PAYMENT METHOD
+            // ============================================================
+            // PREPARE RESPONSE
+            // ============================================================
             $responseData = [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
@@ -266,20 +404,14 @@ class CheckoutController extends Controller
             ];
 
             if ($validated['payment_method'] === 'cod') {
-                // ✅ COD ORDER - No payment required
                 $responseData['payment_required'] = false;
                 $responseData['message'] = 'Order placed successfully. Pay on delivery.';
                 $responseData['next_step'] = 'order_confirmation';
-
             } else {
-                // ✅ ONLINE PAYMENT - Payment gateway required
                 $responseData['payment_required'] = true;
                 $responseData['message'] = 'Order created. Please complete payment.';
                 $responseData['next_step'] = 'payment_gateway';
                 $responseData['payment_gateway'] = $validated['payment_gateway'] ?? 'stripe';
-
-                // You can add payment gateway initialization here
-                // $responseData['payment_intent'] = $this->initializePayment($order, $transaction);
             }
 
             return response()->json([
@@ -297,6 +429,12 @@ class CheckoutController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            \Log::error('❌ Checkout failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create order',
@@ -692,11 +830,8 @@ class CheckoutController extends Controller
     }
 
     /**
-     * ✅ Confirm payment for online orders
-     * (Called by payment gateway webhook or after payment success)
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Confirm payment for online orders
+     * ✅ UPDATED: Triggers stock deduction via status change
      */
     public function confirmPayment(Request $request): JsonResponse
     {
@@ -710,8 +845,10 @@ class CheckoutController extends Controller
 
             DB::beginTransaction();
 
-            $transaction = Transaction::findOrFail($validated['transaction_id']);
+            $transaction = Transaction::with('order.items.product', 'order.items.variant')->findOrFail($validated['transaction_id']);
             $order = $transaction->order;
+
+            $oldStatus = $order->status_key_code;
 
             // Update transaction
             $transaction->update([
@@ -725,25 +862,24 @@ class CheckoutController extends Controller
             // Update order payment status
             $order->update([
                 'payment_status_key_code' => 'PAYMENT_PAID',
-                'status_key_code' => 'ORDER_CONFIRMED',
+                'status_key_code' => 'ORDER_CONFIRMED', // ← This triggers stock deduction
                 'confirmed_at' => now(),
             ]);
 
-            // Reserve stock after payment confirmation
-            foreach ($order->items as $item) {
-                $item->reserveStock();
-            }
+            // ✅ HANDLE STOCK: PENDING → CONFIRMED (Reserve → Deduct)
+            $this->handleStatusChange($order, $oldStatus, 'ORDER_CONFIRMED');
 
             DB::commit();
 
-            // ✅ SEND PAYMENT CONFIRMATION NOTIFICATION
+            // Notifications
             app(\App\Services\NotificationService::class)->notify('payment_confirmed', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'transaction_number' => $transaction->transaction_number,
                 'amount' => $transaction->getFormattedAmount(),
-                'payment_method' => $transaction->getPaymentMethodLabel(),
             ]);
+
+            app(\App\Services\NotificationService::class)->notifyCustomer('order_confirmed', $order);
 
             return response()->json([
                 'success' => true,
@@ -751,19 +887,136 @@ class CheckoutController extends Controller
                 'data' => [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
-                    'transaction_id' => $transaction->id,
-                    'transaction_number' => $transaction->transaction_number,
+                    'order_status' => 'confirmed',
                     'payment_status' => 'paid',
                 ],
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            \Log::error('❌ Payment confirmation failed', [
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to confirm payment',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Handle status change with stock management
+     * Same logic as Admin OrdersController
+     */
+    private function handleStatusChange($order, $oldStatus, $newStatus)
+    {
+        if ($oldStatus === $newStatus) {
+            return;
+        }
+
+        \Log::info('🔄 Web Order Status Transition', [
+            'order' => $order->order_number,
+            'from' => $oldStatus,
+            'to' => $newStatus,
+        ]);
+
+        foreach ($order->items as $item) {
+            if (!$item->product || !$item->product->track_inventory) {
+                continue;
+            }
+
+            $product = $item->product;
+            $variant = $item->variant;
+            $quantity = $item->quantity;
+            $warehouseId = $item->warehouse_id;
+
+            if (!$warehouseId) {
+                $defaultWarehouse = \App\Models\Warehouse::where('is_default', true)->first();
+                if (!$defaultWarehouse) {
+                    \Log::error('❌ No warehouse', ['item' => $item->id]);
+                    continue;
+                }
+                $warehouseId = $defaultWarehouse->id;
+                $item->update(['warehouse_id' => $warehouseId]);
+            }
+
+            $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                ->where('variant_id', $variant ? $variant->id : null)
+                ->where('warehouse_id', $warehouseId)
+                ->first();
+
+            if (!$warehouseStock) {
+                \Log::error('❌ Warehouse stock not found', [
+                    'product' => $product->name,
+                ]);
+                continue;
+            }
+
+            $itemName = $variant ? "{$product->name} ({$variant->getFullName()})" : $product->name;
+
+            // ============================================================
+            // PENDING → CONFIRMED: Convert reservation to deduction ⚡
+            // ============================================================
+            if ($newStatus === 'ORDER_CONFIRMED' && $oldStatus === 'ORDER_PENDING') {
+                if ($item->stock_reserved && !$item->stock_deducted) {
+                    // Release reservation
+                    $warehouseStock->releaseStock($quantity);
+
+                    // Deduct actual stock
+                    $warehouseStock->reduceStock($quantity);
+
+                    $item->update([
+                        'stock_reserved' => false,
+                        'stock_reserved_at' => null,
+                        'stock_deducted' => true,
+                        'stock_deducted_at' => now(),
+                    ]);
+
+                    \Log::info('⚡ DEDUCTED (Web Order Confirmed)', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                        'quantity' => $quantity,
+                        'warehouse_qty' => $warehouseStock->fresh()->quantity,
+                    ]);
+                }
+            }
+
+            // ============================================================
+            // ANY → CANCELLED: Restore stock
+            // ============================================================
+            elseif ($newStatus === 'ORDER_CANCELLED') {
+                if ($item->stock_deducted) {
+                    $warehouseStock->addStock($quantity);
+
+                    $item->update([
+                        'stock_deducted' => false,
+                        'stock_deducted_at' => null,
+                        'status_key_code' => 'ITEM_CANCELLED',
+                    ]);
+
+                    \Log::info('✅ RESTORED (Web Order Cancelled)', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                        'quantity' => $quantity,
+                    ]);
+                } elseif ($item->stock_reserved) {
+                    $warehouseStock->releaseStock($quantity);
+
+                    $item->update([
+                        'stock_reserved' => false,
+                        'stock_reserved_at' => null,
+                        'status_key_code' => 'ITEM_CANCELLED',
+                    ]);
+
+                    \Log::info('✅ RELEASED (Web Order Cancelled)', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                    ]);
+                }
+            }
         }
     }
 
