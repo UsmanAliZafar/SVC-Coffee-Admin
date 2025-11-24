@@ -193,13 +193,16 @@ class Coupon extends Model
         return ['valid' => true];
     }
 
-    public function isApplicableToCart(array $cartItems, float $subtotal, int $itemCount): array
+    public function isApplicableToCart(array $cartItems, float|string $subtotal, int $itemCount): array
     {
+        // ✅ ENSURE SUBTOTAL IS FLOAT
+        $subtotal = (float) $subtotal;
+
         // Check minimum purchase amount
         if ($subtotal < $this->min_purchase_amount) {
             return [
                 'valid' => false,
-                'message' => "Minimum purchase amount of " . number_format($this->min_purchase_amount, 2) . " required."
+                'message' => "Minimum purchase amount of " . store_currency_symbol() . number_format($this->min_purchase_amount, 2) . " required."
             ];
         }
 
