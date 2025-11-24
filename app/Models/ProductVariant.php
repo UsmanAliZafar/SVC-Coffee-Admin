@@ -117,7 +117,13 @@ class ProductVariant extends Model
         });
 
         // When setting default variant, unset others
-        static::saving(function ($model) {
+       static::saving(function ($model) {
+            // Convert is_default to boolean FIRST
+            if (isset($model->is_default)) {
+                $model->is_default = filter_var($model->is_default, FILTER_VALIDATE_BOOLEAN);
+            }
+
+            // Then handle unsetting other defaults
             if ($model->is_default && $model->isDirty('is_default')) {
                 static::where('product_id', $model->product_id)
                     ->where('id', '!=', $model->id)

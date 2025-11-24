@@ -2970,7 +2970,6 @@ class ProductsController extends Controller
             'low_stock_threshold' => 'nullable|integer|min:0',
             'variant_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'status_key_code' => 'required|string',
-            'is_default' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -2991,7 +2990,12 @@ class ProductsController extends Controller
             ]);
 
             $variantData['product_id'] = $product->id;
-            $variantData['is_default'] = $request->has('is_default');
+            $isDefaultInput = $request->input('is_default');
+            if ($isDefaultInput === 'false' || $isDefaultInput === false || $isDefaultInput === '0' || $isDefaultInput === 0 || is_null($isDefaultInput)) {
+                $variantData['is_default'] = false;
+            } else {
+                $variantData['is_default'] = (bool) $isDefaultInput;
+            }
             $variantData['stock_quantity'] = 0; // ← Start with 0
 
             // Handle image upload
@@ -3094,10 +3098,11 @@ class ProductsController extends Controller
     }
 
     /**
-     * Update variant
+     * Update variant - DEBUG VERSION
      */
     public function updateVariant(Request $request, $productId, $variantId)
     {
+
         $product = Product::findOrFail($productId);
         $variant = ProductVariant::where('product_id', $productId)->findOrFail($variantId);
 
@@ -3115,7 +3120,7 @@ class ProductsController extends Controller
             'low_stock_threshold' => 'nullable|integer|min:0',
             'variant_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'status_key_code' => 'required|string',
-            'is_default' => 'nullable|boolean',
+            // REMOVE validation for is_default temporarily to see raw value
         ]);
 
         if ($validator->fails()) {
@@ -3135,7 +3140,30 @@ class ProductsController extends Controller
                 'low_stock_threshold', 'status_key_code'
             ]);
 
-            $variantData['is_default'] = $request->has('is_default');
+            // DEBUG: Try multiple conversion methods
+            $isDefaultValue = $request->input('is_default');
+
+            \Log::info('is_default conversion attempts:', [
+                'raw_value' => $isDefaultValue,
+                'has_check' => $request->has('is_default'),
+                'boolean_cast' => (bool) $isDefaultValue,
+                'filter_var' => filter_var($isDefaultValue, FILTER_VALIDATE_BOOLEAN),
+                'strict_check' => $isDefaultValue === true || $isDefaultValue === 'true' || $isDefaultValue === '1' || $isDefaultValue === 1,
+            ]);
+
+            // Try this approach
+            if ($request->has('is_default')) {
+                $value = $request->input('is_default');
+                // Convert "on", "1", "true", true to boolean true
+                $variantData['is_default'] = in_array($value, [true, 'true', '1', 1, 'on'], true);
+            } else {
+                $variantData['is_default'] = false;
+            }
+
+            \Log::info('Final is_default value:', [
+                'value' => $variantData['is_default'],
+                'type' => gettype($variantData['is_default'])
+            ]);
 
             // Handle image upload
             if ($request->hasFile('variant_image')) {
@@ -3182,11 +3210,16 @@ class ProductsController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Variant updated successfully',
-                'variant' => $variant
+                'variant' => $variant,
+                'debug_is_default' => $variantData['is_default']
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Update variant failed:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update variant: ' . $e->getMessage()
