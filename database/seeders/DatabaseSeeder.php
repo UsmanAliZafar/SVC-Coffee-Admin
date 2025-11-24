@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             SystemStatusSeeder::class,
             DefaultWarehouseSeeder::class,
-            // CouponSeeder::class,
+            CouponSeeder::class,
             PageSeeder::class,
             StoreSettingSeeder::class,
             ContactUsSeeder::class,

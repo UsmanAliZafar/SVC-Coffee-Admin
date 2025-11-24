@@ -35,7 +35,7 @@ class CouponController extends Controller
     public function getData(Request $request)
     {
         $query = Coupon::with(['createdBy', 'updatedBy'])
-            ->withCount('usages');
+            ->withCount('usages')->orderBy('created_at', 'desc');
 
         // Apply filters
         if ($request->filled('status')) {
@@ -259,6 +259,29 @@ class CouponController extends Controller
             ], 422);
         }
 
+        // ✅ SET DEFAULTS FOR NULLABLE FIELDS
+        $validated['min_purchase_amount'] = $validated['min_purchase_amount'] ?? 0;
+        $validated['min_items_count'] = $validated['min_items_count'] ?? 0;
+        $validated['max_discount_amount'] = $validated['max_discount_amount'] ?? null;
+        $validated['usage_limit_total'] = $validated['usage_limit_total'] ?? null;
+        $validated['applies_to_sale_items'] = $request->has('applies_to_sale_items') ? 1 : 0;
+        $validated['first_order_only'] = $request->has('first_order_only') ? 1 : 0;
+        $validated['is_active'] = $request->has('is_active') ? 1 : 0;
+        $validated['is_featured'] = $request->has('is_featured') ? 1 : 0;
+
+        // ✅ HANDLE FREE SHIPPING (no discount_value needed)
+        if ($validated['discount_type'] === 'free_shipping') {
+            $validated['discount_value'] = 0;
+        }
+
+        // ✅ CLEAN UP BUY X GET Y FIELDS
+        if ($validated['discount_type'] !== 'buy_x_get_y') {
+            $validated['buy_quantity'] = null;
+            $validated['get_quantity'] = null;
+            $validated['buy_product_id'] = null;
+            $validated['get_product_id'] = null;
+        }
+
         DB::beginTransaction();
         try {
             $validated['created_by'] = auth('admin')->id();
@@ -274,9 +297,16 @@ class CouponController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            \Log::error('Coupon creation failed', [
+                'error' => $e->getMessage(),
+                'data' => $validated
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create coupon: ' . $e->getMessage()
+                'message' => 'Failed to create coupon. Please try again.',
+                'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
     }

@@ -419,12 +419,12 @@
                             </a>
                         </li>
 
-                        <li>
+                        {{-- <li>
                             <a href="{{ route('admin.coupons.index', ['discount_type' => 'buy_x_get_y']) }}"
                             class="{{ request()->get('discount_type') === 'buy_x_get_y' ? 'active' : '' }}">
                                 <i class="bi bi-gift text-warning"></i> Buy X Get Y
                             </a>
-                        </li>
+                        </li> --}}
 
                         <li class="submenu-divider"></li>
 

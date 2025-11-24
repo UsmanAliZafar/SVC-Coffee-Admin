@@ -175,7 +175,7 @@
                                 <small class="text-muted">No cost</small>
                             </label>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-3 mb-3 d-none">
                             <label class="discount-type-card" data-type="buy_x_get_y">
                                 <input type="radio" name="discount_type" value="buy_x_get_y">
                                 <i class="bi bi-gift"></i>
@@ -285,7 +285,7 @@
                 </div>
 
                 <!-- Restrictions (Optional - Collapsed by default) -->
-                <div class="form-section">
+                <div class="form-section d-none">
                     <h3 class="form-section-title">
                         <i class="bi bi-filter"></i> Product/Category Restrictions
                         <button type="button" class="btn btn-sm btn-outline-secondary float-end"
@@ -398,7 +398,7 @@
                         <small class="d-block text-muted">Only for customers' first purchase</small>
                     </div>
 
-                    <div class="form-check form-switch mb-3">
+                    <div class="form-check form-switch mb-3 d-none">
                         <input class="form-check-input" type="checkbox" id="is_featured"
                             name="is_featured" value="1">
                         <label class="form-check-label" for="is_featured">
@@ -475,7 +475,23 @@ $(document).ready(function() {
             if (result.isConfirmed) {
                 $.get('{{ route("admin.coupons.generate-code") }}', { length: result.value })
                     .done(function(response) {
-                        $('#code').val(response.code);
+                        if (response.success) {
+                            $('#code').val(response.code);
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Generated!',
+                                text: 'Code: ' + response.code,
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                        }
+                    })
+                    .fail(function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to generate code'
+                        });
                     });
             }
         });
@@ -495,29 +511,35 @@ $(document).ready(function() {
     function updateDiscountFields(type) {
         $('.conditional-section').hide();
 
+        // Remove required attributes
+        $('#discount_value, #buy_quantity, #get_quantity, #buy_product_id, #get_product_id')
+            .prop('required', false)
+            .removeClass('is-invalid');
+
         if (type === 'percentage') {
             $('#discountValueSection').show();
             $('#maxDiscountField').show();
             $('#discountPrefix').text('%');
-            $('#discount_value').attr('max', 100);
+            $('#discount_value').attr('max', 100).prop('required', true);
             $('#discountInfo').text('Enter percentage (0-100). Optionally set a maximum discount cap.');
         } else if (type === 'fixed_amount') {
             $('#discountValueSection').show();
             $('#maxDiscountField').hide();
-            $('#discountPrefix').text('$');
-            $('#discount_value').removeAttr('max');
+            $('#discountPrefix').text('{{ store_currency_symbol() }}');
+            $('#discount_value').removeAttr('max').prop('required', true);
             $('#discountInfo').text('Enter the fixed dollar amount to discount.');
         } else if (type === 'free_shipping') {
             // No additional fields needed
+            $('#discount_value').val('0');
         } else if (type === 'buy_x_get_y') {
             $('#buyXGetYSection').show();
+            $('#buy_quantity, #get_quantity, #buy_product_id, #get_product_id').prop('required', true);
         }
     }
 
     // Load products for dropdowns (if needed)
-    // You would implement this based on your products API
     function loadProducts() {
-        // Example:
+        // Example implementation:
         // $.get('/admin/api/products', function(products) {
         //     products.forEach(function(product) {
         //         const option = `<option value="${product.id}">${product.name}</option>`;
@@ -528,7 +550,7 @@ $(document).ready(function() {
 
     // Load categories for dropdowns
     function loadCategories() {
-        // Example:
+        // Example implementation:
         // $.get('/admin/api/categories', function(categories) {
         //     categories.forEach(function(category) {
         //         const option = `<option value="${category.id}">${category.title}</option>`;
@@ -541,20 +563,49 @@ $(document).ready(function() {
     loadProducts();
     loadCategories();
 
-    // Form submission
+    // Form submission with proper data handling
     $('#couponForm').on('submit', function(e) {
         e.preventDefault();
 
+        // Clear previous errors
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').text('');
+
+        // ✅ PREPARE FORM DATA PROPERLY
         const formData = new FormData(this);
+
+        // ✅ ENSURE NUMERIC FIELDS HAVE VALUES OR NULL
+        const numericFields = ['min_purchase_amount', 'min_items_count', 'usage_limit_total', 'max_discount_amount'];
+        numericFields.forEach(field => {
+            const input = $(`[name="${field}"]`);
+            if (input.val() === '' || input.val() === null) {
+                formData.delete(field);
+                // Don't set to 0 for nullable fields
+                if (field === 'min_purchase_amount' || field === 'min_items_count') {
+                    formData.set(field, '0');
+                }
+            }
+        });
+
+        // ✅ HANDLE CHECKBOXES (unchecked boxes don't submit)
+        const checkboxes = ['applies_to_sale_items', 'first_order_only', 'is_active', 'is_featured'];
+        checkboxes.forEach(name => {
+            if (!$(`[name="${name}"]`).is(':checked')) {
+                formData.set(name, '0');
+            }
+        });
+
+        // ✅ HANDLE DISCOUNT VALUE FOR FREE SHIPPING
+        const discountType = $('input[name="discount_type"]:checked').val();
+        if (discountType === 'free_shipping') {
+            formData.set('discount_value', '0');
+        }
+
         const submitBtn = $('#submitBtn');
         const originalText = submitBtn.html();
 
         // Disable submit button
         submitBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Creating...');
-
-        // Clear previous errors
-        $('.is-invalid').removeClass('is-invalid');
-        $('.invalid-feedback').text('');
 
         $.ajax({
             url: '{{ route("admin.coupons.store") }}',
@@ -581,26 +632,68 @@ $(document).ready(function() {
                 if (xhr.status === 422) {
                     // Validation errors
                     const errors = xhr.responseJSON.errors;
+                    let errorMessages = [];
+
                     $.each(errors, function(key, messages) {
                         const input = $(`[name="${key}"]`);
                         input.addClass('is-invalid');
                         input.siblings('.invalid-feedback').text(messages[0]);
+                        errorMessages.push(messages[0]);
                     });
 
                     Swal.fire({
                         icon: 'error',
                         title: 'Validation Error',
-                        text: 'Please check the form and fix the errors.'
+                        html: errorMessages.join('<br>'),
+                        confirmButtonColor: '#5B914C'
+                    });
+                } else if (xhr.status === 500) {
+                    const errorMsg = xhr.responseJSON?.message || 'Failed to create coupon';
+                    const debugInfo = xhr.responseJSON?.error;
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Server Error',
+                        text: errorMsg,
+                        footer: debugInfo ? `<small>Debug: ${debugInfo}</small>` : null,
+                        confirmButtonColor: '#5B914C'
                     });
                 } else {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Failed to create coupon'
+                        text: 'An unexpected error occurred. Please try again.',
+                        confirmButtonColor: '#5B914C'
                     });
                 }
             }
         });
+    });
+
+    // ✅ VALIDATE PERCENTAGE ON INPUT
+    $('#discount_value').on('input', function() {
+        const type = $('input[name="discount_type"]:checked').val();
+        if (type === 'percentage' && parseFloat($(this).val()) > 100) {
+            $(this).addClass('is-invalid');
+            $(this).siblings('.invalid-feedback').text('Percentage cannot exceed 100%');
+        } else {
+            $(this).removeClass('is-invalid');
+            $(this).siblings('.invalid-feedback').text('');
+        }
+    });
+
+    // ✅ DATE VALIDATION
+    $('#valid_from, #valid_until').on('change', function() {
+        const validFrom = new Date($('#valid_from').val());
+        const validUntil = new Date($('#valid_until').val());
+
+        if (validFrom && validUntil && validUntil <= validFrom) {
+            $('#valid_until').addClass('is-invalid');
+            $('#valid_until').siblings('.invalid-feedback').text('End date must be after start date');
+        } else {
+            $('#valid_until').removeClass('is-invalid');
+            $('#valid_until').siblings('.invalid-feedback').text('');
+        }
     });
 });
 </script>

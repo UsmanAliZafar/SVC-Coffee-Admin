@@ -246,7 +246,7 @@
                                 <small class="text-muted">No cost</small>
                             </label>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-3 mb-3 d-none">
                             <label class="discount-type-card {{ $coupon->discount_type === 'buy_x_get_y' ? 'active' : '' }}" data-type="buy_x_get_y">
                                 <input type="radio"
                                     name="discount_type"
@@ -306,7 +306,7 @@
                 </div>
 
                 <!-- Buy X Get Y Configuration -->
-                <div class="form-section conditional-section" id="buyXGetYSection">
+                <div class="form-section conditional-section d-none" id="buyXGetYSection">
                     <h3 class="form-section-title"><i class="bi bi-gift"></i> Buy X Get Y Configuration</h3>
 
                     <div class="row">
@@ -393,7 +393,7 @@
                 </div>
 
                 <!-- Restrictions (Optional - Collapsed by default) -->
-                <div class="form-section">
+                <div class="form-section d-none">
                     <h3 class="form-section-title">
                         <i class="bi bi-filter"></i> Product/Category Restrictions
                         <button type="button" class="btn btn-sm btn-outline-secondary float-end"
@@ -539,7 +539,7 @@
                         <small class="d-block text-muted">Only for customers' first purchase</small>
                     </div>
 
-                    <div class="form-check form-switch mb-3">
+                    <div class="form-check form-switch mb-3 d-none">
                         <input class="form-check-input"
                             type="checkbox"
                             id="is_featured"

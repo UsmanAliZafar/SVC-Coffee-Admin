@@ -31,7 +31,7 @@ class CouponSeeder extends Seeder
             ],
             [
                 'code' => 'SAVE10',
-                'name' => '$10 Off Any Order',
+                'name' => '10 Off Any Order',
                 'description' => 'Get $10 off on orders over $50',
                 'discount_type' => 'fixed_amount',
                 'discount_value' => 10.00,
@@ -89,7 +89,7 @@ class CouponSeeder extends Seeder
             [
                 'code' => 'VIP50',
                 'name' => 'VIP Customer Exclusive',
-                'description' => '$50 off for VIP customers only',
+                'description' => store_currency_symbol().'50 off for VIP customers only',
                 'discount_type' => 'fixed_amount',
                 'discount_value' => 50.00,
                 'min_purchase_amount' => 200.00,
@@ -163,7 +163,7 @@ class CouponSeeder extends Seeder
             ],
             [
                 'code' => 'PARTS10',
-                'name' => '$10 Off Spare Parts',
+                'name' => store_currency_symbol().' 10 Off Spare Parts',
                 'description' => 'Discount on coffee machine spare parts',
                 'discount_type' => 'fixed_amount',
                 'discount_value' => 10.00,
