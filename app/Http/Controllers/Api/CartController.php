@@ -364,6 +364,7 @@ class CartController extends Controller
 
     /**
      * Apply coupon code
+     * ✅ PROPER TYPE HANDLING
      *
      * @param Request $request
      * @return JsonResponse
@@ -421,14 +422,29 @@ class CartController extends Controller
                 ], 400);
             }
 
-            // Calculate cart totals
+            // Calculate cart totals (now returns numeric values)
             $cartTotals = $this->calculateTotals($cart);
+
+            // ✅ PREPARE CART ITEMS ARRAY WITH PROPER TYPES
+            $cartItemsForCoupon = [];
+            foreach ($cart as $item) {
+                $cartItemsForCoupon[] = [
+                    'product_id' => $item['product_id'] ?? null,
+                    'variant_id' => $item['variant_id'] ?? null,
+                    'price' => is_numeric($item['price']) ? (float) $item['price'] : 0.0,
+                    'quantity' => is_numeric($item['quantity']) ? (int) $item['quantity'] : 0,
+                ];
+            }
+
+            // ✅ ENSURE NUMERIC VALUES
+            $subtotal = is_numeric($cartTotals['subtotal']) ? (float) $cartTotals['subtotal'] : 0.0;
+            $totalItems = is_numeric($cartTotals['total_items']) ? (int) $cartTotals['total_items'] : 0;
 
             // Check cart applicability
             $cartCheck = $coupon->isApplicableToCart(
-                $cart,
-                $cartTotals['subtotal'],
-                $cartTotals['total_items']
+                $cartItemsForCoupon,
+                $subtotal,
+                $totalItems
             );
 
             if (!$cartCheck['valid']) {
@@ -439,10 +455,14 @@ class CartController extends Controller
             }
 
             // Calculate discount
-            $discountDetails = $coupon->calculateDiscount($cart, $cartTotals['subtotal']);
+            $discountDetails = $coupon->calculateDiscount($cartItemsForCoupon, $subtotal);
 
-            // Store coupon in cart
-            $cartData = Cache::get("cart:{$validated['cart_id']}", []);
+            // ✅ ENSURE DISCOUNT AMOUNT IS NUMERIC
+            $discountAmount = isset($discountDetails['discount_amount']) && is_numeric($discountDetails['discount_amount'])
+                ? (float) $discountDetails['discount_amount']
+                : 0.0;
+
+            // Store coupon in cart metadata
             $cartMeta = Cache::get("cart_meta:{$validated['cart_id']}", []);
 
             $cartMeta['coupon'] = [
@@ -450,24 +470,31 @@ class CartController extends Controller
                 'code' => $coupon->code,
                 'name' => $coupon->name,
                 'discount_type' => $coupon->discount_type,
-                'discount_amount' => $discountDetails['discount_amount'],
-                'free_shipping' => $discountDetails['free_shipping'],
+                'discount_amount' => $discountAmount, // ✅ NUMERIC VALUE
+                'free_shipping' => $discountDetails['free_shipping'] ?? false,
                 'applied_at' => now()->toIso8601String(),
             ];
 
             Cache::put("cart_meta:{$validated['cart_id']}", $cartMeta, now()->addDays(7));
 
             // Recalculate totals with coupon
-            $newTotals = $this->calculateTotalsWithCoupon($cartData, $cartMeta);
+            $newTotals = $this->calculateTotalsWithCoupon($cart, $cartMeta);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Coupon applied successfully!',
                 'data' => [
                     'cart_id' => $validated['cart_id'],
-                    'coupon' => $cartMeta['coupon'],
+                    'coupon' => [
+                        'code' => $coupon->code,
+                        'name' => $coupon->name,
+                        'discount_type' => $coupon->discount_type,
+                        'discount_amount' => $discountAmount,
+                        'formatted_discount' => format_amount($discountAmount),
+                    ],
                     'totals' => $newTotals,
-                    'savings' => round($discountDetails['discount_amount'], 2),
+                    'savings' => round($discountAmount, 2),
+                    'formatted_savings' => format_amount($discountAmount),
                 ],
             ]);
 
@@ -478,11 +505,17 @@ class CartController extends Controller
                 'errors' => $e->errors(),
             ], 422);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \Log::error('Coupon application failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'code' => $validated['coupon_code'] ?? null,
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to apply coupon',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'Please try again',
             ], 500);
         }
     }
@@ -536,41 +569,56 @@ class CartController extends Controller
 
     /**
      * Calculate cart totals
+     * ✅ RETURNS NUMERIC VALUES, NOT FORMATTED STRINGS
      *
      * @param array $cart
      * @return array
      */
     private function calculateTotals(array $cart): array
     {
-        $subtotal = 0;
-        $taxAmount = 0;
+        $subtotal = 0.0;
+        $taxAmount = 0.0;
         $totalItems = 0;
 
         foreach ($cart as $item) {
-            $itemSubtotal = $item['price'] * $item['quantity'];
-            $subtotal += $itemSubtotal;
-            $totalItems += $item['quantity'];
+            // ✅ ENSURE ALL VALUES ARE NUMERIC
+            $price = is_numeric($item['price']) ? (float) $item['price'] : 0.0;
+            $quantity = is_numeric($item['quantity']) ? (int) $item['quantity'] : 0;
+            $taxRate = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? (float) $item['tax_rate'] : 0.0;
 
-            if ($item['is_taxable']) {
-                $taxAmount += $itemSubtotal * ($item['tax_rate'] / 100);
+            $itemSubtotal = $price * $quantity;
+            $subtotal += $itemSubtotal;
+            $totalItems += $quantity;
+
+            if (isset($item['is_taxable']) && $item['is_taxable']) {
+                $taxAmount += $itemSubtotal * ($taxRate / 100);
             }
         }
 
         $total = $subtotal + $taxAmount;
 
         return [
-            'subtotal' => format_amount($subtotal),
-            'tax_amount' => format_amount($taxAmount),
-            'shipping_amount' => 0, // Calculate based on shipping method
-            'discount_amount' => 0,
-            'total_amount' => format_amount($total),
+            'subtotal' => round($subtotal, 2), // ✅ NUMERIC, NOT FORMATTED
+            'tax_amount' => round($taxAmount, 2),
+            'shipping_amount' => 0.0,
+            'discount_amount' => 0.0,
+            'total_amount' => round($total, 2),
             'total_items' => $totalItems,
-            'currency' => store_currency_symbol(), // Get from config
+            'currency' => store_currency_symbol(),
+            // ✅ ADD FORMATTED VERSIONS FOR DISPLAY
+            'formatted' => [
+                'subtotal' => format_amount($subtotal),
+                'tax_amount' => format_amount($taxAmount),
+                'shipping_amount' => format_amount(0),
+                'discount_amount' => format_amount(0),
+                'total_amount' => format_amount($total),
+            ]
         ];
     }
 
     /**
      * Calculate cart totals with coupon applied
+     * ✅ WORKS WITH NUMERIC VALUES
      *
      * @param array $cart
      * @param array $cartMeta
@@ -581,25 +629,39 @@ class CartController extends Controller
         $totals = $this->calculateTotals($cart);
 
         if (isset($cartMeta['coupon'])) {
-            $couponDiscount = $cartMeta['coupon']['discount_amount'];
+            // ✅ ENSURE COUPON DISCOUNT IS NUMERIC
+            $couponDiscount = isset($cartMeta['coupon']['discount_amount']) && is_numeric($cartMeta['coupon']['discount_amount'])
+                ? (float) $cartMeta['coupon']['discount_amount']
+                : 0.0;
+
             $totals['discount_amount'] = round($couponDiscount, 2);
 
             // Apply free shipping if applicable
-            if ($cartMeta['coupon']['free_shipping']) {
-                $totals['shipping_amount'] = 0;
+            if (!empty($cartMeta['coupon']['free_shipping'])) {
+                $totals['shipping_amount'] = 0.0;
                 $totals['free_shipping_applied'] = true;
             }
 
+            // ✅ ENSURE ALL VALUES ARE NUMERIC BEFORE CALCULATION
+            $subtotal = is_numeric($totals['subtotal']) ? (float) $totals['subtotal'] : 0.0;
+            $taxAmount = is_numeric($totals['tax_amount']) ? (float) $totals['tax_amount'] : 0.0;
+            $shippingAmount = is_numeric($totals['shipping_amount']) ? (float) $totals['shipping_amount'] : 0.0;
+            $discountAmount = is_numeric($totals['discount_amount']) ? (float) $totals['discount_amount'] : 0.0;
+
             // Recalculate total
-            $totals['total_amount'] = round(
-                $totals['subtotal'] + $totals['tax_amount'] + $totals['shipping_amount'] - $totals['discount_amount'],
-                2
-            );
+            $newTotal = $subtotal + $taxAmount + $shippingAmount - $discountAmount;
 
             // Ensure total doesn't go negative
-            if ($totals['total_amount'] < 0) {
-                $totals['total_amount'] = 0;
-            }
+            $totals['total_amount'] = round(max(0, $newTotal), 2);
+
+            // ✅ UPDATE FORMATTED VERSIONS
+            $totals['formatted'] = [
+                'subtotal' => format_amount($subtotal),
+                'tax_amount' => format_amount($taxAmount),
+                'shipping_amount' => format_amount($shippingAmount),
+                'discount_amount' => format_amount($discountAmount),
+                'total_amount' => format_amount($totals['total_amount']),
+            ];
         }
 
         return $totals;
@@ -654,6 +716,7 @@ class CartController extends Controller
 
     /**
      * Revalidate coupon when cart changes
+     * ✅ PROPER TYPE HANDLING
      *
      * @param array $cart
      * @param array $cartMeta
@@ -675,12 +738,29 @@ class CartController extends Controller
             return $cartMeta;
         }
 
-        // Recalculate discount
+        // Calculate cart totals (returns numeric values)
         $cartTotals = $this->calculateTotals($cart);
+
+        // ✅ PREPARE CART ITEMS WITH PROPER TYPES
+        $cartItemsForCoupon = [];
+        foreach ($cart as $item) {
+            $cartItemsForCoupon[] = [
+                'product_id' => $item['product_id'] ?? null,
+                'variant_id' => $item['variant_id'] ?? null,
+                'price' => is_numeric($item['price']) ? (float) $item['price'] : 0.0,
+                'quantity' => is_numeric($item['quantity']) ? (int) $item['quantity'] : 0,
+            ];
+        }
+
+        // ✅ ENSURE NUMERIC VALUES
+        $subtotal = is_numeric($cartTotals['subtotal']) ? (float) $cartTotals['subtotal'] : 0.0;
+        $totalItems = is_numeric($cartTotals['total_items']) ? (int) $cartTotals['total_items'] : 0;
+
+        // Check if still applicable
         $cartCheck = $coupon->isApplicableToCart(
-            $cart,
-            $cartTotals['subtotal'],
-            $cartTotals['total_items']
+            $cartItemsForCoupon,
+            $subtotal,
+            $totalItems
         );
 
         if (!$cartCheck['valid']) {
@@ -691,8 +771,14 @@ class CartController extends Controller
         }
 
         // Update discount amount
-        $discountDetails = $coupon->calculateDiscount($cart, $cartTotals['subtotal']);
-        $cartMeta['coupon']['discount_amount'] = $discountDetails['discount_amount'];
+        $discountDetails = $coupon->calculateDiscount($cartItemsForCoupon, $subtotal);
+
+        // ✅ ENSURE NUMERIC VALUE
+        $discountAmount = isset($discountDetails['discount_amount']) && is_numeric($discountDetails['discount_amount'])
+            ? (float) $discountDetails['discount_amount']
+            : 0.0;
+
+        $cartMeta['coupon']['discount_amount'] = $discountAmount;
 
         Cache::put("cart_meta:{$cartId}", $cartMeta, now()->addDays(7));
 
