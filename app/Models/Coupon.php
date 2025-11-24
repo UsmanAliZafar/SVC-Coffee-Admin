@@ -193,10 +193,15 @@ class Coupon extends Model
         return ['valid' => true];
     }
 
-    public function isApplicableToCart(array $cartItems, float|string $subtotal, int $itemCount): array
+    /**
+     * Check if coupon is applicable to cart
+     * ✅ ACCEPTS BOTH STRING AND FLOAT, CASTS INTERNALLY
+     */
+    public function isApplicableToCart(array $cartItems, float|string $subtotal, int|string $itemCount): array
     {
-        // ✅ ENSURE SUBTOTAL IS FLOAT
+        // ✅ CAST TO PROPER TYPES
         $subtotal = (float) $subtotal;
+        $itemCount = (int) $itemCount;
 
         // Check minimum purchase amount
         if ($subtotal < $this->min_purchase_amount) {
@@ -248,7 +253,7 @@ class Coupon extends Model
             $buyProductCount = 0;
             foreach ($cartItems as $item) {
                 if ($item['product_id'] === $this->buy_product_id) {
-                    $buyProductCount += $item['quantity'];
+                    $buyProductCount += (int) $item['quantity'];
                 }
             }
 
@@ -264,25 +269,29 @@ class Coupon extends Model
     }
 
     /**
-     * Discount Calculation
+     * Calculate discount amount
+     * ✅ ACCEPTS BOTH STRING AND FLOAT, CASTS INTERNALLY
      */
-    public function calculateDiscount(array $cartItems, float $subtotal): array
+    public function calculateDiscount(array $cartItems, float|string $subtotal): array
     {
+        // ✅ CAST TO FLOAT
+        $subtotal = (float) $subtotal;
+
         $discountAmount = 0;
         $freeShipping = false;
 
         switch ($this->discount_type) {
             case 'percentage':
-                $discountAmount = $subtotal * ($this->discount_value / 100);
+                $discountAmount = $subtotal * ((float) $this->discount_value / 100);
 
                 // Apply max discount cap if set
-                if ($this->max_discount_amount && $discountAmount > $this->max_discount_amount) {
-                    $discountAmount = $this->max_discount_amount;
+                if ($this->max_discount_amount && $discountAmount > (float) $this->max_discount_amount) {
+                    $discountAmount = (float) $this->max_discount_amount;
                 }
                 break;
 
             case 'fixed_amount':
-                $discountAmount = min($this->discount_value, $subtotal);
+                $discountAmount = min((float) $this->discount_value, $subtotal);
                 break;
 
             case 'free_shipping':
@@ -303,6 +312,9 @@ class Coupon extends Model
         ];
     }
 
+    /**
+     * Calculate Buy X Get Y discount
+     */
     private function calculateBuyXGetYDiscount(array $cartItems): float
     {
         $discount = 0;
@@ -311,8 +323,8 @@ class Coupon extends Model
         foreach ($cartItems as $item) {
             if ($item['product_id'] === $this->get_product_id) {
                 // Calculate how many free items customer gets
-                $freeItemsCount = min($item['quantity'], $this->get_quantity);
-                $discount = $item['price'] * $freeItemsCount;
+                $freeItemsCount = min((int) $item['quantity'], (int) $this->get_quantity);
+                $discount = (float) $item['price'] * $freeItemsCount;
                 break;
             }
         }
