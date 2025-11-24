@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\ProductsCategories;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -503,6 +504,7 @@ class ProductsController extends Controller
                 'id' => $product->category->id,
                 'title' => $product->category->title,
                 'slug' => $product->category->slug,
+                'translations' => $this->getCategoryTranslations($product->category),
             ] : null,
             'price' => [
                 'regular' => format_amount($product->price),
@@ -695,6 +697,93 @@ class ProductsController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Get all translations for a category
+     *
+     * @param ProductsCategories $category
+     * @return array
+     */
+    private function getCategoryTranslations(ProductsCategories $category): array
+    {
+        // Get all available languages
+        $availableLanguages = get_available_languages(false); // Don't include English
+
+        $translations = [
+            'available_languages' => array_keys($availableLanguages),
+            'has_translations' => false,
+            'translation_stats' => [],
+            'data' => []
+        ];
+
+        // English is the default, add it first
+        $translations['data']['en'] = [
+            'language_code' => 'en',
+            'language_name' => 'English',
+            'is_default' => true,
+            'completion' => 100,
+            'fields' => [
+                'title' => $category->title,
+                'short_description' => $category->short_description,
+                'description' => $category->description,
+                'meta_title' => $category->meta_title,
+                'meta_description' => $category->meta_description,
+                'meta_keywords' => $category->meta_keywords,
+            ]
+        ];
+
+        // Get all category translations grouped by language
+        if (method_exists($category, 'getTranslationsGroupedByLanguage')) {
+            $categoryTranslations = $category->getTranslationsGroupedByLanguage();
+
+            foreach ($availableLanguages as $langCode => $langInfo) {
+                $langTranslations = $categoryTranslations[$langCode] ?? [];
+
+                // Calculate completion
+                $translatableFields = $category->getTranslatableFields();
+                $translatedCount = count(array_filter($langTranslations, function($value) {
+                    return !empty($value) && trim($value) !== '';
+                }));
+                $completion = count($translatableFields) > 0
+                    ? round(($translatedCount / count($translatableFields)) * 100, 2)
+                    : 0;
+
+                // Only include languages that have at least some translations
+                if ($completion > 0) {
+                    $translations['has_translations'] = true;
+
+                    $translations['data'][$langCode] = [
+                        'language_code' => $langCode,
+                        'language_name' => $langInfo['name'],
+                        'native_name' => $langInfo['native_name'],
+                        'flag' => $langInfo['flag'],
+                        'direction' => $langInfo['direction'],
+                        'is_rtl' => $langInfo['direction'] === 'rtl',
+                        'is_default' => false,
+                        'completion' => $completion,
+                        'fields' => [
+                            'title' => $langTranslations['title'] ?? null,
+                            'short_description' => $langTranslations['short_description'] ?? null,
+                            'description' => $langTranslations['description'] ?? null,
+                            'meta_title' => $langTranslations['meta_title'] ?? null,
+                            'meta_description' => $langTranslations['meta_description'] ?? null,
+                            'meta_keywords' => $langTranslations['meta_keywords'] ?? null,
+                        ]
+                    ];
+
+                    // Add to stats
+                    $translations['translation_stats'][$langCode] = [
+                        'completion' => $completion,
+                        'translated_fields' => $translatedCount,
+                        'total_fields' => count($translatableFields),
+                        'missing_fields' => count($translatableFields) - $translatedCount,
+                    ];
+                }
+            }
+        }
+
+        return $translations;
     }
 
     /**

@@ -582,7 +582,7 @@ class ProductsCategories extends Model
         return $result;
     }
 
-    protected function getTranslatableFields(): array
+    public function getTranslatableFields(): array
     {
         return [
             'title',
