@@ -407,6 +407,12 @@
         background-color: #5B914C !important;
         border-bottom: 2px solid #4a7a3d;
     }
+
+    #taxPercentage:disabled {
+        background-color: #f8f9fa !important;
+        cursor: not-allowed;
+        color: #6c757d;
+    }
 </style>
 @endpush
 
@@ -1792,7 +1798,7 @@ $(document).ready(function() {
         if (descriptionEditor) {
             $('textarea[name="description"]').val(descriptionEditor.getData());
         }
-
+        $('#taxPercentage').prop('disabled', false);
         // Update all feature editors before submit
         if (typeof beforeProductFormSubmit === 'function') {
             beforeProductFormSubmit();
@@ -2348,6 +2354,7 @@ $('#regularPrice, #salePrice, #taxPercentage, #taxType').on('keyup change', func
 });
 
 // Update tax preview
+// Update tax preview
 function updateTaxPreview() {
     if (!$('#isTaxable').is(':checked')) {
         $('#taxPreview').hide();
@@ -2360,7 +2367,7 @@ function updateTaxPreview() {
     const currency = $('select[name="curency"]').val() || 'USD';
     const symbol = get_currency_symbol(currency);
 
-    if (price <= 0 || taxPercentage <= 0) {
+    if (price <= 0) {
         $('#taxPreview').hide();
         return;
     }
@@ -2368,25 +2375,38 @@ function updateTaxPreview() {
     let taxAmount, priceExcludingTax, priceIncludingTax;
 
     if (taxType === 'inclusive') {
-        // Tax is included in price
-        priceExcludingTax = price / (1 + (taxPercentage / 100));
-        taxAmount = price - priceExcludingTax;
+        // ✅ For inclusive tax: Show that tax is already included
         priceIncludingTax = price;
+        taxAmount = 0; // Tax is already in the price
+        priceExcludingTax = price; // Display as-is
+
+        const html = `
+            <p class="mb-1"><strong>Price (Tax Inclusive):</strong> ${symbol} ${price.toFixed(2)}</p>
+            <p class="mb-0 text-muted"><small><i class="bi bi-info-circle"></i> Tax is already included in the price</small></p>
+        `;
+
+        $('#taxPreviewContent').html(html);
+        $('#taxPreview').slideDown();
     } else {
-        // Tax is exclusive
+        // ✅ For exclusive tax: Calculate and show breakdown
+        if (taxPercentage <= 0) {
+            $('#taxPreview').hide();
+            return;
+        }
+
         priceExcludingTax = price;
         taxAmount = price * (taxPercentage / 100);
         priceIncludingTax = price + taxAmount;
+
+        const html = `
+            <p class="mb-1"><strong>Base Price:</strong> ${symbol} ${priceExcludingTax.toFixed(2)}</p>
+            <p class="mb-1"><strong>Tax (${taxPercentage}%):</strong> ${symbol} ${taxAmount.toFixed(2)}</p>
+            <p class="mb-0"><strong>Final Price:</strong> ${symbol} ${priceIncludingTax.toFixed(2)}</p>
+        `;
+
+        $('#taxPreviewContent').html(html);
+        $('#taxPreview').slideDown();
     }
-
-    const html = `
-        <p class="mb-1"><strong>Base Price:</strong> ${symbol} ${priceExcludingTax.toFixed(2)}</p>
-        <p class="mb-1"><strong>Tax (${taxPercentage}%):</strong> ${symbol} ${taxAmount.toFixed(2)}</p>
-        <p class="mb-0"><strong>Final Price:</strong> ${symbol} ${priceIncludingTax.toFixed(2)}</p>
-    `;
-
-    $('#taxPreviewContent').html(html);
-    $('#taxPreview').slideDown();
 }
 
 // Helper function for currency symbol (if not already defined)
@@ -2741,5 +2761,35 @@ function loadVariants() {
         }
     });
 }
+
+// Tax Type change handler
+$('#taxType').on('change', function() {
+    const taxType = $(this).val();
+
+    if (taxType === 'inclusive') {
+        // Disable tax percentage when inclusive
+        $('#taxPercentage').val('0').prop('disabled', true).addClass('bg-light');
+
+        // Update help text
+        $('#taxPercentage').closest('.mb-3').find('.form-text').html(
+            '<small class="text-muted"><i class="bi bi-info-circle"></i> Tax percentage is not needed for inclusive pricing</small>'
+        );
+    } else {
+        // Enable tax percentage when exclusive
+        $('#taxPercentage').prop('disabled', false).removeClass('bg-light');
+
+        // Restore original help text
+        $('#taxPercentage').closest('.mb-3').find('.form-text').html(
+            'Enter tax rate (e.g., 15 for 15% tax)'
+        );
+    }
+
+    updateTaxPreview();
+});
+
+// Trigger on page load to set initial state based on existing product data
+$(document).ready(function() {
+    $('#taxType').trigger('change');
+});
 </script>
 @endpush

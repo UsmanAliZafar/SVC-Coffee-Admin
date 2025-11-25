@@ -319,6 +319,12 @@
         font-weight: 600;
         color: #5B914C;
     }
+
+    #taxPercentage:disabled {
+        background-color: #f8f9fa !important;
+        cursor: not-allowed;
+        color: #6c757d;
+    }
 </style>
 @endpush
 
@@ -601,7 +607,15 @@
                         <div class="mb-3">
                             <label class="form-label">Tax Percentage (%)</label>
                             <div class="input-group">
-                                <input type="number" name="tax_percentage" id="taxPercentage" class="form-control" placeholder="0.00" step="0.01" min="0" max="100" value="0">
+                                <input type="number"
+                                    name="tax_percentage"
+                                    id="taxPercentage"
+                                    class="form-control"
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value="0">
                                 <span class="input-group-text">%</span>
                             </div>
                             <div class="form-text">Enter tax rate (e.g., 15 for 15% tax)</div>
@@ -1539,13 +1553,13 @@ function updateTaxPreview() {
         return;
     }
 
-    const price = parseFloat($('#salePrice').val()) || parseFloat($('#regularPrice').val()) || 0;
+    const price = parseFloat($('input[name="sale_price"]').val()) || parseFloat($('input[name="price"]').val()) || 0;
     const taxPercentage = parseFloat($('#taxPercentage').val()) || 0;
     const taxType = $('#taxType').val();
     const currency = $('select[name="curency"]').val() || 'USD';
     const symbol = currency_symbol(currency);
 
-    if (price <= 0 || taxPercentage <= 0) {
+    if (price <= 0) {
         $('#taxPreview').hide();
         return;
     }
@@ -1553,25 +1567,38 @@ function updateTaxPreview() {
     let taxAmount, priceExcludingTax, priceIncludingTax;
 
     if (taxType === 'inclusive') {
-        // Tax is included in price
-        priceExcludingTax = price / (1 + (taxPercentage / 100));
-        taxAmount = price - priceExcludingTax;
+        // ✅ For inclusive tax: Show that tax is already included
         priceIncludingTax = price;
+        taxAmount = 0; // Tax is already in the price
+        priceExcludingTax = price; // Display as-is
+
+        const html = `
+            <p class="mb-1"><strong>Price (Tax Inclusive):</strong> ${symbol} ${price.toFixed(2)}</p>
+            <p class="mb-0 text-muted"><small><i class="bi bi-info-circle"></i> Tax is already included in the price</small></p>
+        `;
+
+        $('#taxPreviewContent').html(html);
+        $('#taxPreview').slideDown();
     } else {
-        // Tax is exclusive
+        // ✅ For exclusive tax: Calculate and show breakdown
+        if (taxPercentage <= 0) {
+            $('#taxPreview').hide();
+            return;
+        }
+
         priceExcludingTax = price;
         taxAmount = price * (taxPercentage / 100);
         priceIncludingTax = price + taxAmount;
+
+        const html = `
+            <p class="mb-1"><strong>Base Price:</strong> ${symbol} ${priceExcludingTax.toFixed(2)}</p>
+            <p class="mb-1"><strong>Tax (${taxPercentage}%):</strong> ${symbol} ${taxAmount.toFixed(2)}</p>
+            <p class="mb-0"><strong>Final Price:</strong> ${symbol} ${priceIncludingTax.toFixed(2)}</p>
+        `;
+
+        $('#taxPreviewContent').html(html);
+        $('#taxPreview').slideDown();
     }
-
-    const html = `
-        <p class="mb-1"><strong>Base Price:</strong> ${symbol} ${priceExcludingTax.toFixed(2)}</p>
-        <p class="mb-1"><strong>Tax (${taxPercentage}%):</strong> ${symbol} ${taxAmount.toFixed(2)}</p>
-        <p class="mb-0"><strong>Final Price:</strong> ${symbol} ${priceIncludingTax.toFixed(2)}</p>
-    `;
-
-    $('#taxPreviewContent').html(html);
-    $('#taxPreview').slideDown();
 }
 
 // Helper function for currency symbol (if not already defined)
@@ -1586,6 +1613,36 @@ function currency_symbol(code) {
 // Initialize on page load
 $(document).ready(function() {
     updateTaxPreview();
+});
+
+// Tax Type change handler
+$('#taxType').on('change', function() {
+    const taxType = $(this).val();
+
+    if (taxType === 'inclusive') {
+        // Disable tax percentage when inclusive
+        $('#taxPercentage').val('0').prop('disabled', true).addClass('bg-light');
+
+        // Update help text
+        $('.form-text', '#taxPercentage').closest('.mb-3').find('.form-text').html(
+            '<small class="text-muted">Tax percentage is not needed for inclusive pricing</small>'
+        );
+    } else {
+        // Enable tax percentage when exclusive
+        $('#taxPercentage').prop('disabled', false).removeClass('bg-light');
+
+        // Restore original help text
+        $('#taxPercentage').closest('.mb-3').find('.form-text').html(
+            'Enter tax rate (e.g., 15 for 15% tax)'
+        );
+    }
+
+    updateTaxPreview();
+});
+
+// Trigger on page load to set initial state
+$(document).ready(function() {
+    $('#taxType').trigger('change');
 });
 </script>
 @endpush
