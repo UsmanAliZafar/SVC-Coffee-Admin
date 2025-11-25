@@ -1603,6 +1603,456 @@
                 ]
             }
         },
+        "/api/cart/calculate-shipping": {
+            "post": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Calculate shipping cost for cart",
+                "description": "Calculate shipping cost for cart items considering weight, volume, item count, coupon discounts, and free shipping thresholds. Supports multiple shipping methods (standard, express, overnight) and calculation types (flat rate, per kg, per liter, per item, tiered).",
+                "operationId": "calculateCartShipping",
+                "requestBody": {
+                    "description": "Shipping calculation request with cart ID and optional shipping method",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "cart_id"
+                                ],
+                                "properties": {
+                                    "cart_id": {
+                                        "description": "Cart UUID or session ID",
+                                        "type": "string",
+                                        "example": "9d4e8f2a-1b3c-4d5e-6f7a-8b9c0d1e2f3a"
+                                    },
+                                    "shipping_method": {
+                                        "description": "Shipping method selection (optional, defaults to 'standard')",
+                                        "type": "string",
+                                        "enum": [
+                                            "standard",
+                                            "express",
+                                            "overnight",
+                                            "free"
+                                        ],
+                                        "example": "standard",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Shipping cost calculated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "description": "Regular shipping cost",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Shipping cost calculated successfully"
+                                                },
+                                                "data": {
+                                                    "properties": {
+                                                        "shipping_cost": {
+                                                            "description": "Calculated shipping cost",
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 15.5
+                                                        },
+                                                        "formatted_cost": {
+                                                            "description": "Formatted shipping cost with currency symbol",
+                                                            "type": "string",
+                                                            "example": "Rs. 15.50"
+                                                        },
+                                                        "free_shipping": {
+                                                            "description": "Whether free shipping applies",
+                                                            "type": "boolean",
+                                                            "example": false
+                                                        },
+                                                        "calculation_type": {
+                                                            "description": "Method used to calculate shipping cost",
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "flat_rate",
+                                                                "per_kg",
+                                                                "per_liter",
+                                                                "per_item",
+                                                                "tiered"
+                                                            ],
+                                                            "example": "per_kg"
+                                                        },
+                                                        "shipping_method": {
+                                                            "description": "Selected shipping method",
+                                                            "type": "string",
+                                                            "example": "standard"
+                                                        },
+                                                        "currency": {
+                                                            "description": "Currency symbol",
+                                                            "type": "string",
+                                                            "example": "Rs."
+                                                        },
+                                                        "estimated_delivery": {
+                                                            "description": "Estimated delivery timeframe",
+                                                            "type": "string",
+                                                            "example": "3-5 business days",
+                                                            "nullable": true
+                                                        },
+                                                        "breakdown": {
+                                                            "description": "Detailed cost breakdown",
+                                                            "properties": {
+                                                                "base_cost": {
+                                                                    "description": "Base shipping cost before additional fees",
+                                                                    "type": "number",
+                                                                    "format": "float",
+                                                                    "example": 12.5
+                                                                },
+                                                                "handling_fee": {
+                                                                    "description": "Additional handling fee",
+                                                                    "type": "number",
+                                                                    "format": "float",
+                                                                    "example": 3
+                                                                },
+                                                                "total_weight": {
+                                                                    "description": "Total cart weight in kg",
+                                                                    "type": "number",
+                                                                    "format": "float",
+                                                                    "example": 2.5
+                                                                },
+                                                                "total_volume": {
+                                                                    "description": "Total cart volume in liters",
+                                                                    "type": "number",
+                                                                    "format": "float",
+                                                                    "example": 1.2
+                                                                },
+                                                                "item_count": {
+                                                                    "description": "Total number of items in cart",
+                                                                    "type": "integer",
+                                                                    "example": 3
+                                                                },
+                                                                "cart_subtotal": {
+                                                                    "description": "Cart subtotal amount",
+                                                                    "type": "number",
+                                                                    "format": "float",
+                                                                    "example": 150
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        {
+                                            "description": "Free shipping applied from coupon",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Free shipping applied from coupon"
+                                                },
+                                                "data": {
+                                                    "properties": {
+                                                        "shipping_cost": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 0
+                                                        },
+                                                        "formatted_cost": {
+                                                            "type": "string",
+                                                            "example": "Rs. 0.00"
+                                                        },
+                                                        "free_shipping": {
+                                                            "type": "boolean",
+                                                            "example": true
+                                                        },
+                                                        "free_shipping_reason": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "coupon",
+                                                                "threshold",
+                                                                "disabled"
+                                                            ],
+                                                            "example": "coupon"
+                                                        },
+                                                        "coupon_code": {
+                                                            "type": "string",
+                                                            "example": "FREESHIP",
+                                                            "nullable": true
+                                                        },
+                                                        "currency": {
+                                                            "type": "string",
+                                                            "example": "Rs."
+                                                        },
+                                                        "estimated_delivery": {
+                                                            "type": "string",
+                                                            "example": "3-5 business days",
+                                                            "nullable": true
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        {
+                                            "description": "Free shipping threshold met",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Free shipping threshold met"
+                                                },
+                                                "data": {
+                                                    "properties": {
+                                                        "shipping_cost": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 0
+                                                        },
+                                                        "formatted_cost": {
+                                                            "type": "string",
+                                                            "example": "Rs. 0.00"
+                                                        },
+                                                        "free_shipping": {
+                                                            "type": "boolean",
+                                                            "example": true
+                                                        },
+                                                        "free_shipping_reason": {
+                                                            "type": "string",
+                                                            "example": "threshold"
+                                                        },
+                                                        "threshold_amount": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 500
+                                                        },
+                                                        "formatted_threshold": {
+                                                            "type": "string",
+                                                            "example": "Rs. 500.00"
+                                                        },
+                                                        "currency": {
+                                                            "type": "string",
+                                                            "example": "Rs."
+                                                        },
+                                                        "estimated_delivery": {
+                                                            "type": "string",
+                                                            "example": "3-5 business days",
+                                                            "nullable": true
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - Cart empty, minimum order not met, or shipping limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean",
+                                                    "example": false
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Cart is empty"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        {
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean",
+                                                    "example": false
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Minimum order value not met for shipping"
+                                                },
+                                                "data": {
+                                                    "properties": {
+                                                        "minimum_required": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 100
+                                                        },
+                                                        "formatted_minimum": {
+                                                            "type": "string",
+                                                            "example": "Rs. 100.00"
+                                                        },
+                                                        "current_subtotal": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 75
+                                                        },
+                                                        "formatted_subtotal": {
+                                                            "type": "string",
+                                                            "example": "Rs. 75.00"
+                                                        },
+                                                        "amount_needed": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 25
+                                                        },
+                                                        "formatted_amount_needed": {
+                                                            "type": "string",
+                                                            "example": "Rs. 25.00"
+                                                        },
+                                                        "currency": {
+                                                            "type": "string",
+                                                            "example": "Rs."
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        {
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean",
+                                                    "example": false
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Order exceeds maximum weight limit"
+                                                },
+                                                "data": {
+                                                    "properties": {
+                                                        "limit_type": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "weight",
+                                                                "volume"
+                                                            ],
+                                                            "example": "weight"
+                                                        },
+                                                        "limit_value": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 50
+                                                        },
+                                                        "current_value": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 55.5
+                                                        },
+                                                        "unit": {
+                                                            "type": "string",
+                                                            "example": "kg"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "cart_id": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The cart id field is required."
+                                                    }
+                                                },
+                                                "shipping_method": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The selected shipping method is invalid."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to calculate shipping"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "An unexpected error occurred"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
         "/api/checkout/create-order": {
             "post": {
                 "tags": [
@@ -5271,6 +5721,480 @@
                     }
                 },
                 "type": "object"
+            },
+            "ContactForm": {
+                "title": "Contact Form",
+                "description": "Contact form submission data",
+                "required": [
+                    "name",
+                    "email",
+                    "subject",
+                    "message"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "example": "John Doe"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255,
+                        "example": "john.doe@example.com"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 20,
+                        "example": "+1234567890",
+                        "nullable": true
+                    },
+                    "subject": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "example": "Product Inquiry - Coffee Machine"
+                    },
+                    "message": {
+                        "type": "string",
+                        "maxLength": 5000,
+                        "example": "I'm interested in your professional espresso machine..."
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": [
+                            "low",
+                            "normal",
+                            "high",
+                            "urgent"
+                        ],
+                        "example": "normal"
+                    }
+                },
+                "type": "object"
+            },
+            "ContactResponse": {
+                "title": "Contact Response",
+                "description": "Successful contact form submission response",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Your message has been sent successfully! We will get back to you soon."
+                    },
+                    "data": {
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "example": "9d4f5678-1234-5678-9abc-def123456789"
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "John Doe"
+                            },
+                            "email": {
+                                "type": "string",
+                                "example": "john.doe@example.com"
+                            },
+                            "subject": {
+                                "type": "string",
+                                "example": "Product Inquiry - Coffee Machine"
+                            },
+                            "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "ContactValidationError": {
+                "title": "Contact Validation Error",
+                "description": "Contact form validation error response",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Validation failed"
+                    },
+                    "errors": {
+                        "properties": {
+                            "field_name": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "example": "The field is required"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingCalculationRequest": {
+                "title": "Shipping Calculation Request",
+                "description": "Request payload for calculating shipping cost",
+                "required": [
+                    "cart_id"
+                ],
+                "properties": {
+                    "cart_id": {
+                        "description": "Cart UUID",
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9d4e8f2a-1b3c-4d5e-6f7a-8b9c0d1e2f3a"
+                    },
+                    "shipping_method": {
+                        "description": "Shipping method (optional, defaults to 'standard')",
+                        "type": "string",
+                        "enum": [
+                            "standard",
+                            "express",
+                            "overnight",
+                            "free"
+                        ],
+                        "example": "standard",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingCalculationResponse": {
+                "title": "Shipping Calculation Response",
+                "description": "Successful shipping calculation response",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Shipping cost calculated successfully"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/ShippingCalculationData"
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingCalculationData": {
+                "title": "Shipping Calculation Data",
+                "description": "Detailed shipping cost calculation data",
+                "properties": {
+                    "shipping_cost": {
+                        "description": "Calculated shipping cost",
+                        "type": "number",
+                        "format": "float",
+                        "example": 15.5
+                    },
+                    "formatted_cost": {
+                        "description": "Formatted shipping cost with currency",
+                        "type": "string",
+                        "example": "Rs. 15.50"
+                    },
+                    "free_shipping": {
+                        "description": "Whether free shipping applies",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "calculation_type": {
+                        "description": "Method used to calculate shipping",
+                        "type": "string",
+                        "enum": [
+                            "flat_rate",
+                            "per_kg",
+                            "per_liter",
+                            "per_item",
+                            "tiered"
+                        ],
+                        "example": "per_kg"
+                    },
+                    "shipping_method": {
+                        "description": "Selected shipping method",
+                        "type": "string",
+                        "example": "standard"
+                    },
+                    "currency": {
+                        "description": "Currency symbol",
+                        "type": "string",
+                        "example": "Rs."
+                    },
+                    "estimated_delivery": {
+                        "description": "Estimated delivery time",
+                        "type": "string",
+                        "example": "3-5 business days",
+                        "nullable": true
+                    },
+                    "breakdown": {
+                        "$ref": "#/components/schemas/ShippingBreakdown"
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingBreakdown": {
+                "title": "Shipping Cost Breakdown",
+                "description": "Detailed breakdown of shipping cost calculation",
+                "properties": {
+                    "base_cost": {
+                        "description": "Base shipping cost before fees",
+                        "type": "number",
+                        "format": "float",
+                        "example": 12.5
+                    },
+                    "handling_fee": {
+                        "description": "Additional handling fee",
+                        "type": "number",
+                        "format": "float",
+                        "example": 3
+                    },
+                    "total_weight": {
+                        "description": "Total weight in kg",
+                        "type": "number",
+                        "format": "float",
+                        "example": 2.5
+                    },
+                    "total_volume": {
+                        "description": "Total volume in liters",
+                        "type": "number",
+                        "format": "float",
+                        "example": 1.2
+                    },
+                    "item_count": {
+                        "description": "Total number of items",
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "cart_subtotal": {
+                        "description": "Cart subtotal amount",
+                        "type": "number",
+                        "format": "float",
+                        "example": 150
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingFreeFromCoupon": {
+                "title": "Free Shipping from Coupon",
+                "description": "Response when free shipping is applied via coupon",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Free shipping applied from coupon"
+                    },
+                    "data": {
+                        "properties": {
+                            "shipping_cost": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 0
+                            },
+                            "formatted_cost": {
+                                "type": "string",
+                                "example": "Rs. 0.00"
+                            },
+                            "free_shipping": {
+                                "type": "boolean",
+                                "example": true
+                            },
+                            "free_shipping_reason": {
+                                "type": "string",
+                                "example": "coupon"
+                            },
+                            "coupon_code": {
+                                "type": "string",
+                                "example": "FREESHIP",
+                                "nullable": true
+                            },
+                            "currency": {
+                                "type": "string",
+                                "example": "Rs."
+                            },
+                            "estimated_delivery": {
+                                "type": "string",
+                                "example": "3-5 business days",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingFreeFromThreshold": {
+                "title": "Free Shipping from Threshold",
+                "description": "Response when free shipping threshold is met",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Free shipping threshold met"
+                    },
+                    "data": {
+                        "properties": {
+                            "shipping_cost": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 0
+                            },
+                            "formatted_cost": {
+                                "type": "string",
+                                "example": "Rs. 0.00"
+                            },
+                            "free_shipping": {
+                                "type": "boolean",
+                                "example": true
+                            },
+                            "free_shipping_reason": {
+                                "type": "string",
+                                "example": "threshold"
+                            },
+                            "threshold_amount": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 500
+                            },
+                            "formatted_threshold": {
+                                "type": "string",
+                                "example": "Rs. 500.00"
+                            },
+                            "currency": {
+                                "type": "string",
+                                "example": "Rs."
+                            },
+                            "estimated_delivery": {
+                                "type": "string",
+                                "example": "3-5 business days",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingMinimumNotMet": {
+                "title": "Minimum Order Not Met",
+                "description": "Error when minimum order value for shipping is not met",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Minimum order value not met for shipping"
+                    },
+                    "data": {
+                        "properties": {
+                            "minimum_required": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 100
+                            },
+                            "formatted_minimum": {
+                                "type": "string",
+                                "example": "Rs. 100.00"
+                            },
+                            "current_subtotal": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 75
+                            },
+                            "formatted_subtotal": {
+                                "type": "string",
+                                "example": "Rs. 75.00"
+                            },
+                            "amount_needed": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 25
+                            },
+                            "formatted_amount_needed": {
+                                "type": "string",
+                                "example": "Rs. 25.00"
+                            },
+                            "currency": {
+                                "type": "string",
+                                "example": "Rs."
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingLimitExceeded": {
+                "title": "Shipping Limit Exceeded",
+                "description": "Error when order exceeds shipping weight or volume limits",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Order exceeds maximum weight limit"
+                    },
+                    "data": {
+                        "properties": {
+                            "limit_type": {
+                                "type": "string",
+                                "enum": [
+                                    "weight",
+                                    "volume"
+                                ],
+                                "example": "weight"
+                            },
+                            "limit_value": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 50
+                            },
+                            "current_value": {
+                                "type": "number",
+                                "format": "float",
+                                "example": 55.5
+                            },
+                            "unit": {
+                                "type": "string",
+                                "example": "kg"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "ShippingCartEmpty": {
+                "title": "Empty Cart Error",
+                "description": "Error when attempting to calculate shipping for empty cart",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Cart is empty"
+                    }
+                },
+                "type": "object"
             }
         },
         "responses": {
@@ -5501,7 +6425,7 @@
         },
         {
             "name": "Cart",
-            "description": "Shopping cart management - Add, update, remove items from cart"
+            "description": "Shopping cart management - Add, update, remove items, apply coupons, and calculate shipping"
         },
         {
             "name": "Checkout",

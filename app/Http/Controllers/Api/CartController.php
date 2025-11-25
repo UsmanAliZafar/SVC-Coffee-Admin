@@ -784,4 +784,364 @@ class CartController extends Controller
 
         return $cartMeta;
     }
+
+    /**
+     * Calculate shipping cost for cart
+     * Takes into account: coupon (free shipping), cart totals, weight, volume, item count
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function calculateShipping(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'cart_id' => 'required|string',
+                'shipping_method' => 'nullable|string|in:standard,express,overnight,free',
+            ]);
+
+            // Get cart and metadata
+            $cart = Cache::get("cart:{$validated['cart_id']}", []);
+            $cartMeta = Cache::get("cart_meta:{$validated['cart_id']}", []);
+
+            if (empty($cart)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cart is empty',
+                ], 400);
+            }
+
+            // ============================================================
+            // CALCULATE CART TOTALS
+            // ============================================================
+            $totals = isset($cartMeta['coupon'])
+                ? $this->calculateTotalsWithCoupon($cart, $cartMeta)
+                : $this->calculateTotals($cart);
+
+            $subtotal = is_numeric($totals['subtotal']) ? (float) $totals['subtotal'] : 0.0;
+
+            // ============================================================
+            // CHECK IF COUPON PROVIDES FREE SHIPPING
+            // ============================================================
+            if (isset($cartMeta['coupon']['free_shipping']) && $cartMeta['coupon']['free_shipping']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Free shipping applied from coupon',
+                    'data' => [
+                        'shipping_cost' => 0.00,
+                        'formatted_cost' => format_amount(0),
+                        'free_shipping' => true,
+                        'free_shipping_reason' => 'coupon',
+                        'coupon_code' => $cartMeta['coupon']['code'] ?? null,
+                        'currency' => store_currency_symbol(),
+                        'estimated_delivery' => $this->getEstimatedDelivery(),
+                    ],
+                ]);
+            }
+
+            // ============================================================
+            // CALCULATE TOTAL WEIGHT, VOLUME, ITEM COUNT
+            // ============================================================
+            $totalWeight = 0.0;
+            $totalVolume = 0.0;
+            $itemCount = 0;
+
+            foreach ($cart as $item) {
+                $quantity = is_numeric($item['quantity']) ? (int) $item['quantity'] : 0;
+                $itemCount += $quantity;
+
+                // Get product details for weight/volume
+                $product = Product::find($item['product_id']);
+
+                if ($product) {
+                    // If variant exists, try to get variant weight/dimensions
+                    if (!empty($item['variant_id'])) {
+                        $variant = \App\Models\ProductVariant::find($item['variant_id']);
+
+                        if ($variant) {
+                            $weight = is_numeric($variant->weight) ? (float) $variant->weight : 0.0;
+                            $length = is_numeric($variant->length) ? (float) $variant->length : 0.0;
+                            $width = is_numeric($variant->width) ? (float) $variant->width : 0.0;
+                            $height = is_numeric($variant->height) ? (float) $variant->height : 0.0;
+
+                            $totalWeight += $weight * $quantity;
+
+                            // Calculate volume in liters (assuming dimensions are in cm)
+                            if ($length > 0 && $width > 0 && $height > 0) {
+                                $volumeInLiters = ($length * $width * $height) / 1000; // cm³ to liters
+                                $totalVolume += $volumeInLiters * $quantity;
+                            }
+                        } else {
+                            // Fallback to product weight/dimensions
+                            $this->addProductWeightVolume($product, $quantity, $totalWeight, $totalVolume);
+                        }
+                    } else {
+                        // No variant, use product weight/dimensions
+                        $this->addProductWeightVolume($product, $quantity, $totalWeight, $totalVolume);
+                    }
+                }
+            }
+
+            // ============================================================
+            // GET STORE SETTINGS
+            // ============================================================
+            $settings = \App\Models\StoreSetting::getSettings();
+
+            if (!$settings->shipping_enabled) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Shipping is disabled',
+                    'data' => [
+                        'shipping_cost' => 0.00,
+                        'formatted_cost' => format_amount(0),
+                        'free_shipping' => true,
+                        'free_shipping_reason' => 'disabled',
+                        'currency' => store_currency_symbol(),
+                    ],
+                ]);
+            }
+
+            // ============================================================
+            // CHECK FREE SHIPPING THRESHOLD
+            // ============================================================
+            if ($settings->free_shipping_threshold && $subtotal >= $settings->free_shipping_threshold) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Free shipping threshold met',
+                    'data' => [
+                        'shipping_cost' => 0.00,
+                        'formatted_cost' => format_amount(0),
+                        'free_shipping' => true,
+                        'free_shipping_reason' => 'threshold',
+                        'threshold_amount' => $settings->free_shipping_threshold,
+                        'formatted_threshold' => format_amount($settings->free_shipping_threshold),
+                        'currency' => store_currency_symbol(),
+                        'estimated_delivery' => $this->getEstimatedDelivery(),
+                    ],
+                ]);
+            }
+
+            // ============================================================
+            // CHECK MINIMUM ORDER REQUIREMENT
+            // ============================================================
+            if ($settings->minimum_order_for_shipping && $subtotal < $settings->minimum_order_for_shipping) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Minimum order value not met for shipping',
+                    'data' => [
+                        'minimum_required' => $settings->minimum_order_for_shipping,
+                        'formatted_minimum' => format_amount($settings->minimum_order_for_shipping),
+                        'current_subtotal' => $subtotal,
+                        'formatted_subtotal' => format_amount($subtotal),
+                        'amount_needed' => $settings->minimum_order_for_shipping - $subtotal,
+                        'formatted_amount_needed' => format_amount($settings->minimum_order_for_shipping - $subtotal),
+                        'currency' => store_currency_symbol(),
+                    ],
+                ], 400);
+            }
+
+            // ============================================================
+            // CHECK SHIPPING LIMITS
+            // ============================================================
+            $limitCheck = $settings->exceedsShippingLimits($totalWeight, $totalVolume);
+
+            if ($limitCheck['exceeds']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Order exceeds maximum {$limitCheck['type']} limit",
+                    'data' => [
+                        'limit_type' => $limitCheck['type'],
+                        'limit_value' => $limitCheck['limit'],
+                        'current_value' => $limitCheck['type'] === 'weight' ? $totalWeight : $totalVolume,
+                        'unit' => $limitCheck['type'] === 'weight' ? 'kg' : 'L',
+                    ],
+                ], 400);
+            }
+
+            // ============================================================
+            // CALCULATE SHIPPING COST
+            // ============================================================
+            $shippingMethod = $validated['shipping_method'] ?? 'standard';
+            $shippingCost = 0.0;
+
+            switch ($settings->shipping_calculation_type) {
+                case 'flat_rate':
+                    if ($settings->enable_nationwide_flat_rate && $settings->nationwide_flat_rate) {
+                        $shippingCost = (float) $settings->nationwide_flat_rate;
+                    } else {
+                        $shippingCost = $this->getMethodBasedRate($settings, $shippingMethod);
+                    }
+                    break;
+
+                case 'per_kg':
+                    if ($totalWeight > 0 && $settings->shipping_rate_per_kg) {
+                        $shippingCost = $totalWeight * (float) $settings->shipping_rate_per_kg;
+                    } else {
+                        $shippingCost = (float) $settings->default_shipping_cost;
+                    }
+                    break;
+
+                case 'per_liter':
+                    if ($totalVolume > 0 && $settings->shipping_rate_per_liter) {
+                        $shippingCost = $totalVolume * (float) $settings->shipping_rate_per_liter;
+                    } else {
+                        $shippingCost = (float) $settings->default_shipping_cost;
+                    }
+                    break;
+
+                case 'per_item':
+                    if ($itemCount > 0 && $settings->shipping_rate_per_item) {
+                        $shippingCost = $itemCount * (float) $settings->shipping_rate_per_item;
+                    } else {
+                        $shippingCost = (float) $settings->default_shipping_cost;
+                    }
+                    break;
+
+                case 'tiered':
+                    $shippingCost = $this->calculateTieredRate($settings, $subtotal, $totalWeight);
+                    break;
+
+                default:
+                    $shippingCost = (float) $settings->default_shipping_cost;
+            }
+
+            // Add handling fee
+            if ($settings->handling_fee) {
+                $shippingCost += (float) $settings->handling_fee;
+            }
+
+            // Ensure non-negative
+            $shippingCost = max(0, $shippingCost);
+
+            // ============================================================
+            // PREPARE RESPONSE
+            // ============================================================
+            return response()->json([
+                'success' => true,
+                'message' => 'Shipping cost calculated successfully',
+                'data' => [
+                    'shipping_cost' => round($shippingCost, 2),
+                    'formatted_cost' => format_amount($shippingCost),
+                    'free_shipping' => false,
+                    'calculation_type' => $settings->shipping_calculation_type,
+                    'shipping_method' => $shippingMethod,
+                    'currency' => store_currency_symbol(),
+                    'estimated_delivery' => $this->getEstimatedDelivery(),
+                    'breakdown' => [
+                        'base_cost' => round($shippingCost - (float) ($settings->handling_fee ?? 0), 2),
+                        'handling_fee' => round((float) ($settings->handling_fee ?? 0), 2),
+                        'total_weight' => round($totalWeight, 2),
+                        'total_volume' => round($totalVolume, 2),
+                        'item_count' => $itemCount,
+                        'cart_subtotal' => round($subtotal, 2),
+                    ],
+                ],
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $e->errors(),
+            ], 422);
+
+        } catch (\Exception $e) {
+            \Log::error('Shipping calculation failed', [
+                'error' => $e->getMessage(),
+                'cart_id' => $validated['cart_id'] ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to calculate shipping',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper: Add product weight/volume to totals
+     *
+     * @param Product $product
+     * @param int $quantity
+     * @param float &$totalWeight
+     * @param float &$totalVolume
+     */
+    private function addProductWeightVolume(Product $product, int $quantity, float &$totalWeight, float &$totalVolume): void
+    {
+        $weight = is_numeric($product->weight) ? (float) $product->weight : 0.0;
+        $length = is_numeric($product->length) ? (float) $product->length : 0.0;
+        $width = is_numeric($product->width) ? (float) $product->width : 0.0;
+        $height = is_numeric($product->height) ? (float) $product->height : 0.0;
+
+        $totalWeight += $weight * $quantity;
+
+        // Calculate volume in liters (assuming dimensions are in cm)
+        if ($length > 0 && $width > 0 && $height > 0) {
+            $volumeInLiters = ($length * $width * $height) / 1000; // cm³ to liters
+            $totalVolume += $volumeInLiters * $quantity;
+        }
+    }
+
+    /**
+     * Helper: Get method-based shipping rate
+     *
+     * @param \App\Models\StoreSetting $settings
+     * @param string $method
+     * @return float
+     */
+    private function getMethodBasedRate(\App\Models\StoreSetting $settings, string $method): float
+    {
+        $rates = [
+            'standard' => (float) $settings->default_shipping_cost,
+            'express' => (float) $settings->default_shipping_cost * 2,
+            'overnight' => (float) $settings->default_shipping_cost * 3,
+            'free' => 0.00,
+        ];
+
+        return $rates[$method] ?? (float) $settings->default_shipping_cost;
+    }
+
+    /**
+     * Helper: Calculate tiered shipping rate
+     *
+     * @param \App\Models\StoreSetting $settings
+     * @param float $subtotal
+     * @param float $totalWeight
+     * @return float
+     */
+    private function calculateTieredRate(\App\Models\StoreSetting $settings, float $subtotal, float $totalWeight): float
+    {
+        if (!$settings->tiered_shipping_rates || empty($settings->tiered_shipping_rates)) {
+            return (float) $settings->default_shipping_cost;
+        }
+
+        $tiers = collect($settings->tiered_shipping_rates)->sortBy('threshold');
+        $applicableRate = (float) $settings->default_shipping_cost;
+
+        foreach ($tiers as $tier) {
+            $threshold = $tier['threshold'] ?? 0;
+            $rate = $tier['rate'] ?? 0;
+            $type = $tier['type'] ?? 'order_total';
+
+            if ($type === 'order_total' && $subtotal >= $threshold) {
+                $applicableRate = (float) $rate;
+            } elseif ($type === 'weight' && $totalWeight >= $threshold) {
+                $applicableRate = (float) $rate;
+            }
+        }
+
+        return $applicableRate;
+    }
+
+    /**
+     * Helper: Get estimated delivery time
+     *
+     * @return string|null
+     */
+    private function getEstimatedDelivery(): ?string
+    {
+        $settings = \App\Models\StoreSetting::getSettings();
+        return $settings->getEstimatedDelivery();
+    }
 }

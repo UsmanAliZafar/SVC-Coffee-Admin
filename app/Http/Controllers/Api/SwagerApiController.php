@@ -752,6 +752,195 @@ class SwagerApiController extends Controller
      * )
      */
     public function removeCoupon() {}
+
+    /**
+     * @OA\Post(
+     *     path="/api/cart/calculate-shipping",
+     *     operationId="calculateCartShipping",
+     *     tags={"Cart"},
+     *     summary="Calculate shipping cost for cart",
+     *     description="Calculate shipping cost for cart items considering weight, volume, item count, coupon discounts, and free shipping thresholds. Supports multiple shipping methods (standard, express, overnight) and calculation types (flat rate, per kg, per liter, per item, tiered).",
+     *     security={{"apiKey": {}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Shipping calculation request with cart ID and optional shipping method",
+     *         @OA\JsonContent(
+     *             required={"cart_id"},
+     *             @OA\Property(
+     *                 property="cart_id",
+     *                 type="string",
+     *                 description="Cart UUID or session ID",
+     *                 example="9d4e8f2a-1b3c-4d5e-6f7a-8b9c0d1e2f3a"
+     *             ),
+     *             @OA\Property(
+     *                 property="shipping_method",
+     *                 type="string",
+     *                 enum={"standard", "express", "overnight", "free"},
+     *                 description="Shipping method selection (optional, defaults to 'standard')",
+     *                 example="standard",
+     *                 nullable=true
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Shipping cost calculated successfully",
+     *         @OA\JsonContent(
+     *             oneOf={
+     *                 @OA\Schema(
+     *                     description="Regular shipping cost",
+     *                     @OA\Property(property="success", type="boolean", example=true),
+     *                     @OA\Property(property="message", type="string", example="Shipping cost calculated successfully"),
+     *                     @OA\Property(property="data", type="object",
+     *                         @OA\Property(
+     *                             property="shipping_cost",
+     *                             type="number",
+     *                             format="float",
+     *                             description="Calculated shipping cost",
+     *                             example=15.50
+     *                         ),
+     *                         @OA\Property(
+     *                             property="formatted_cost",
+     *                             type="string",
+     *                             description="Formatted shipping cost with currency symbol",
+     *                             example="Rs. 15.50"
+     *                         ),
+     *                         @OA\Property(
+     *                             property="free_shipping",
+     *                             type="boolean",
+     *                             description="Whether free shipping applies",
+     *                             example=false
+     *                         ),
+     *                         @OA\Property(
+     *                             property="calculation_type",
+     *                             type="string",
+     *                             enum={"flat_rate", "per_kg", "per_liter", "per_item", "tiered"},
+     *                             description="Method used to calculate shipping cost",
+     *                             example="per_kg"
+     *                         ),
+     *                         @OA\Property(
+     *                             property="shipping_method",
+     *                             type="string",
+     *                             description="Selected shipping method",
+     *                             example="standard"
+     *                         ),
+     *                         @OA\Property(
+     *                             property="currency",
+     *                             type="string",
+     *                             description="Currency symbol",
+     *                             example="Rs."
+     *                         ),
+     *                         @OA\Property(
+     *                             property="estimated_delivery",
+     *                             type="string",
+     *                             nullable=true,
+     *                             description="Estimated delivery timeframe",
+     *                             example="3-5 business days"
+     *                         ),
+     *                         @OA\Property(
+     *                             property="breakdown",
+     *                             type="object",
+     *                             description="Detailed cost breakdown",
+     *                             @OA\Property(property="base_cost", type="number", format="float", example=12.50, description="Base shipping cost before additional fees"),
+     *                             @OA\Property(property="handling_fee", type="number", format="float", example=3.00, description="Additional handling fee"),
+     *                             @OA\Property(property="total_weight", type="number", format="float", example=2.5, description="Total cart weight in kg"),
+     *                             @OA\Property(property="total_volume", type="number", format="float", example=1.2, description="Total cart volume in liters"),
+     *                             @OA\Property(property="item_count", type="integer", example=3, description="Total number of items in cart"),
+     *                             @OA\Property(property="cart_subtotal", type="number", format="float", example=150.00, description="Cart subtotal amount")
+     *                         )
+     *                     )
+     *                 ),
+     *                 @OA\Schema(
+     *                     description="Free shipping applied from coupon",
+     *                     @OA\Property(property="success", type="boolean", example=true),
+     *                     @OA\Property(property="message", type="string", example="Free shipping applied from coupon"),
+     *                     @OA\Property(property="data", type="object",
+     *                         @OA\Property(property="shipping_cost", type="number", format="float", example=0.00),
+     *                         @OA\Property(property="formatted_cost", type="string", example="Rs. 0.00"),
+     *                         @OA\Property(property="free_shipping", type="boolean", example=true),
+     *                         @OA\Property(property="free_shipping_reason", type="string", example="coupon", enum={"coupon", "threshold", "disabled"}),
+     *                         @OA\Property(property="coupon_code", type="string", nullable=true, example="FREESHIP"),
+     *                         @OA\Property(property="currency", type="string", example="Rs."),
+     *                         @OA\Property(property="estimated_delivery", type="string", nullable=true, example="3-5 business days")
+     *                     )
+     *                 ),
+     *                 @OA\Schema(
+     *                     description="Free shipping threshold met",
+     *                     @OA\Property(property="success", type="boolean", example=true),
+     *                     @OA\Property(property="message", type="string", example="Free shipping threshold met"),
+     *                     @OA\Property(property="data", type="object",
+     *                         @OA\Property(property="shipping_cost", type="number", format="float", example=0.00),
+     *                         @OA\Property(property="formatted_cost", type="string", example="Rs. 0.00"),
+     *                         @OA\Property(property="free_shipping", type="boolean", example=true),
+     *                         @OA\Property(property="free_shipping_reason", type="string", example="threshold"),
+     *                         @OA\Property(property="threshold_amount", type="number", format="float", example=500.00),
+     *                         @OA\Property(property="formatted_threshold", type="string", example="Rs. 500.00"),
+     *                         @OA\Property(property="currency", type="string", example="Rs."),
+     *                         @OA\Property(property="estimated_delivery", type="string", nullable=true, example="3-5 business days")
+     *                     )
+     *                 )
+     *             }
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Bad request - Cart empty, minimum order not met, or shipping limit exceeded",
+     *         @OA\JsonContent(
+     *             oneOf={
+     *                 @OA\Schema(
+     *                     @OA\Property(property="success", type="boolean", example=false),
+     *                     @OA\Property(property="message", type="string", example="Cart is empty")
+     *                 ),
+     *                 @OA\Schema(
+     *                     @OA\Property(property="success", type="boolean", example=false),
+     *                     @OA\Property(property="message", type="string", example="Minimum order value not met for shipping"),
+     *                     @OA\Property(property="data", type="object",
+     *                         @OA\Property(property="minimum_required", type="number", format="float", example=100.00),
+     *                         @OA\Property(property="formatted_minimum", type="string", example="Rs. 100.00"),
+     *                         @OA\Property(property="current_subtotal", type="number", format="float", example=75.00),
+     *                         @OA\Property(property="formatted_subtotal", type="string", example="Rs. 75.00"),
+     *                         @OA\Property(property="amount_needed", type="number", format="float", example=25.00),
+     *                         @OA\Property(property="formatted_amount_needed", type="string", example="Rs. 25.00"),
+     *                         @OA\Property(property="currency", type="string", example="Rs.")
+     *                     )
+     *                 ),
+     *                 @OA\Schema(
+     *                     @OA\Property(property="success", type="boolean", example=false),
+     *                     @OA\Property(property="message", type="string", example="Order exceeds maximum weight limit"),
+     *                     @OA\Property(property="data", type="object",
+     *                         @OA\Property(property="limit_type", type="string", enum={"weight", "volume"}, example="weight"),
+     *                         @OA\Property(property="limit_value", type="number", format="float", example=50.0),
+     *                         @OA\Property(property="current_value", type="number", format="float", example=55.5),
+     *                         @OA\Property(property="unit", type="string", example="kg")
+     *                     )
+     *                 )
+     *             }
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(property="errors", type="object",
+     *                 @OA\Property(property="cart_id", type="array", @OA\Items(type="string", example="The cart id field is required.")),
+     *                 @OA\Property(property="shipping_method", type="array", @OA\Items(type="string", example="The selected shipping method is invalid."))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to calculate shipping"),
+     *             @OA\Property(property="error", type="string", example="An unexpected error occurred")
+     *         )
+     *     )
+     * )
+     */
+    public function calculateCartShipping() {}
     /**
      * ============================================
      * CHECKOUT ENDPOINTS

@@ -26,6 +26,9 @@ Route::prefix('cart')->name('cart.')->group(function () {
     // Remove coupon code
     Route::delete('/coupon', [CartController::class, 'removeCoupon'])->name('remove-coupon');
 
+    // Calculate shipping costs
+    Route::post('/calculate-shipping', [CartController::class, 'calculateShipping'])->name('calculate-shipping');
+
     // Get cart item count (optional - you may want to add this method)
     // Route::get('/count', [CartController::class, 'getCount'])->name('count');
 });
