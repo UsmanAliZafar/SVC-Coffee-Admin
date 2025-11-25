@@ -586,7 +586,7 @@
                     <div class="list-group-item activity-item">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
-                                <h6 class="mb-1">{{ $movement->product->name }}</h6>
+                                <h6 class="mb-1">{{ $movement->product->name ?? 'Deleted Product' }}</h6>
                                 <small class="text-muted">
                                     <i class="bi bi-building"></i> {{ $movement->warehouse->name }}
                                     <span class="mx-2">•</span>
