@@ -123,22 +123,22 @@
                         </li>
 
                         {{-- Low Stock --}}
-                        <li>
+                        {{-- <li>
                             <a href="{{ route('admin.inventory.low-stock') }}"
                             class="{{ request()->routeIs('admin.inventory.low-stock') ? 'active' : '' }}">
                                 <i class="bi bi-exclamation-triangle text-warning"></i> Low Stock
                                 <span class="badge bg-warning text-dark ms-auto" id="lowStockBadge" style="display: none;">0</span>
                             </a>
-                        </li>
+                        </li> --}}
 
                         {{-- Out of Stock --}}
-                        <li>
+                        {{-- <li>
                             <a href="{{ route('admin.inventory.out-of-stock') }}"
                             class="{{ request()->routeIs('admin.inventory.out-of-stock') ? 'active' : '' }}">
                                 <i class="bi bi-x-octagon text-danger"></i> Out of Stock
                                 <span class="badge bg-danger text-white ms-auto" id="outOfStockBadge" style="display: none;">0</span>
                             </a>
-                        </li>
+                        </li> --}}
 
                         {{-- Stock Alerts --}}
                         {{-- <li>

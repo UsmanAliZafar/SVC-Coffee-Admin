@@ -3,18 +3,27 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
-use App\Models\Customer;
-use App\Models\Transaction; // ✅ ADD THIS
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+// Models
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
+use App\Models\Customer;
+use App\Models\Transaction;
+
 
 class CheckoutController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct()
+    {
+        $this->notificationService = app(NotificationService::class);
+    }
     /**
      * Create order from cart
      *
@@ -275,6 +284,41 @@ class CheckoutController extends Controller
             $order = Order::create($orderData);
 
             // ============================================================
+            // NOTIFICATIONS
+            // ============================================================
+            app(\App\Services\NotificationService::class)->notify('order_created', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
+                'customer_name' => $order->getCustomerName(),
+                'customer_email' => $order->getCustomerEmail(),
+                'items_count' => count($cart),
+                'payment_method' => ucfirst($validated['payment_method']),
+            ]);
+
+            // ✅ ADD HERE: New order notification to admin
+            app(\App\Services\NotificationService::class)->notify('admin_new_order', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'customer_name' => $order->getCustomerName(),
+                'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
+                'order_source' => 'web',
+                'payment_method' => ucfirst($validated['payment_method']),
+            ]);
+
+            // High-value order notification
+            if ($order->total_amount >= 500) {
+                app(\App\Services\NotificationService::class)->notify('customer_high_value_order', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->getCustomerName(),
+                    'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
+                ]);
+            }
+
+            app(\App\Services\NotificationService::class)->notifyCustomer('order_created', $order);
+
+            // ============================================================
             // CREATE ORDER ITEMS
             // ============================================================
             foreach ($cart as $item) {
@@ -454,7 +498,6 @@ class CheckoutController extends Controller
     }
 
     /**
-     * ✅ NEW METHOD: Create transaction entry
      *
      * @param Order $order
      * @param array $validated
@@ -535,308 +578,6 @@ class CheckoutController extends Controller
         }
 
         return 'desktop';
-    }
-
-    /**
-     * Calculate shipping cost based on store settings and order details
-     *
-     * @param string $method - Shipping method selected by customer
-     * @param float $subtotal - Order subtotal
-     * @param int $itemCount - Total number of items
-     * @param float $totalWeight - Total order weight in kg (optional)
-     * @param float $totalVolume - Total order volume in liters (optional)
-     * @return float
-     */
-    private function calculateShipping(
-        string $method,
-        float $subtotal,
-        int $itemCount = 0,
-        float $totalWeight = 0,
-        float $totalVolume = 0
-    ): float
-    {
-        try {
-            // Get store settings
-            $settings = \App\Models\StoreSetting::getSettings();
-
-            // Check if shipping is disabled
-            if (!$settings->shipping_enabled) {
-                return 0.00;
-            }
-
-            // Check for free shipping threshold
-            if ($settings->free_shipping_threshold && $subtotal >= $settings->free_shipping_threshold) {
-                \Log::info('Free shipping applied due to threshold', [
-                    'subtotal' => $subtotal,
-                    'threshold' => $settings->free_shipping_threshold
-                ]);
-                return 0.00;
-            }
-
-            // Check minimum order requirement
-            if ($settings->minimum_order_for_shipping && $subtotal < $settings->minimum_order_for_shipping) {
-                \Log::warning('Order does not meet minimum shipping requirement', [
-                    'subtotal' => $subtotal,
-                    'minimum_required' => $settings->minimum_order_for_shipping
-                ]);
-                throw new \Exception("Minimum order value of {$settings->currency_symbol}{$settings->minimum_order_for_shipping} required for shipping");
-            }
-
-            // Check if order exceeds shipping limits
-            $limitCheck = $settings->exceedsShippingLimits($totalWeight, $totalVolume);
-            if ($limitCheck['exceeds']) {
-                \Log::warning('Order exceeds shipping limits', $limitCheck);
-                throw new \Exception("Order exceeds maximum {$limitCheck['type']} limit of {$limitCheck['limit']}");
-            }
-
-            $shippingCost = 0;
-
-            // Calculate based on shipping calculation type
-            switch ($settings->shipping_calculation_type) {
-                case 'flat_rate':
-                    $shippingCost = $this->calculateFlatRate($settings, $method);
-                    break;
-
-                case 'per_kg':
-                    $shippingCost = $this->calculatePerKilogram($settings, $totalWeight);
-                    break;
-
-                case 'per_liter':
-                    $shippingCost = $this->calculatePerLiter($settings, $totalVolume);
-                    break;
-
-                case 'per_item':
-                    $shippingCost = $this->calculatePerItem($settings, $itemCount);
-                    break;
-
-                case 'tiered':
-                    $shippingCost = $this->calculateTieredShipping($settings, $subtotal, $totalWeight);
-                    break;
-
-                default:
-                    $shippingCost = $settings->default_shipping_cost;
-                    \Log::info('Using default shipping cost', [
-                        'cost' => $shippingCost,
-                        'method' => $method
-                    ]);
-            }
-
-            // Add handling fee
-            if ($settings->handling_fee) {
-                $shippingCost += $settings->handling_fee;
-            }
-
-            // Ensure non-negative
-            $shippingCost = max(0, $shippingCost);
-
-            \Log::info('Shipping cost calculated', [
-                'method' => $method,
-                'calculation_type' => $settings->shipping_calculation_type,
-                'base_cost' => $shippingCost - ($settings->handling_fee ?? 0),
-                'handling_fee' => $settings->handling_fee ?? 0,
-                'total_cost' => $shippingCost,
-                'subtotal' => $subtotal,
-                'weight' => $totalWeight,
-                'volume' => $totalVolume,
-                'items' => $itemCount
-            ]);
-
-            return round($shippingCost, 2);
-
-        } catch (\Exception $e) {
-            \Log::error('Shipping calculation error', [
-                'error' => $e->getMessage(),
-                'method' => $method,
-                'subtotal' => $subtotal,
-                'weight' => $totalWeight,
-                'volume' => $totalVolume,
-                'items' => $itemCount
-            ]);
-
-            // Return default shipping cost on error
-            return \App\Models\StoreSetting::get('default_shipping_cost', 5.00);
-        }
-    }
-
-    /**
-     * Calculate flat rate shipping
-     *
-     * @param \App\Models\StoreSetting $settings
-     * @param string $method
-     * @return float
-     */
-    private function calculateFlatRate(\App\Models\StoreSetting $settings, string $method): float
-    {
-        // Check if nationwide flat rate is enabled
-        if ($settings->enable_nationwide_flat_rate && $settings->nationwide_flat_rate) {
-            \Log::info('Using nationwide flat rate', [
-                'rate' => $settings->nationwide_flat_rate
-            ]);
-            return $settings->nationwide_flat_rate;
-        }
-
-        // Method-specific rates (if you want different rates for standard/express/overnight)
-        $methodRates = [
-            'standard' => $settings->default_shipping_cost,
-            'express' => $settings->default_shipping_cost * 2, // 2x for express
-            'overnight' => $settings->default_shipping_cost * 3, // 3x for overnight
-            'free' => 0.00,
-        ];
-
-        return $methodRates[$method] ?? $settings->default_shipping_cost;
-    }
-
-    /**
-     * Calculate per kilogram shipping
-     *
-     * @param \App\Models\StoreSetting $settings
-     * @param float $totalWeight
-     * @return float
-     */
-    private function calculatePerKilogram(\App\Models\StoreSetting $settings, float $totalWeight): float
-    {
-        if (!$totalWeight || !$settings->shipping_rate_per_kg) {
-            \Log::warning('Weight-based shipping requested but weight or rate not available', [
-                'weight' => $totalWeight,
-                'rate_per_kg' => $settings->shipping_rate_per_kg
-            ]);
-            return $settings->default_shipping_cost;
-        }
-
-        // Check maximum weight limit
-        if ($settings->max_weight_standard_shipping && $totalWeight > $settings->max_weight_standard_shipping) {
-            \Log::warning('Order exceeds maximum weight for standard shipping', [
-                'weight' => $totalWeight,
-                'max_weight' => $settings->max_weight_standard_shipping
-            ]);
-            throw new \Exception("Order weight ({$totalWeight}kg) exceeds maximum limit of {$settings->max_weight_standard_shipping}kg for standard shipping");
-        }
-
-        $cost = $totalWeight * $settings->shipping_rate_per_kg;
-
-        \Log::info('Per-kg shipping calculated', [
-            'weight' => $totalWeight,
-            'rate_per_kg' => $settings->shipping_rate_per_kg,
-            'cost' => $cost
-        ]);
-
-        return $cost;
-    }
-
-    /**
-     * Calculate per liter shipping
-     *
-     * @param \App\Models\StoreSetting $settings
-     * @param float $totalVolume
-     * @return float
-     */
-    private function calculatePerLiter(\App\Models\StoreSetting $settings, float $totalVolume): float
-    {
-        if (!$totalVolume || !$settings->shipping_rate_per_liter) {
-            \Log::warning('Volume-based shipping requested but volume or rate not available', [
-                'volume' => $totalVolume,
-                'rate_per_liter' => $settings->shipping_rate_per_liter
-            ]);
-            return $settings->default_shipping_cost;
-        }
-
-        // Check maximum volume limit
-        if ($settings->max_volume_standard_shipping && $totalVolume > $settings->max_volume_standard_shipping) {
-            \Log::warning('Order exceeds maximum volume for standard shipping', [
-                'volume' => $totalVolume,
-                'max_volume' => $settings->max_volume_standard_shipping
-            ]);
-            throw new \Exception("Order volume ({$totalVolume}L) exceeds maximum limit of {$settings->max_volume_standard_shipping}L for standard shipping");
-        }
-
-        $cost = $totalVolume * $settings->shipping_rate_per_liter;
-
-        \Log::info('Per-liter shipping calculated', [
-            'volume' => $totalVolume,
-            'rate_per_liter' => $settings->shipping_rate_per_liter,
-            'cost' => $cost
-        ]);
-
-        return $cost;
-    }
-
-    /**
-     * Calculate per item shipping
-     *
-     * @param \App\Models\StoreSetting $settings
-     * @param int $itemCount
-     * @return float
-     */
-    private function calculatePerItem(\App\Models\StoreSetting $settings, int $itemCount): float
-    {
-        if (!$itemCount || !$settings->shipping_rate_per_item) {
-            \Log::warning('Item-based shipping requested but item count or rate not available', [
-                'item_count' => $itemCount,
-                'rate_per_item' => $settings->shipping_rate_per_item
-            ]);
-            return $settings->default_shipping_cost;
-        }
-
-        $cost = $itemCount * $settings->shipping_rate_per_item;
-
-        \Log::info('Per-item shipping calculated', [
-            'item_count' => $itemCount,
-            'rate_per_item' => $settings->shipping_rate_per_item,
-            'cost' => $cost
-        ]);
-
-        return $cost;
-    }
-
-    /**
-     * Calculate tiered shipping based on order total or weight
-     *
-     * @param \App\Models\StoreSetting $settings
-     * @param float $orderTotal
-     * @param float $totalWeight
-     * @return float
-     */
-    private function calculateTieredShipping(
-        \App\Models\StoreSetting $settings,
-        float $orderTotal,
-        float $totalWeight
-    ): float
-    {
-        $tieredRates = $settings->tiered_shipping_rates;
-
-        if (!$tieredRates || empty($tieredRates)) {
-            \Log::warning('Tiered shipping selected but no tiers configured');
-            return $settings->default_shipping_cost;
-        }
-
-        // Sort tiers by threshold (ascending)
-        $tiers = collect($tieredRates)->sortBy('threshold');
-
-        $applicableRate = $settings->default_shipping_cost;
-        $appliedTier = null;
-
-        foreach ($tiers as $tier) {
-            $threshold = $tier['threshold'] ?? 0;
-            $rate = $tier['rate'] ?? 0;
-            $type = $tier['type'] ?? 'order_total'; // 'order_total' or 'weight'
-
-            if ($type === 'order_total' && $orderTotal >= $threshold) {
-                $applicableRate = $rate;
-                $appliedTier = $tier;
-            } elseif ($type === 'weight' && $totalWeight >= $threshold) {
-                $applicableRate = $rate;
-                $appliedTier = $tier;
-            }
-        }
-
-        \Log::info('Tiered shipping calculated', [
-            'order_total' => $orderTotal,
-            'total_weight' => $totalWeight,
-            'applied_tier' => $appliedTier,
-            'rate' => $applicableRate
-        ]);
-
-        return $applicableRate;
     }
 
     /**
