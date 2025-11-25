@@ -426,25 +426,49 @@ class ProductsController extends Controller
         ]);
 
         try {
+            $searchTerm = trim($request->q);
+
             $query = Product::query()
+                ->select(['id', 'name', 'slug', 'sku', 'barcode', 'short_description'])
                 ->active()
-                ->available()
-                ->search($request->q)
-                ->with(['category', 'images']);
+                ->where(function($q) use ($searchTerm) {
+                    $q->where('name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('slug', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('short_description', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('description', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('sku', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('barcode', 'LIKE', "%{$searchTerm}%");
+                })
+                ->with(['urlRedirects:id,entity_id,old_url,new_url,redirect_type']);
 
             // Pagination
             $perPage = min($request->get('per_page', 20), 100);
             $products = $query->paginate($perPage);
 
-            // Transform products
+            // Transform products to limited data
             $products->getCollection()->transform(function ($product) {
-                return $this->transformProduct($product, false);
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'slug' => $product->slug,
+                    'url_redirects' => $product->urlRedirects->map(function($redirect) {
+                        return [
+                            'id' => $redirect->id,
+                            'old_url' => ltrim(str_replace('/products/', '', $redirect->old_url), '/'),
+                            'new_url' => ltrim(str_replace('/products/', '', $redirect->new_url), '/'),
+                            'redirect_type' => $redirect->redirect_type,
+                        ];
+                    }),
+                    'sku' => $product->sku,
+                    'barcode' => $product->barcode,
+                    'short_description' => $product->short_description,
+                ];
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Search results retrieved successfully',
-                'query' => $request->q,
+                'query' => $searchTerm,
                 'data' => $products->items(),
                 'pagination' => [
                     'total' => $products->total(),
