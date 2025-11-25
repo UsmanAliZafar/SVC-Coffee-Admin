@@ -4,7 +4,7 @@
         {{-- Dynamic Brand with Logo --}}
         <a class="navbar-brand d-flex align-items-center" href="{{ route('admin.dashboard') }}">
             {{-- Store Logo --}}
-            <img src="{{ store_logo() }}"
+            <img style="background: #ffffff" src="{{ store_logo() }}"
                  alt="{{ store_name() }}"
                  class="navbar-brand-logo me-2"
                  style="height: 40px; width: auto; object-fit: contain;">
