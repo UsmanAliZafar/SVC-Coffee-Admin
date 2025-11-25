@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Coffee Admin Panel')</title>
+    <title>@yield('title', store_name() . ' - Admin Panel')</title>
+    <link rel="icon" type="image/png" href="{{ store_favicon() }}">
+    <link rel="shortcut icon" type="image/png" href="{{ store_favicon() }}">
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -25,5 +27,19 @@
         </main>
     </div>
     @include('admin.layouts.partials.scripts')
+    {{-- Global JavaScript variables --}}
+    <script>
+        // Make store settings available globally
+        window.storeSettings = {
+            name: "{{ store_name() }}",
+            email: "{{ store_email() }}",
+            phone: "{{ store_phone() }}",
+            currency: "{{ store_currency() }}",
+            currencySymbol: "{{ store_currency_symbol() }}",
+            timezone: "{{ store_timezone() }}",
+            dateFormat: "{{ store_date_format() }}",
+            timeFormat: "{{ store_time_format() }}"
+        };
+    </script>
 </body>
 </html>

@@ -1,8 +1,17 @@
 {{-- resources/views/admin/layouts/partials/navbar.blade.php --}}
 <nav class="navbar navbar-expand-lg navbar-dark bg-brand">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{{ route('admin.dashboard') }}">
-            <i class="bi bi-cup-hot"></i> SVC-Coffee Admin
+        {{-- Dynamic Brand with Logo --}}
+        <a class="navbar-brand d-flex align-items-center" href="{{ route('admin.dashboard') }}">
+            {{-- Store Logo --}}
+            <img src="{{ store_logo() }}"
+                 alt="{{ store_name() }}"
+                 class="navbar-brand-logo me-2"
+                 style="height: 40px; width: auto; object-fit: contain;">
+
+            {{-- Store Name --}}
+            <span class="d-none d-md-inline">{{ store_name() }} Admin</span>
+            <span class="d-inline d-md-none">{{ Str::limit(store_name(), 15) }}</span>
         </a>
 
         <!-- Mobile menu button -->
@@ -14,15 +23,22 @@
             <ul class="navbar-nav ms-auto">
                 <!-- Notifications -->
                 <li class="nav-item dropdown me-3 mt-3">
-                    <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown">
+                    <a class="nav-link position-relative"
+                       href="#"
+                       id="notificationDropdown"
+                       role="button"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false"
+                       title="Notifications">
                         <i class="bi bi-bell fs-5"></i>
                         @if(unread_notifications_count() > 0)
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge">
-                                {{ unread_notifications_count() }}
+                                {{ unread_notifications_count() > 99 ? '99+' : unread_notifications_count() }}
                             </span>
                         @endif
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown" style="min-width: 350px; max-height: 500px; overflow-y: auto;">
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown"
+                        style="min-width: 350px; max-height: 500px; overflow-y: auto;">
                         <li>
                             <h6 class="dropdown-header d-flex justify-content-between align-items-center">
                                 <span><i class="bi bi-bell"></i> Notifications</span>
@@ -35,8 +51,9 @@
                         @forelse(recent_notifications(5) as $notification)
                             <li>
                                 <a class="dropdown-item py-2 {{ $notification->isUnread() ? 'bg-light' : '' }}"
-                                href="{{ $notification->action_url ?? route('admin.notifications.index') }}"
-                                data-notification-id="{{ $notification->id }}">
+                                   href="{{ $notification->action_url ?? route('admin.notifications.index') }}"
+                                   data-notification-id="{{ $notification->id }}"
+                                   onclick="markNotificationAsRead('{{ $notification->id }}')">
                                     <div class="d-flex align-items-start">
                                         <i class="{{ $notification->icon }} text-{{ $notification->color }} me-3 mt-1"></i>
                                         <div class="flex-grow-1">
@@ -63,7 +80,7 @@
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <a class="dropdown-item text-center text-primary fw-semibold"
-                            href="{{ route('admin.notifications.index') }}">
+                               href="{{ route('admin.notifications.index') }}">
                                 <i class="bi bi-arrow-right-circle"></i> View all notifications
                             </a>
                         </li>
@@ -71,9 +88,104 @@
                 </li>
                 <!-- End Notifications -->
 
+                <!-- Quick Links -->
+                <li class="nav-item dropdown me-3 mt-3">
+                    <a class="nav-link"
+                       href="#"
+                       id="quickLinksDropdown"
+                       role="button"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false"
+                       title="Quick Links">
+                        <i class="bi bi-grid-3x3-gap fs-5"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" style="min-width: 200px;">
+                        <li><h6 class="dropdown-header"><i class="bi bi-lightning"></i> Quick Actions</h6></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.orders.index') }}">
+                            <i class="bi bi-cart me-2"></i> Orders
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.products.index') }}">
+                            <i class="bi bi-box me-2"></i> Products
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.customers.index') }}">
+                            <i class="bi bi-people me-2"></i> Customers
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">
+                            <i class="bi bi-gear me-2"></i> Settings
+                        </a></li>
+                    </ul>
+                </li>
+
+                <!-- Store Info -->
+                <li class="nav-item dropdown me-3 mt-3">
+                    <a class="nav-link"
+                       href="#"
+                       id="storeInfoDropdown"
+                       role="button"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false"
+                       title="Store Information">
+                        <i class="bi bi-info-circle fs-5"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" style="min-width: 280px;">
+                        <li><h6 class="dropdown-header"><i class="bi bi-shop"></i> Store Info</h6></li>
+                        <li class="px-3 py-2">
+                            <div class="small">
+                                <strong><i class="bi bi-building me-2"></i>Name:</strong><br>
+                                <span class="text-muted">{{ store_name() }}</span>
+                            </div>
+                        </li>
+                        <li class="px-3 py-2">
+                            <div class="small">
+                                <strong><i class="bi bi-envelope me-2"></i>Email:</strong><br>
+                                <span class="text-muted">{{ store_email() }}</span>
+                            </div>
+                        </li>
+                        @if(store_phone())
+                        <li class="px-3 py-2">
+                            <div class="small">
+                                <strong><i class="bi bi-telephone me-2"></i>Phone:</strong><br>
+                                <span class="text-muted">{{ store_phone() }}</span>
+                            </div>
+                        </li>
+                        @endif
+                        <li class="px-3 py-2">
+                            <div class="small">
+                                <strong><i class="bi bi-currency-exchange me-2"></i>Currency:</strong><br>
+                                <span class="text-muted">{{ store_currency() }} ({{ store_currency_symbol() }})</span>
+                            </div>
+                        </li>
+                        <li class="px-3 py-2">
+                            <div class="small">
+                                <strong><i class="bi bi-clock me-2"></i>Timezone:</strong><br>
+                                <span class="text-muted">{{ store_timezone() }}</span>
+                            </div>
+                        </li>
+                        @if(is_store_open_today())
+                        <li class="px-3 py-2">
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> Store Open Today
+                            </span>
+                        </li>
+                        @else
+                        <li class="px-3 py-2">
+                            <span class="badge bg-danger">
+                                <i class="bi bi-x-circle"></i> Store Closed Today
+                            </span>
+                        </li>
+                        @endif
+                    </ul>
+                </li>
+
                 <!-- User Menu -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center"
+                       href="#"
+                       id="navbarDropdown"
+                       role="button"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false">
                         <i class="bi bi-person-circle fs-4 me-2"></i>
                         <div class="text-start">
                             <div>{{ auth('admin')->user()->name }}</div>
@@ -81,9 +193,12 @@
                         </div>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="{{ route('admin.profile.edit') }}"><i class="bi bi-person me-2"></i> Profile</a></li>
-                        <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}"><i class="bi bi-gear me-2"></i> Settings</a></li>
-                        {{-- <li><a class="dropdown-item" href="#"><i class="bi bi-question-circle me-2"></i> Help</a></li> --}}
+                        <li><a class="dropdown-item" href="{{ route('admin.profile.edit') }}">
+                            <i class="bi bi-person me-2"></i> Profile
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ route('admin.settings.index') }}">
+                            <i class="bi bi-gear me-2"></i> Settings
+                        </a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <form action="{{ route('admin.logout') }}" method="POST" class="d-inline">
@@ -99,3 +214,18 @@
         </div>
     </div>
 </nav>
+
+{{-- Notification Mark as Read Script --}}
+@push('scripts')
+<script>
+function markNotificationAsRead(notificationId) {
+    fetch(`/admin/notifications/${notificationId}/mark-read`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        }
+    }).catch(err => console.error('Error marking notification as read:', err));
+}
+</script>
+@endpush
