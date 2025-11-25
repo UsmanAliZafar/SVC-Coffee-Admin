@@ -2059,7 +2059,7 @@
                     "Checkout"
                 ],
                 "summary": "Create order from cart",
-                "description": "Create a new order from cart. Supports both guest and registered customer checkout.",
+                "description": "Create a new order from cart. Supports both guest and registered customer checkout. Shipping amount should be calculated separately using the shipping calculation API.",
                 "operationId": "createOrder",
                 "requestBody": {
                     "required": true,
@@ -2076,7 +2076,8 @@
                                     "shipping_country",
                                     "shipping_phone",
                                     "shipping_method",
-                                    "payment_method"
+                                    "payment_method",
+                                    "shipping_amount"
                                 ],
                                 "properties": {
                                     "cart_id": {
@@ -2084,20 +2085,16 @@
                                         "example": "abc123xyz"
                                     },
                                     "customer_id": {
-                                        "description": "Customer UUID (null for guest checkout)",
                                         "type": "string",
                                         "format": "uuid",
-                                        "example": null,
                                         "nullable": true
                                     },
                                     "guest_email": {
-                                        "description": "Required if customer_id is null",
                                         "type": "string",
                                         "format": "email",
                                         "example": "john.doe@example.com"
                                     },
                                     "guest_name": {
-                                        "description": "Required if customer_id is null",
                                         "type": "string",
                                         "example": "John Doe"
                                     },
@@ -2158,7 +2155,6 @@
                                         "example": true
                                     },
                                     "billing_first_name": {
-                                        "description": "Required if billing_same_as_shipping is false",
                                         "type": "string",
                                         "example": "John",
                                         "nullable": true
@@ -2200,23 +2196,35 @@
                                     },
                                     "shipping_method": {
                                         "type": "string",
-                                        "enum": [
-                                            "standard",
-                                            "express",
-                                            "overnight",
-                                            "free"
-                                        ],
                                         "example": "standard"
+                                    },
+                                    "shipping_amount": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 15.5
+                                    },
+                                    "free_shipping": {
+                                        "type": "boolean",
+                                        "example": false
+                                    },
+                                    "free_shipping_reason": {
+                                        "type": "string",
+                                        "example": "threshold",
+                                        "nullable": true
+                                    },
+                                    "shipping_calculation_type": {
+                                        "type": "string",
+                                        "example": "per_kg",
+                                        "nullable": true
                                     },
                                     "payment_method": {
                                         "type": "string",
-                                        "enum": [
-                                            "credit_card",
-                                            "paypal",
-                                            "stripe",
-                                            "cash_on_delivery"
-                                        ],
                                         "example": "credit_card"
+                                    },
+                                    "payment_gateway": {
+                                        "type": "string",
+                                        "example": "stripe",
+                                        "nullable": true
                                     },
                                     "customer_notes": {
                                         "type": "string",
@@ -2268,9 +2276,35 @@
                                                     "type": "string",
                                                     "example": "USD"
                                                 },
+                                                "shipping_amount": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 15.5
+                                                },
                                                 "payment_required": {
                                                     "type": "boolean",
                                                     "example": true
+                                                },
+                                                "transaction_id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "transaction_number": {
+                                                    "type": "string",
+                                                    "example": "TXN-2025-00001"
+                                                },
+                                                "payment_method": {
+                                                    "type": "string",
+                                                    "example": "credit_card"
+                                                },
+                                                "payment_gateway": {
+                                                    "type": "string",
+                                                    "example": "stripe",
+                                                    "nullable": true
+                                                },
+                                                "next_step": {
+                                                    "type": "string",
+                                                    "example": "payment_gateway"
                                                 }
                                             },
                                             "type": "object"
@@ -2282,24 +2316,7 @@
                         }
                     },
                     "400": {
-                        "description": "Cart is empty or insufficient stock",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Cart is empty"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Cart is empty or insufficient stock"
                     },
                     "422": {
                         "description": "Validation error"

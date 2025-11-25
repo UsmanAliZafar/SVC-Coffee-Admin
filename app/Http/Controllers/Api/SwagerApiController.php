@@ -953,16 +953,16 @@ class SwagerApiController extends Controller
      *     operationId="createOrder",
      *     tags={"Checkout"},
      *     summary="Create order from cart",
-     *     description="Create a new order from cart. Supports both guest and registered customer checkout.",
+     *     description="Create a new order from cart. Supports both guest and registered customer checkout. Shipping amount should be calculated separately using the shipping calculation API.",
      *     security={{"apiKey": {}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"cart_id", "shipping_first_name", "shipping_last_name", "shipping_address_line1", "shipping_city", "shipping_postal_code", "shipping_country", "shipping_phone", "shipping_method", "payment_method"},
+     *             required={"cart_id", "shipping_first_name", "shipping_last_name", "shipping_address_line1", "shipping_city", "shipping_postal_code", "shipping_country", "shipping_phone", "shipping_method", "payment_method", "shipping_amount"},
      *             @OA\Property(property="cart_id", type="string", example="abc123xyz"),
-     *             @OA\Property(property="customer_id", type="string", format="uuid", nullable=true, example=null, description="Customer UUID (null for guest checkout)"),
-     *             @OA\Property(property="guest_email", type="string", format="email", example="john.doe@example.com", description="Required if customer_id is null"),
-     *             @OA\Property(property="guest_name", type="string", example="John Doe", description="Required if customer_id is null"),
+     *             @OA\Property(property="customer_id", type="string", format="uuid", nullable=true),
+     *             @OA\Property(property="guest_email", type="string", format="email", example="john.doe@example.com"),
+     *             @OA\Property(property="guest_name", type="string", example="John Doe"),
      *             @OA\Property(property="guest_phone", type="string", example="+1234567890", nullable=true),
      *             @OA\Property(property="shipping_first_name", type="string", example="John", maxLength=100),
      *             @OA\Property(property="shipping_last_name", type="string", example="Doe", maxLength=100),
@@ -974,7 +974,7 @@ class SwagerApiController extends Controller
      *             @OA\Property(property="shipping_country", type="string", example="United States", maxLength=100),
      *             @OA\Property(property="shipping_phone", type="string", example="+1234567890", maxLength=20),
      *             @OA\Property(property="billing_same_as_shipping", type="boolean", example=true),
-     *             @OA\Property(property="billing_first_name", type="string", example="John", nullable=true, description="Required if billing_same_as_shipping is false"),
+     *             @OA\Property(property="billing_first_name", type="string", example="John", nullable=true),
      *             @OA\Property(property="billing_last_name", type="string", example="Doe", nullable=true),
      *             @OA\Property(property="billing_address_line1", type="string", example="456 Business Ave", nullable=true),
      *             @OA\Property(property="billing_address_line2", type="string", example="Suite 100", nullable=true),
@@ -982,8 +982,13 @@ class SwagerApiController extends Controller
      *             @OA\Property(property="billing_state", type="string", example="CA", nullable=true),
      *             @OA\Property(property="billing_postal_code", type="string", example="90001", nullable=true),
      *             @OA\Property(property="billing_country", type="string", example="United States", nullable=true),
-     *             @OA\Property(property="shipping_method", type="string", example="standard", enum={"standard", "express", "overnight", "free"}),
-     *             @OA\Property(property="payment_method", type="string", example="credit_card", enum={"credit_card", "paypal", "stripe", "cash_on_delivery"}),
+     *             @OA\Property(property="shipping_method", type="string", example="standard"),
+     *             @OA\Property(property="shipping_amount", type="number", format="float", example=15.50),
+     *             @OA\Property(property="free_shipping", type="boolean", example=false),
+     *             @OA\Property(property="free_shipping_reason", type="string", nullable=true, example="threshold"),
+     *             @OA\Property(property="shipping_calculation_type", type="string", nullable=true, example="per_kg"),
+     *             @OA\Property(property="payment_method", type="string", example="credit_card"),
+     *             @OA\Property(property="payment_gateway", type="string", example="stripe", nullable=true),
      *             @OA\Property(property="customer_notes", type="string", example="Please ring doorbell", nullable=true),
      *             @OA\Property(property="coupon_code", type="string", example="SUMMER2025", nullable=true)
      *         )
@@ -999,18 +1004,17 @@ class SwagerApiController extends Controller
      *                 @OA\Property(property="order_number", type="string", example="ORD-2025-00001"),
      *                 @OA\Property(property="total_amount", type="number", format="float", example=659.97),
      *                 @OA\Property(property="currency", type="string", example="USD"),
-     *                 @OA\Property(property="payment_required", type="boolean", example=true)
+     *                 @OA\Property(property="shipping_amount", type="number", format="float", example=15.50),
+     *                 @OA\Property(property="payment_required", type="boolean", example=true),
+     *                 @OA\Property(property="transaction_id", type="string", format="uuid"),
+     *                 @OA\Property(property="transaction_number", type="string", example="TXN-2025-00001"),
+     *                 @OA\Property(property="payment_method", type="string", example="credit_card"),
+     *                 @OA\Property(property="payment_gateway", type="string", example="stripe", nullable=true),
+     *                 @OA\Property(property="next_step", type="string", example="payment_gateway")
      *             )
      *         )
      *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Cart is empty or insufficient stock",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Cart is empty")
-     *         )
-     *     ),
+     *     @OA\Response(response=400, description="Cart is empty or insufficient stock"),
      *     @OA\Response(response=422, description="Validation error"),
      *     @OA\Response(response=500, description="Failed to create order")
      * )
