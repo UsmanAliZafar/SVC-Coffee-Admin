@@ -61,6 +61,12 @@ class CheckoutController extends Controller
                 'payment_gateway' => 'nullable|string|in:stripe,paypal,razorpay',
                 'customer_notes' => 'nullable|string',
                 'coupon_code' => 'nullable|string',
+
+                // ✅ NEW: Shipping details from external API
+                'shipping_amount' => 'required|numeric|min:0',
+                'shipping_calculation_type' => 'nullable|string',
+                'free_shipping' => 'boolean',
+                'free_shipping_reason' => 'nullable|string',
             ]);
 
             // Get cart
@@ -104,21 +110,18 @@ class CheckoutController extends Controller
             }
 
             // ✅ Calculate shipping
-            try {
-                $shippingAmount = $this->calculateShipping(
-                    $validated['shipping_method'],
-                    $subtotal,
-                    $itemCount,
-                    $totalWeight,
-                    $totalVolume
-                );
-            } catch (\Exception $e) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'message' => $e->getMessage(),
-                    'error_type' => 'shipping_calculation_error'
-                ], 400);
+            // ✅ Use shipping amount from external calculation
+            $shippingAmount = $validated['shipping_amount'];
+            $freeShipping = $validated['free_shipping'] ?? false;
+            $freeShippingReason = $validated['free_shipping_reason'] ?? null;
+
+            // Override shipping amount if free shipping is applied
+            if ($freeShipping) {
+                $shippingAmount = 0;
+                \Log::info('Free shipping applied in order creation', [
+                    'reason' => $freeShippingReason,
+                    'original_shipping_amount' => $validated['shipping_amount']
+                ]);
             }
 
             // ✅ Apply coupon discount if exists
@@ -241,6 +244,9 @@ class CheckoutController extends Controller
                 'billing_country' => $validated['billing_country'] ?? $validated['shipping_country'],
 
                 'shipping_method' => $validated['shipping_method'],
+                'shipping_amount' => $shippingAmount, // ✅ Use calculated shipping
+                'shipping_calculation_type' => $validated['shipping_calculation_type'] ?? null, // ✅ NEW
+
                 'payment_method' => $validated['payment_method'],
                 'payment_gateway' => $validated['payment_gateway'] ?? null,
                 'customer_notes' => $validated['customer_notes'] ?? null,
@@ -249,17 +255,21 @@ class CheckoutController extends Controller
                 'currency' => $cart[array_key_first($cart)]['product_currency'] ?? 'USD',
                 'subtotal' => $subtotal,
                 'tax_amount' => $taxAmount,
-                'shipping_amount' => $shippingAmount,
                 'discount_amount' => $discountAmount,
                 'discount_code' => $couponDetails['code'] ?? null,
                 'total_amount' => $totalAmount,
 
-                // ✅ Status: Always start as PENDING (customer placed order)
                 'status_key_code' => 'ORDER_PENDING',
                 'payment_status_key_code' => 'PAYMENT_PENDING',
 
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
+
+                // ✅ Optional: Store free shipping info if needed
+                'metadata' => $freeShipping ? json_encode([
+                    'free_shipping' => true,
+                    'free_shipping_reason' => $freeShippingReason
+                ]) : null,
             ];
 
             $order = Order::create($orderData);
