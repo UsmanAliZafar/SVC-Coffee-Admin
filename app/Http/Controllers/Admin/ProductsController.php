@@ -484,7 +484,7 @@ class ProductsController extends Controller
                 }
 
                 // Manage stock button
-                if ($canUpdate && $product->track_inventory) {
+                if ($canUpdate && $product->track_inventory && !$product->has_variants) {
                     return '
                         <div class="stock-badge-container">
                             ' . $badge . '
