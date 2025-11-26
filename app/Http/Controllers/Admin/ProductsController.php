@@ -113,16 +113,118 @@ class ProductsController extends Controller
             $query->where('is_available', $request->is_available);
         }
 
+        // STOCK STATUS FILTER (IN_STOCK, OUT_OF_STOCK, LOW_STOCK)
         if ($request->filled('stock_status')) {
             if ($request->stock_status === 'in_stock') {
-                $query->where('stock_quantity', '>', 0);
-            } elseif ($request->stock_status === 'out_of_stock') {
-                $query->where('track_inventory', true)
-                    ->where('stock_quantity', '<=', 0);
-            } elseif ($request->stock_status === 'low_stock') {
-                $query->where('track_inventory', true)
-                    ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                    ->where('stock_quantity', '>', 0);
+                $query->where(function($q) {
+                    $q->where(function($subQ) {
+                        $subQ->where('has_variants', false)
+                            ->where('track_inventory', true)
+                            ->where('stock_quantity', '>', 0);
+                    })
+                    ->orWhere(function($subQ) {
+                        $subQ->where('has_variants', false)
+                            ->where('track_inventory', false);
+                    })
+                    ->orWhere(function($subQ) {
+                        $subQ->where('has_variants', true)
+                            ->whereHas('variants', function($varQ) {
+                                $varQ->where('stock_quantity', '>', 0);
+                            });
+                    });
+                });
+            }
+            elseif ($request->stock_status === 'out_of_stock') {
+                $query->where(function($q) {
+                    $q->where(function($subQ) {
+                        $subQ->where('has_variants', false)
+                            ->where('track_inventory', true)
+                            ->where('stock_quantity', '<=', 0);
+                    })
+                    ->orWhere(function($subQ) {
+                        $subQ->where('has_variants', true)
+                            ->whereHas('variants')
+                            ->whereDoesntHave('variants', function($varQ) {
+                                $varQ->where('stock_quantity', '>', 0);
+                            });
+                    })
+                    ->orWhere(function($subQ) {
+                        $subQ->where('has_variants', true)
+                            ->whereDoesntHave('variants');
+                    });
+                });
+            }
+            elseif ($request->stock_status === 'low_stock') {
+                $query->where(function($q) {
+                    $q->where(function($subQ) {
+                        $subQ->where('has_variants', false)
+                            ->where('track_inventory', true)
+                            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                            ->where('stock_quantity', '>', 0);
+                    })
+                    ->orWhere(function($subQ) {
+                        $subQ->where('has_variants', true)
+                            ->whereHas('variants', function($varQ) {
+                                $varQ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                                    ->where('stock_quantity', '>', 0);
+                            });
+                    });
+                });
+            }
+        }
+
+        // STOCK LEVEL FILTER (CRITICAL, VERY_LOW, LOW)
+        if ($request->filled('stock_level')) {
+            if ($request->stock_level === 'critical') {
+                $query->where(function($q) {
+                    $q->where(function($subQ) {
+                        $subQ->where('has_variants', false)
+                            ->where('track_inventory', true)
+                            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                            ->whereBetween('stock_quantity', [1, 5]);
+                    })
+                    ->orWhere(function($subQ) {
+                        $subQ->where('has_variants', true)
+                            ->whereHas('variants', function($varQ) {
+                                $varQ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                                    ->whereBetween('stock_quantity', [1, 5]);
+                            });
+                    });
+                });
+            }
+            elseif ($request->stock_level === 'very_low') {
+                $query->where(function($q) {
+                    $q->where(function($subQ) {
+                        $subQ->where('has_variants', false)
+                            ->where('track_inventory', true)
+                            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                            ->whereBetween('stock_quantity', [6, 10]);
+                    })
+                    ->orWhere(function($subQ) {
+                        $subQ->where('has_variants', true)
+                            ->whereHas('variants', function($varQ) {
+                                $varQ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                                    ->whereBetween('stock_quantity', [6, 10]);
+                            });
+                    });
+                });
+            }
+            elseif ($request->stock_level === 'low') {
+                $query->where(function($q) {
+                    $q->where(function($subQ) {
+                        $subQ->where('has_variants', false)
+                            ->where('track_inventory', true)
+                            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                            ->whereBetween('stock_quantity', [11, 20]);
+                    })
+                    ->orWhere(function($subQ) {
+                        $subQ->where('has_variants', true)
+                            ->whereHas('variants', function($varQ) {
+                                $varQ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                                    ->whereBetween('stock_quantity', [11, 20]);
+                            });
+                    });
+                });
             }
         }
 
@@ -130,26 +232,9 @@ class ProductsController extends Controller
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%")
-                  ->orWhere('barcode', 'like', "%{$search}%");
+                ->orWhere('sku', 'like', "%{$search}%")
+                ->orWhere('barcode', 'like', "%{$search}%");
             });
-        }
-
-        if ($request->filled('stock_level')) {
-            if ($request->stock_level === 'critical') {
-                $query->where('track_inventory', true)
-                    ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                    ->where('stock_quantity', '<=', 5)
-                    ->where('stock_quantity', '>', 0);
-            } elseif ($request->stock_level === 'very_low') {
-                $query->where('track_inventory', true)
-                    ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                    ->whereBetween('stock_quantity', [6, 10]);
-            } elseif ($request->stock_level === 'low') {
-                $query->where('track_inventory', true)
-                    ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                    ->whereBetween('stock_quantity', [11, 20]);
-            }
         }
 
         return DataTables::of($query)
@@ -243,17 +328,42 @@ class ProductsController extends Controller
                 if (!$product->track_inventory) {
                     $badge = '<span class="badge bg-info">No Tracking</span>';
                 } else {
-                    $stock = $product->getTotalStock();
+                    // ✅ FIX: Handle variant products differently
+                    if ($product->has_variants) {
+                        $totalStock = $product->variants()->sum('stock_quantity');
+                        $variantCount = $product->variants()->count();
+                        $lowStockVariants = $product->variants()
+                            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                            ->where('stock_quantity', '>', 0)
+                            ->count();
+                        $outOfStockVariants = $product->variants()
+                            ->where('stock_quantity', '<=', 0)
+                            ->count();
 
-                    if ($stock <= 0) {
-                        $badge = '<span class="badge bg-danger">Out of Stock (' . $stock . ')</span>';
-                    } elseif ($stock < $product->low_stock_threshold) {
-                        $badge = '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
+                        if ($outOfStockVariants == $variantCount) {
+                            $badge = '<span class="badge bg-danger">All Variants Out of Stock</span>';
+                        } elseif ($outOfStockVariants > 0) {
+                            $badge = '<span class="badge bg-warning">Some Variants Out (' . $outOfStockVariants . '/' . $variantCount . ')</span>';
+                        } elseif ($lowStockVariants > 0) {
+                            $badge = '<span class="badge bg-warning">Low Stock Variants (' . $lowStockVariants . ')</span>';
+                        } else {
+                            $badge = '<span class="badge bg-success">All In Stock (Total: ' . $totalStock . ')</span>';
+                        }
                     } else {
-                        $badge = '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
+                        // Simple product logic (your existing code)
+                        $stock = $product->stock_quantity;
+
+                        if ($stock <= 0) {
+                            $badge = '<span class="badge bg-danger">Out of Stock (' . $stock . ')</span>';
+                        } elseif ($stock < $product->low_stock_threshold) {
+                            $badge = '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
+                        } else {
+                            $badge = '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
+                        }
                     }
                 }
 
+                // Rest of your code for the manage stock button...
                 if ($canUpdate && $product->track_inventory) {
                     return '
                         <div class="stock-badge-container">
@@ -261,8 +371,7 @@ class ProductsController extends Controller
                             <button type="button" class="btn btn-sm btn-link p-0 ms-1 quick-stock-btn"
                                 data-id="' . $product->id . '"
                                 data-name="' . htmlspecialchars($product->name) . '"
-                                data-stock="' . $product->stock_quantity . '"
-                                data-threshold="' . $product->low_stock_threshold . '"
+                                data-has-variants="' . ($product->has_variants ? '1' : '0') . '"
                                 title="Manage Stock">
                                 <i class="bi bi-pencil-square text-primary"></i>
                             </button>
@@ -580,7 +689,7 @@ class ProductsController extends Controller
                 'low_stock_threshold',
                 'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
                 'is_taxable', 'tax_type', 'tax_percentage', 'tax_class',
-                'weight', 'length', 'width', 'height', 'has_variants',
+                'weight', 'length', 'width', 'height',
             ]);
 
             // Handle main image upload
@@ -597,7 +706,7 @@ class ProductsController extends Controller
             $productData['is_available'] = $request->has('is_available') ?? true;
             $productData['track_inventory'] = $request->has('track_inventory') ?? true;
             $productData['is_taxable'] = $request->has('is_taxable');
-            $productData['has_variants'] = $request->has('has_variants') ?? false;
+            $productData['has_variants'] =  false;
 
             if (!isset($productData['tax_type'])) {
                 $productData['tax_type'] = 'exclusive';
@@ -638,7 +747,6 @@ class ProductsController extends Controller
 
             // Create product
             $product = Product::create($productData);
-
             // Handle initial stock AFTER product is created
             if ($request->filled('stock_quantity') && $request->stock_quantity > 0 && $request->has('track_inventory')) {
                 $product->setStock(
@@ -916,7 +1024,7 @@ class ProductsController extends Controller
                 'is_featured', 'show_on_home', 'is_available', 'track_inventory','low_stock_threshold',
                 'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
                 'is_taxable', 'tax_type', 'tax_percentage', 'tax_class',
-                'weight', 'length', 'width', 'height', 'has_variants'
+                'weight', 'length', 'width', 'height',
             ]);
 
             // Handle main image upload
@@ -938,7 +1046,6 @@ class ProductsController extends Controller
             $productData['is_available'] = $request->has('is_available');
             $productData['track_inventory'] = $request->has('track_inventory');
             $productData['is_taxable'] = $request->has('is_taxable');
-            $productData['has_variants'] = $request->has('has_variants') ?? false;
             // Set updated_by
             $productData['updated_by'] = auth('admin')->id();
             // Attach features if provided
@@ -961,7 +1068,14 @@ class ProductsController extends Controller
             }
             // Update product
             $product->update($productData);
-
+            //
+            $variantCount = $product->variants()->count();
+            if ($variantCount > 0 && !$product->has_variants) {
+                $product->update(['has_variants' => true]);
+            } elseif ($variantCount === 0 && $product->has_variants) {
+                $product->update(['has_variants' => false]);
+            }
+            $product->syncHasVariantsFlag();
             // Handle stock update AFTER product is updated
             if ($request->filled('stock_quantity') && $productData['track_inventory']) {
                 $newStock = (int) $request->stock_quantity;
@@ -1032,7 +1146,7 @@ class ProductsController extends Controller
 
         try {
             $product = Product::findOrFail($id);
-
+            $product->syncHasVariantsFlag();
             // Delete main image
             if ($product->main_image && Storage::disk('public')->exists($product->main_image)) {
                 Storage::disk('public')->delete($product->main_image);
@@ -1970,35 +2084,6 @@ class ProductsController extends Controller
             ]
         ]);
     }
-
-    /**
-     * Get product variants
-     */
-    // public function getVariants($id)
-    // {
-    //     // Check permission
-    //     if (!auth('admin')->user()->hasPermission('products.read')) {
-    //         return response()->json(['error' => 'Unauthorized'], 403);
-    //     }
-
-    //     $product = Product::with('variants')->findOrFail($id);
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'variants' => $product->variants->map(function($variant) {
-    //             return [
-    //                 'id' => $variant->id,
-    //                 'name' => $variant->getFullName(),
-    //                 'sku' => $variant->sku,
-    //                 'price' => $variant->price,
-    //                 'sale_price' => $variant->sale_price,
-    //                 'stock' => $variant->getTotalStock(),
-    //                 'is_default' => $variant->is_default,
-    //                 'status' => $variant->status_key_code,
-    //             ];
-    //         })
-    //     ]);
-    // }
 
     /**
      * Update product published status
@@ -3046,6 +3131,7 @@ class ProductsController extends Controller
                 // Update product total stock
                 $product->updateTotalStock();
             }
+            $product->syncHasVariantsFlag();
 
             DB::commit();
 
@@ -3205,6 +3291,9 @@ class ProductsController extends Controller
                 }
             }
 
+            // ✅ SYNC has_variants flag (in case this was the last/first variant)
+            // This shouldn't change anything during update, but it's a safety check
+            $product->syncHasVariantsFlag();
             DB::commit();
 
             return response()->json([
@@ -3232,9 +3321,11 @@ class ProductsController extends Controller
      */
     public function setDefaultVariant($productId, $variantId)
     {
+        $product = Product::findOrFail($productId);
         $variant = ProductVariant::where('product_id', $productId)->findOrFail($variantId);
 
         if ($variant->setAsDefault()) {
+            $product->syncHasVariantsFlag();
             return response()->json([
                 'success' => true,
                 'message' => 'Default variant updated successfully'
@@ -3252,19 +3343,131 @@ class ProductsController extends Controller
      */
     public function deleteVariant($productId, $variantId)
     {
+        $product = Product::findOrFail($productId);
         $variant = ProductVariant::where('product_id', $productId)->findOrFail($variantId);
 
-        if ($variant->delete()) {
+        DB::beginTransaction();
+
+        try {
+            // Delete warehouse stock records for this variant
+            ProductWarehouseStock::where('product_id', $product->id)
+                                ->where('variant_id', $variant->id)
+                                ->delete();
+
+            // Delete inventory movement records for this variant
+            InventoryMovement::where('product_id', $product->id)
+                            ->where('variant_id', $variant->id)
+                            ->delete();
+
+            // Delete the variant
+            $variant->delete();
+
+            // ✅ CRITICAL: Update product's total stock after variant deletion
+            $product->updateTotalStock();
+
+            // ✅ CRITICAL: Sync has_variants flag (might be false now if last variant was deleted)
+            $product->syncHasVariantsFlag();
+
+            DB::commit();
+
+            $remainingVariants = $product->variants()->count();
+
             return response()->json([
                 'success' => true,
-                'message' => 'Variant deleted successfully'
+                'message' => 'Variant deleted successfully',
+                'remaining_variants' => $remainingVariants,
+                'product_has_variants' => $product->fresh()->has_variants,
+                'warning' => $remainingVariants === 0 ? 'This was the last variant. Product is now a simple product.' : null
             ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Delete variant failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete variant: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk delete variants
+     */
+    public function bulkDeleteVariants(Request $request, $productId)
+    {
+        $product = Product::findOrFail($productId);
+
+        $validator = Validator::make($request->all(), [
+            'variant_ids' => 'required|array',
+            'variant_ids.*' => 'required|string|exists:product_variants,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
         }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to delete variant'
-        ], 500);
+        DB::beginTransaction();
+
+        try {
+            $variantIds = $request->variant_ids;
+
+            // Verify all variants belong to this product
+            $variants = ProductVariant::where('product_id', $productId)
+                                    ->whereIn('id', $variantIds)
+                                    ->get();
+
+            if ($variants->count() !== count($variantIds)) {
+                throw new \Exception('Some variants do not belong to this product');
+            }
+
+            // Delete warehouse stock
+            ProductWarehouseStock::where('product_id', $product->id)
+                                ->whereIn('variant_id', $variantIds)
+                                ->delete();
+
+            // Delete inventory movements
+            InventoryMovement::where('product_id', $product->id)
+                            ->whereIn('variant_id', $variantIds)
+                            ->delete();
+
+            // Delete variants
+            ProductVariant::where('product_id', $productId)
+                        ->whereIn('id', $variantIds)
+                        ->delete();
+
+            // ✅ Update product's total stock
+            $product->updateTotalStock();
+
+            // ✅ CRITICAL: Sync has_variants flag
+            $product->syncHasVariantsFlag();
+
+            DB::commit();
+
+            $remainingVariants = $product->variants()->count();
+
+            return response()->json([
+                'success' => true,
+                'message' => count($variantIds) . ' variant(s) deleted successfully',
+                'deleted_count' => count($variantIds),
+                'remaining_variants' => $remainingVariants,
+                'product_has_variants' => $product->fresh()->has_variants,
+                'warning' => $remainingVariants === 0 ? 'All variants deleted. Product is now a simple product.' : null
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Bulk delete variants failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete variants: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

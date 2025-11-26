@@ -557,14 +557,21 @@ class Product extends Model
     }
 
     /**
-     * Get total stock quantity
+     * Get total stock (handles both simple and variant products)
      */
     public function getTotalStock(): int
     {
         if (!$this->track_inventory) {
             return PHP_INT_MAX;
         }
-        return $this->stock_quantity;
+
+        // ✅ FIX: For variant products, sum variant stocks
+        if ($this->has_variants) {
+            return $this->variants()->sum('stock_quantity');
+        }
+
+        // For simple products: return synced stock_quantity field
+        return $this->stock_quantity ?? 0;
     }
 
     /**
@@ -1587,4 +1594,16 @@ class Product extends Model
         return 'product';
     }
 
+    /**
+     * Sync has_variants flag based on actual variants count
+     */
+    public function syncHasVariantsFlag(): void
+    {
+        $variantCount = $this->variants()->count();
+        $shouldHaveVariants = $variantCount > 0;
+
+        if ($this->has_variants !== $shouldHaveVariants) {
+            $this->update(['has_variants' => $shouldHaveVariants]);
+        }
+    }
 }
