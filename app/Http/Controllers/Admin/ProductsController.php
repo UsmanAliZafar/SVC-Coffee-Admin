@@ -308,15 +308,93 @@ class ProductsController extends Controller
             ->addColumn('price_display', function($product) {
                 $html = '<div class="price-container">';
 
-                if ($product->isOnSale()) {
-                    $html .= '<div class="original-price">';
-                    $html .= '<span class="text-decoration-line-through text-muted">'
-                         . $product->getFormattedPrice() . '</span>';
-                    $html .= '</div>';
-                    $html .= '<strong class="text-success">' . $product->getFormattedSalePrice() . '</strong>';
-                    $html .= ' <span class="badge bg-danger">-' . $product->getDiscountPercentage() . '%</span>';
+                // ✅ IMPROVED: Handle variant products with price range
+                if ($product->has_variants) {
+                    $variants = $product->variants()->active()->get();
+
+                    if ($variants->count() > 0) {
+                        // Get min and max prices considering sale prices
+                        $prices = $variants->map(function($variant) {
+                            return $variant->getFinalPrice();
+                        });
+
+                        $minPrice = $prices->min();
+                        $maxPrice = $prices->max();
+
+                        // Get default variant if exists
+                        $defaultVariant = $variants->where('is_default', true)->first();
+
+                        if ($minPrice == $maxPrice) {
+                            // All variants same price
+                            $html .= '<strong>' . format_store_price($minPrice) . '</strong>';
+
+                            // Show if on sale
+                            $anyOnSale = $variants->filter(function($v) {
+                                return $v->isOnSale();
+                            })->count();
+
+                            if ($anyOnSale > 0) {
+                                $html .= ' <span class="badge bg-danger">Sale</span>';
+                            }
+                        } else {
+                            // Price range
+                            $html .= '<div class="price-range">';
+                            $html .= '<strong>' . format_store_price($minPrice) . '</strong>';
+                            $html .= ' <span class="text-muted">-</span> ';
+                            $html .= '<strong>' . format_store_price($maxPrice) . '</strong>';
+                            $html .= '</div>';
+
+                            // Show default variant price if available
+                            if ($defaultVariant) {
+                                $html .= '<div class="default-price" style="font-size: 0.75rem;">';
+                                $html .= '<span class="text-muted">Default: ' . $defaultVariant->getFormattedFinalPrice() . '</span>';
+                                $html .= '</div>';
+                            }
+                        }
+
+                        // Add hover tooltip with all variant prices
+                        $tooltipContent = '<div class="text-start">';
+                        foreach ($variants->sortBy('price') as $variant) {
+                            $tooltipContent .= '<div class="mb-1">';
+                            $tooltipContent .= '<strong>' . htmlspecialchars($variant->variant_value) . ':</strong> ';
+
+                            if ($variant->isOnSale()) {
+                                $tooltipContent .= '<span class="text-decoration-line-through">' . format_store_price($variant->price) . '</span> ';
+                                $tooltipContent .= '<span class="text-success">' . format_store_price($variant->sale_price) . '</span>';
+                            } else {
+                                $tooltipContent .= format_store_price($variant->price);
+                            }
+
+                            if ($variant->is_default) {
+                                $tooltipContent .= ' <span class="badge bg-primary" style="font-size: 0.6rem;">Default</span>';
+                            }
+
+                            $tooltipContent .= '</div>';
+                        }
+                        $tooltipContent .= '</div>';
+
+                        $html = '<div class="price-container"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-html="true"
+                                    data-bs-placement="right"
+                                    title="' . htmlspecialchars($tooltipContent) . '">'
+                                . $html .
+                                '</div>';
+                    } else {
+                        $html .= '<span class="text-muted">No variants</span>';
+                    }
                 } else {
-                    $html .= '<strong>' . $product->getFormattedPrice() . '</strong>';
+                    // Simple product pricing (original logic)
+                    if ($product->isOnSale()) {
+                        $html .= '<div class="original-price">';
+                        $html .= '<span class="text-decoration-line-through text-muted">'
+                            . $product->getFormattedPrice() . '</span>';
+                        $html .= '</div>';
+                        $html .= '<strong class="text-success">' . $product->getFormattedSalePrice() . '</strong>';
+                        $html .= ' <span class="badge bg-danger">-' . $product->getDiscountPercentage() . '%</span>';
+                    } else {
+                        $html .= '<strong>' . $product->getFormattedPrice() . '</strong>';
+                    }
                 }
 
                 $html .= '</div>';
@@ -328,34 +406,76 @@ class ProductsController extends Controller
                 if (!$product->track_inventory) {
                     $badge = '<span class="badge bg-info">No Tracking</span>';
                 } else {
-                    // ✅ FIX: Handle variant products differently
+                    // ✅ IMPROVED: Handle variant products with detailed info
                     if ($product->has_variants) {
-                        $totalStock = $product->variants()->sum('stock_quantity');
-                        $variantCount = $product->variants()->count();
-                        $lowStockVariants = $product->variants()
-                            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                            ->where('stock_quantity', '>', 0)
-                            ->count();
-                        $outOfStockVariants = $product->variants()
-                            ->where('stock_quantity', '<=', 0)
-                            ->count();
+                        $variants = $product->variants;
+                        $variantCount = $variants->count();
 
-                        if ($outOfStockVariants == $variantCount) {
-                            $badge = '<span class="badge bg-danger">All Variants Out of Stock</span>';
-                        } elseif ($outOfStockVariants > 0) {
-                            $badge = '<span class="badge bg-warning">Some Variants Out (' . $outOfStockVariants . '/' . $variantCount . ')</span>';
-                        } elseif ($lowStockVariants > 0) {
-                            $badge = '<span class="badge bg-warning">Low Stock Variants (' . $lowStockVariants . ')</span>';
+                        if ($variantCount === 0) {
+                            $badge = '<span class="badge bg-secondary">No Variants</span>';
                         } else {
-                            $badge = '<span class="badge bg-success">All In Stock (Total: ' . $totalStock . ')</span>';
+                            $totalStock = $variants->sum('stock_quantity');
+                            $inStockVariants = $variants->where('stock_quantity', '>', 0)->count();
+                            $outOfStockVariants = $variants->where('stock_quantity', '<=', 0)->count();
+                            $lowStockVariants = $variants->filter(function($v) {
+                                return $v->stock_quantity > 0 && $v->stock_quantity <= $v->low_stock_threshold;
+                            })->count();
+
+                            // Build detailed tooltip
+                            $tooltip = 'Total Stock: ' . $totalStock . ' units<br>';
+                            $tooltip .= 'In Stock: ' . $inStockVariants . ' variants<br>';
+                            if ($lowStockVariants > 0) {
+                                $tooltip .= 'Low Stock: ' . $lowStockVariants . ' variants<br>';
+                            }
+                            if ($outOfStockVariants > 0) {
+                                $tooltip .= 'Out of Stock: ' . $outOfStockVariants . ' variants';
+                            }
+
+                            // Determine badge based on priority
+                            if ($outOfStockVariants == $variantCount) {
+                                // All variants out of stock
+                                $badge = '<span class="badge bg-danger"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-html="true"
+                                                title="' . htmlspecialchars($tooltip) . '">
+                                            All Out (0/' . $variantCount . ')
+                                        </span>';
+                            } elseif ($outOfStockVariants > 0) {
+                                // Some variants out of stock
+                                $badge = '<span class="badge bg-warning"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-html="true"
+                                                title="' . htmlspecialchars($tooltip) . '">
+                                            ' . $inStockVariants . '/' . $variantCount . ' In Stock
+                                            <small class="d-block" style="font-size: 0.65rem;">Total: ' . $totalStock . '</small>
+                                        </span>';
+                            } elseif ($lowStockVariants > 0) {
+                                // Some variants low on stock
+                                $badge = '<span class="badge bg-warning"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-html="true"
+                                                title="' . htmlspecialchars($tooltip) . '">
+                                            ⚠ ' . $lowStockVariants . ' Low Stock
+                                            <small class="d-block" style="font-size: 0.65rem;">Total: ' . $totalStock . '</small>
+                                        </span>';
+                            } else {
+                                // All variants in good stock
+                                $badge = '<span class="badge bg-success"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-html="true"
+                                                title="' . htmlspecialchars($tooltip) . '">
+                                            ✓ All In Stock
+                                            <small class="d-block" style="font-size: 0.65rem;">Total: ' . $totalStock . '</small>
+                                        </span>';
+                            }
                         }
                     } else {
-                        // Simple product logic (your existing code)
+                        // Simple product logic
                         $stock = $product->stock_quantity;
 
                         if ($stock <= 0) {
-                            $badge = '<span class="badge bg-danger">Out of Stock (' . $stock . ')</span>';
-                        } elseif ($stock < $product->low_stock_threshold) {
+                            $badge = '<span class="badge bg-danger">Out of Stock</span>';
+                        } elseif ($stock <= $product->low_stock_threshold) {
                             $badge = '<span class="badge bg-warning">Low Stock (' . $stock . ')</span>';
                         } else {
                             $badge = '<span class="badge bg-success">In Stock (' . $stock . ')</span>';
@@ -363,7 +483,7 @@ class ProductsController extends Controller
                     }
                 }
 
-                // Rest of your code for the manage stock button...
+                // Manage stock button
                 if ($canUpdate && $product->track_inventory) {
                     return '
                         <div class="stock-badge-container">

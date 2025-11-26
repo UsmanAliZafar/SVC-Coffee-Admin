@@ -94,6 +94,38 @@
         border-color: #5B914C;
         color: white;
     }
+
+    /* Price Container */
+    .price-container {
+        cursor: help;
+    }
+
+    .price-range {
+        white-space: nowrap;
+    }
+
+    .default-price {
+        margin-top: 2px;
+        color: #6c757d;
+    }
+
+    /* Stock Badge Improvements */
+    .stock-badge-container .badge {
+        cursor: help;
+        min-width: 80px;
+        text-align: center;
+    }
+
+    .stock-badge-container .badge small {
+        opacity: 0.9;
+        font-weight: normal;
+    }
+
+    /* Tooltip Improvements */
+    .tooltip-inner {
+        max-width: 300px;
+        text-align: left;
+    }
 </style>
 @endpush
 
@@ -573,7 +605,22 @@ $(document).ready(function() {
         $('#stockFilter').val('');
         table.draw();
     });
+    // ✅ Initialize tooltips after table draw
+    table.on('draw', function() {
+        // Initialize Bootstrap tooltips
+        $('[data-bs-toggle="tooltip"]').tooltip({
+            trigger: 'hover',
+            boundary: 'window'
+        });
 
+        updateStatistics();
+    });
+
+    // ✅ Also initialize on first load
+    $('[data-bs-toggle="tooltip"]').tooltip({
+        trigger: 'hover',
+        boundary: 'window'
+    });
     // Select all checkbox
     $('#selectAll').on('change', function() {
         $('.product-checkbox').prop('checked', this.checked);
