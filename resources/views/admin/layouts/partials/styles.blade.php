@@ -326,9 +326,9 @@
     }
 
     /* Notification badge animation */
-    .badge {
+    /* .badge {
         animation: pulse 2s infinite;
-    }
+    } */
 
     @keyframes pulse {
         0% { transform: scale(1); }
