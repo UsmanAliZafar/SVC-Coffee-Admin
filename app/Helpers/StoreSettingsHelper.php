@@ -899,3 +899,81 @@ if (!function_exists('recent_notifications')) {
         return \App\Models\Notification::getRecentUnreadForAdmin($adminId, $limit);
     }
 }
+
+//
+if (!function_exists('now_in_store_timezone')) {
+    /**
+     * Get current time in store timezone
+     *
+     * @return \Carbon\Carbon
+     */
+    function now_in_store_timezone(): \Carbon\Carbon
+    {
+        return \Carbon\Carbon::now(store_timezone());
+    }
+}
+
+if (!function_exists('today_in_store_timezone')) {
+    /**
+     * Get today's date in store timezone
+     *
+     * @return \Carbon\Carbon
+     */
+    function today_in_store_timezone(): \Carbon\Carbon
+    {
+        return \Carbon\Carbon::today(store_timezone());
+    }
+}
+
+if (!function_exists('to_store_timezone')) {
+    /**
+     * Convert any datetime to store timezone
+     *
+     * @param \Carbon\Carbon|string $datetime
+     * @return \Carbon\Carbon
+     */
+    function to_store_timezone(\Carbon\Carbon|string $datetime): \Carbon\Carbon
+    {
+        if (is_string($datetime)) {
+            $datetime = \Carbon\Carbon::parse($datetime);
+        }
+
+        return $datetime->timezone(store_timezone());
+    }
+}
+
+if (!function_exists('store_time_now')) {
+    /**
+     * Get current time formatted in store timezone
+     *
+     * @return string
+     */
+    function store_time_now(): string
+    {
+        return now_in_store_timezone()->format(store_time_format());
+    }
+}
+
+if (!function_exists('store_date_now')) {
+    /**
+     * Get current date formatted in store timezone
+     *
+     * @return string
+     */
+    function store_date_now(): string
+    {
+        return today_in_store_timezone()->format(store_date_format());
+    }
+}
+
+if (!function_exists('store_datetime_now')) {
+    /**
+     * Get current datetime formatted in store timezone
+     *
+     * @return string
+     */
+    function store_datetime_now(): string
+    {
+        return format_store_datetime(now_in_store_timezone());
+    }
+}

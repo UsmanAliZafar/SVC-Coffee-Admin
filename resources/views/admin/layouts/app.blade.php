@@ -25,8 +25,10 @@
                 @yield('content')
             </div>
         </main>
+
     </div>
     @include('admin.layouts.partials.scripts')
+    @include('admin.layouts.partials.footer')
     {{-- Global JavaScript variables --}}
     <script>
         // Make store settings available globally
