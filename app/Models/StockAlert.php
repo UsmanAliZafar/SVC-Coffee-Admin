@@ -19,6 +19,7 @@ class StockAlert extends Model
 
     protected $fillable = [
         'product_id',
+        'variant_id',
         'warehouse_id',
         'alert_type',
         'current_quantity',

@@ -42,10 +42,19 @@ class InventoryController extends Controller
         $warehouseId = $request->get('warehouse_id');
 
         if ($warehouseId) {
-            $query = ProductWarehouseStock::with(['product', 'variant', 'warehouse'])->where('warehouse_id', $warehouseId);
+            $query = ProductWarehouseStock::with(['product', 'variant', 'warehouse'])
+                ->where('warehouse_id', $warehouseId)
+                ->where(function($q) {
+                    // Include records that have a variant_id (variant stock)
+                    $q->whereNotNull('variant_id')
+                    // OR include records for simple products (products without variants)
+                    ->orWhereHas('product', function($pq) {
+                        $pq->where('has_variants', false);
+                    });
+                });
         } else {
             $query = Product::with(['warehouseStock.variant', 'variants.warehouseStock', 'category'])
-                ->where('track_inventory', true);
+            ->where('track_inventory', true)->where('has_variants', false);
         }
 
         // Apply filters
@@ -114,10 +123,7 @@ class InventoryController extends Controller
 
     /**
      * DataTable for warehouse stock
-     */
-        /**
-     * DataTable for warehouse stock
-     * FIXED: Handles soft deleted products gracefully
+     * FIXED: Handles variants properly, excludes parent products with variants
      */
     private function getWarehouseStockDataTable($query)
     {
@@ -132,7 +138,17 @@ class InventoryController extends Controller
                     </div>';
                 }
 
-                // NEW: Check if this is a variant
+                // ✅ CRITICAL CHECK: Skip parent products that have variants
+                // This stock record should be for a variant, not the parent
+                if ($product->has_variants && !$stock->variant_id) {
+                    return '<div>
+                        <strong class="text-warning">⚠ Parent Product (Has Variants)</strong><br>
+                        <small class="text-muted">' . e($product->name) . '</small><br>
+                        <small class="text-danger">This stock should be moved to variants</small>
+                    </div>';
+                }
+
+                // Check if this is a variant
                 $variantInfo = '';
                 if ($stock->variant_id && $stock->variant) {
                     $variantInfo = '<br><span class="badge bg-info">
@@ -152,8 +168,13 @@ class InventoryController extends Controller
                     return '<strong class="text-muted">' . $stock->quantity . '</strong>';
                 }
 
+                // ✅ Use variant's threshold if it's a variant, otherwise use product's
+                $entity = $stock->variant ?: $product;
+                $isLowStock = $stock->quantity > 0 && $stock->quantity <= ($entity->low_stock_threshold ?? 10);
+
                 $class = $stock->quantity <= 0 ? 'text-danger'
-                        : ($stock->isLowStock() ? 'text-warning' : 'text-success');
+                        : ($isLowStock ? 'text-warning' : 'text-success');
+
                 return '<strong class="' . $class . '">' . $stock->quantity . '</strong>';
             })
             ->addColumn('available', function ($stock) {
@@ -186,12 +207,38 @@ class InventoryController extends Controller
                     return $actions;
                 }
 
+                // ✅ If this is a parent product with variants, show warning action
+                if ($product->has_variants && !$stock->variant_id) {
+                    $actions = '<div class="btn-group" role="group">';
+
+                    $actions .= '<button type="button" class="btn btn-sm btn-warning migrate-to-variants"
+                        data-id="' . $stock->id . '"
+                        data-product-id="' . $product->id . '"
+                        data-warehouse-id="' . $stock->warehouse_id . '"
+                        data-quantity="' . $stock->quantity . '"
+                        title="Migrate to Variants">
+                        <i class="bi bi-arrow-right-circle"></i> Migrate
+                    </button>';
+
+                    if (auth('admin')->user()->hasPermission('inventory.delete')) {
+                        $actions .= '<button type="button" class="btn btn-sm btn-danger delete-orphan-stock"
+                            data-id="' . $stock->id . '"
+                            title="Delete Stock Record">
+                            <i class="bi bi-trash"></i>
+                        </button>';
+                    }
+
+                    $actions .= '</div>';
+                    return $actions;
+                }
+
                 $productName = $product->name;
-                $warehouseName = $stock->warehouse->name ?? 'Unknown Warehouse';
+                $variantName = $stock->variant ? $stock->variant->getFullName() : '';
 
                 $actions = '<div class="btn-group" role="group">';
 
                 if (auth('admin')->user()->hasPermission('inventory.update')) {
+                    // ✅ FIXED: Changed class to match blade JavaScript
                     $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-product-stock"
                         data-id="' . $stock->product_id . '"
                         data-name="' . e($productName) . '"
@@ -214,109 +261,150 @@ class InventoryController extends Controller
 
     /**
      * DataTable for all products stock
-     * FIXED: Shows product stock when no warehouse stock exists
+     * FIXED: Shows variants instead of parent products
      */
     private function getAllProductsStockDataTable($query)
     {
-        return DataTables::of($query)
-           ->addColumn('product_info', function($product) {
-                // Show if product has variants
+        // Collect both simple products and variants
+        $items = collect();
+
+        // 1. Get simple products (no variants)
+        $simpleProducts = $query->get();
+
+        foreach ($simpleProducts as $product) {
+            $warehouseTotal = $product->warehouseStock()->sum('quantity');
+            $total = $warehouseTotal > 0 ? $warehouseTotal : $product->stock_quantity;
+
+            $items->push([
+                'type' => 'product',
+                'id' => $product->id,
+                'product_id' => $product->id,
+                'variant_id' => null,
+                'name' => $product->name,
+                'variant_name' => null,
+                'sku' => $product->sku,
+                'category' => $product->category ? $product->category->title : 'N/A',
+                'total_stock' => $total,
+                'threshold' => $product->low_stock_threshold ?? 0,
+                'warehouse_count' => $product->warehouseStock->count(),
+                'warehouses' => $product->warehouseStock,
+                'available' => $warehouseTotal > 0 ? $product->warehouseStock()->sum('available_quantity') : $product->stock_quantity,
+                'reserved' => $product->getTotalReservedStock(),
+                'is_low_stock' => $product->isLowStock(),
+            ]);
+        }
+
+        // 2. Get ALL variants from variant products
+        $variantProducts = Product::with(['variants.warehouseStock.warehouse', 'category'])
+            ->where('track_inventory', true)
+            ->where('has_variants', true)
+            ->get();
+
+        foreach ($variantProducts as $product) {
+            foreach ($product->variants()->active()->get() as $variant) {
+                $warehouseTotal = $variant->warehouseStock()->sum('quantity');
+                $total = $warehouseTotal > 0 ? $warehouseTotal : $variant->stock_quantity;
+
+                $items->push([
+                    'type' => 'variant',
+                    'id' => $variant->id,
+                    'product_id' => $product->id,
+                    'variant_id' => $variant->id,
+                    'name' => $product->name,
+                    'variant_name' => $variant->getFullName(),
+                    'sku' => $variant->sku,
+                    'category' => $product->category ? $product->category->title : 'N/A',
+                    'total_stock' => $total,
+                    'threshold' => $variant->low_stock_threshold ?? 0,
+                    'warehouse_count' => $variant->warehouseStock->count(),
+                    'warehouses' => $variant->warehouseStock,
+                    'available' => $warehouseTotal > 0 ? $variant->warehouseStock()->sum('available_quantity') : $variant->stock_quantity,
+                    'reserved' => $variant->getTotalReservedStock(),
+                    'is_low_stock' => $variant->isLowStock(),
+                ]);
+            }
+        }
+
+        return DataTables::of($items)
+            ->addColumn('product_info', function($item) {
                 $variantBadge = '';
-                if ($product->has_variants) {
-                    $variantCount = $product->variants()->active()->count();
-                    $variantBadge = '<br><span class="badge bg-purple">
-                        <i class="bi bi-collection"></i> ' . $variantCount . ' Variants
+                if ($item['type'] === 'variant') {
+                    $variantBadge = '<br><span class="badge bg-info">
+                        <i class="bi bi-layers"></i> Variant: ' . htmlspecialchars($item['variant_name']) . '
                     </span>';
                 }
 
                 return '<div>
-                    <strong>' . e($product->name) . '</strong>' . $variantBadge . '<br>
-                    <small class="text-muted">SKU: ' . e($product->sku) . '</small>
+                    <strong>' . htmlspecialchars($item['name']) . '</strong>' . $variantBadge . '<br>
+                    <small class="text-muted">SKU: ' . htmlspecialchars($item['sku']) . '</small>
                 </div>';
             })
-            ->addColumn('total_stock', function($product) {
-                // Check if product has warehouse stock
-                $warehouseTotal = $product->warehouseStock()->sum('quantity');
+            ->addColumn('total_stock', function($item) {
+                $class = $item['total_stock'] <= 0 ? 'text-danger' :
+                        ($item['is_low_stock'] ? 'text-warning' : 'text-success');
 
-                // Use warehouse stock if available, otherwise use product stock
-                $total = $warehouseTotal > 0 ? $warehouseTotal : $product->stock_quantity;
-
-                $class = $total <= 0 ? 'text-danger' :
-                        ($product->isLowStock() ? 'text-warning' : 'text-success');
-
-                // Add indicator if using product stock vs warehouse stock
                 $indicator = '';
-                if ($warehouseTotal <= 0 && $product->stock_quantity > 0) {
+                if ($item['warehouse_count'] === 0 && $item['total_stock'] > 0) {
                     $indicator = ' <i class="bi bi-info-circle text-info" title="Product stock (no warehouse assigned)" data-bs-toggle="tooltip"></i>';
                 }
 
-                return '<strong class="' . $class . '">' . $total . $indicator . '</strong>';
+                return '<strong class="' . $class . '">' . $item['total_stock'] . $indicator . '</strong>';
             })
-            ->addColumn('threshold', function($product) {
-                return '<span class="badge bg-secondary">' . ($product->low_stock_threshold ?? 0) . '</span>';
+            ->addColumn('threshold', function($item) {
+                return '<span class="badge bg-secondary">' . $item['threshold'] . '</span>';
             })
-            ->addColumn('warehouse_name', function($product) {
-                $warehouses = $product->warehouseStock;
-
-                if ($warehouses->count() === 0) {
+            ->addColumn('warehouse_name', function($item) {
+                if ($item['warehouse_count'] === 0) {
                     return '<span class="badge bg-warning text-dark">No warehouse</span>';
                 }
 
-                if ($warehouses->count() === 1) {
-                    return e($warehouses->first()->warehouse->name);
+                if ($item['warehouse_count'] === 1) {
+                    return htmlspecialchars($item['warehouses']->first()->warehouse->name);
                 }
 
-                return '<span class="badge bg-info">' . $warehouses->count() . ' warehouses</span>';
+                return '<span class="badge bg-info">' . $item['warehouse_count'] . ' warehouses</span>';
             })
-            ->addColumn('available', function($product) {
-                $warehouseAvailable = $product->warehouseStock()->sum('available_quantity');
-
-                // If no warehouse stock, show product stock as available
-                $available = $warehouseAvailable > 0 ? $warehouseAvailable : $product->stock_quantity;
-
-                return '<span class="badge bg-success">' . $available . '</span>';
+            ->addColumn('available', function($item) {
+                return '<span class="badge bg-success">' . $item['available'] . '</span>';
             })
-            ->addColumn('reserved', function($product) {
-                $reserved = $product->getTotalReservedStock();
-                return $reserved > 0 ?
-                    '<span class="badge bg-warning">' . $reserved . '</span>' :
+            ->addColumn('reserved', function($item) {
+                return $item['reserved'] > 0 ?
+                    '<span class="badge bg-warning">' . $item['reserved'] . '</span>' :
                     '<span class="text-muted">0</span>';
             })
-            ->addColumn('warehouses', function($product) {
-                $warehouses = $product->warehouseStock;
-
-                // If no warehouse stock, show message
-                if ($warehouses->count() === 0) {
+            ->addColumn('warehouses', function($item) {
+                if ($item['warehouse_count'] === 0) {
                     return '<div>
                         <span class="badge bg-warning text-dark">
                             <i class="bi bi-exclamation-triangle"></i> No warehouse assigned
                         </span>
                         <br>
-                        <small class="text-muted">Stock: ' . $product->stock_quantity . ' (Product level)</small>
+                        <small class="text-muted">Stock: ' . $item['total_stock'] . ' (Product level)</small>
                     </div>';
                 }
 
                 $html = '';
-                foreach ($warehouses as $stock) {
+                foreach ($item['warehouses'] as $stock) {
                     $html .= '<div class="mb-1">
-                        <small><strong>' . e($stock->warehouse->name) . ':</strong> ' . $stock->quantity . '</small>
+                        <small><strong>' . htmlspecialchars($stock->warehouse->name) . ':</strong> ' . $stock->quantity . '</small>
                     </div>';
                 }
                 return $html;
             })
-            ->addColumn('actions', function($product) {
+            ->addColumn('actions', function($item) {
                 $actions = '<div class="btn-group" role="group">';
 
                 if (auth('admin')->user()->hasPermission('inventory.update')) {
+                    // ✅ FIXED: Changed class to match blade JavaScript
                     $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-product-stock"
-                        data-id="' . $product->id . '"
-                        data-name="' . e($product->name) . '"
+                        data-id="' . $item['product_id'] . '"
+                        data-name="' . htmlspecialchars($item['name']) . '"
                         title="Adjust Stock">
                         <i class="bi bi-pencil"></i>
                     </button>';
                 }
 
-                $actions .= '<a href="' . route('admin.products.show', $product->id) . '"
+                $actions .= '<a href="' . route('admin.products.show', $item['product_id']) . '"
                     class="btn btn-sm btn-info" title="View Product">
                     <i class="bi bi-eye"></i>
                 </a>';
@@ -324,21 +412,7 @@ class InventoryController extends Controller
                 $actions .= '</div>';
                 return $actions;
             })
-            ->addColumn('product_id', function($product) {
-                return $product->id;
-            })
-            ->addColumn('product_name', function($product) {
-                return $product->name;
-            })
-            ->addColumn('warehouse_id', function($product) {
-                $defaultWarehouse = $product->warehouseStock()->first();
-                return $defaultWarehouse ? $defaultWarehouse->warehouse_id : '';
-            })
-            ->addColumn('quantity', function($product) {
-                $warehouseTotal = $product->warehouseStock()->sum('quantity');
-                return $warehouseTotal > 0 ? $warehouseTotal : $product->stock_quantity;
-            })
-            ->rawColumns(['product_info','threshold','warehouse_name', 'total_stock', 'available', 'reserved', 'warehouses', 'actions'])
+            ->rawColumns(['product_info', 'threshold', 'warehouse_name', 'total_stock', 'available', 'reserved', 'warehouses', 'actions'])
             ->make(true);
     }
 
@@ -450,6 +524,7 @@ class InventoryController extends Controller
 
         $validator = Validator::make($request->all(), [
             'product_id' => 'required|exists:products,id',
+            'variant_id' => 'nullable|exists:product_variants,id',  // ← ADD THIS
             'warehouse_id' => 'required|exists:warehouses,id',
             'action_type' => 'required|in:set,add,reduce',
             'quantity' => 'required|integer|min:0',
@@ -467,12 +542,14 @@ class InventoryController extends Controller
 
         try {
             $product = Product::findOrFail($request->product_id);
+            $variant = $request->variant_id ? ProductVariant::findOrFail($request->variant_id) : null;
             $warehouse = Warehouse::findOrFail($request->warehouse_id);
 
-            // Get or create stock record
+            // ✅ FIXED: Get or create stock record (handle variants)
             $stock = ProductWarehouseStock::firstOrCreate(
                 [
                     'product_id' => $product->id,
+                    'variant_id' => $variant ? $variant->id : null,  // ← CRITICAL
                     'warehouse_id' => $warehouse->id,
                 ],
                 [
@@ -503,6 +580,7 @@ class InventoryController extends Controller
             // Create movement record
             InventoryMovement::create([
                 'product_id' => $product->id,
+                'variant_id' => $variant ? $variant->id : null,  // ← ADD THIS
                 'warehouse_id' => $warehouse->id,
                 'type' => 'adjustment',
                 'quantity' => $quantityChange,
@@ -511,11 +589,14 @@ class InventoryController extends Controller
                 'reason' => $request->reason ?? 'Manual adjustment',
             ]);
 
-            // Update product total stock
-            $product->updateTotalStock();
+            // ✅ Sync will happen automatically via ProductWarehouseStock::saved() event
 
             // Check for alerts
-            $this->checkStockAlerts($product, $warehouse, $stock->fresh()->quantity);
+            if ($variant) {
+                $this->checkStockAlerts($product, $warehouse, $stock->fresh()->quantity, $variant);
+            } else {
+                $this->checkStockAlerts($product, $warehouse, $stock->fresh()->quantity);
+            }
 
             DB::commit();
 
@@ -534,7 +615,6 @@ class InventoryController extends Controller
             ], 500);
         }
     }
-
     /**
      * Show inventory movements page
      */
@@ -1480,39 +1560,81 @@ class InventoryController extends Controller
                 'total_value' => $warehouse->getTotalStockValue(),
             ];
         } else {
-            // Overall stats - Include products without warehouse stock
-            $totalProducts = Product::where('track_inventory', true)->count();
+            // ✅ FIXED: Count simple products + variants separately
+            $simpleProducts = Product::where('track_inventory', true)
+                ->where('has_variants', false)
+                ->count();
 
-            // Count products with warehouse stock > 0 OR product stock > 0
-            $inStock = Product::where('track_inventory', true)
+            $totalVariants = ProductVariant::whereHas('product', function($q) {
+                    $q->where('track_inventory', true);
+                })
+                ->where('status_key_code', 'VARIANT_ACTIVE')
+                ->count();
+
+            $totalProducts = $simpleProducts + $totalVariants;
+
+            // In stock: simple products + variants
+            $inStockSimple = Product::where('track_inventory', true)
+                ->where('has_variants', false)
                 ->where(function($q) {
                     $q->whereHas('warehouseStock', function($wq) {
                         $wq->where('quantity', '>', 0);
                     })->orWhere('stock_quantity', '>', 0);
                 })->count();
 
-            // Out of stock: warehouse stock = 0 AND product stock = 0
-            $outOfStock = Product::where('track_inventory', true)
+            $inStockVariants = ProductVariant::whereHas('product', function($q) {
+                    $q->where('track_inventory', true);
+                })
+                ->where('status_key_code', 'VARIANT_ACTIVE')
+                ->where('stock_quantity', '>', 0)
+                ->count();
+
+            $inStock = $inStockSimple + $inStockVariants;
+
+            // Out of stock
+            $outOfStockSimple = Product::where('track_inventory', true)
+                ->where('has_variants', false)
                 ->where('stock_quantity', '<=', 0)
                 ->whereDoesntHave('warehouseStock', function($q) {
                     $q->where('quantity', '>', 0);
                 })->count();
 
-            // Low stock products
-            $lowStock = Product::where('track_inventory', true)
+            $outOfStockVariants = ProductVariant::whereHas('product', function($q) {
+                    $q->where('track_inventory', true);
+                })
+                ->where('status_key_code', 'VARIANT_ACTIVE')
+                ->where('stock_quantity', '<=', 0)
+                ->count();
+
+            $outOfStock = $outOfStockSimple + $outOfStockVariants;
+
+            // Low stock
+            $lowStockSimple = Product::where('track_inventory', true)
+                ->where('has_variants', false)
                 ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
                 ->where('stock_quantity', '>', 0)->count();
+
+            $lowStockVariants = ProductVariant::whereHas('product', function($q) {
+                    $q->where('track_inventory', true);
+                })
+                ->where('status_key_code', 'VARIANT_ACTIVE')
+                ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                ->where('stock_quantity', '>', 0)->count();
+
+            $lowStock = $lowStockSimple + $lowStockVariants;
 
             $stats = [
                 'total_products' => $totalProducts,
                 'total_warehouses' => Warehouse::active()->count(),
                 'total_stock' => ProductWarehouseStock::sum('quantity') +
                                 Product::where('track_inventory', true)
+                                    ->where('has_variants', false)
                                     ->whereDoesntHave('warehouseStock')
                                     ->sum('stock_quantity'),
                 'total_reserved' => ProductWarehouseStock::sum('reserved_quantity'),
                 'total_available' => ProductWarehouseStock::sum('available_quantity') +
                                     Product::where('track_inventory', true)
+                                        ->where('has_variants', false)
                                         ->whereDoesntHave('warehouseStock')
                                         ->sum('stock_quantity'),
                 'in_stock' => $inStock,
@@ -1527,13 +1649,17 @@ class InventoryController extends Controller
     /**
      * Check and create stock alerts
      */
-    private function checkStockAlerts(Product $product, Warehouse $warehouse, int $quantity)
+    private function checkStockAlerts(Product $product, Warehouse $warehouse, int $quantity, ProductVariant $variant = null)
     {
+        $entity = $variant ?: $product;
+        $entityId = $variant ? $variant->id : null;
+
         // Check for out of stock
         if ($quantity <= 0) {
             StockAlert::updateOrCreate(
                 [
                     'product_id' => $product->id,
+                    'variant_id' => $entityId,  // ← ADD THIS
                     'warehouse_id' => $warehouse->id,
                     'alert_type' => 'out_of_stock',
                     'is_resolved' => false,
@@ -1546,24 +1672,26 @@ class InventoryController extends Controller
         }
 
         // Check for low stock
-        if ($quantity > 0 && $quantity <= $product->low_stock_threshold) {
+        if ($quantity > 0 && $quantity <= $entity->low_stock_threshold) {
             StockAlert::updateOrCreate(
                 [
                     'product_id' => $product->id,
+                    'variant_id' => $entityId,  // ← ADD THIS
                     'warehouse_id' => $warehouse->id,
                     'alert_type' => 'low_stock',
                     'is_resolved' => false,
                 ],
                 [
                     'current_quantity' => $quantity,
-                    'threshold_quantity' => $product->low_stock_threshold,
+                    'threshold_quantity' => $entity->low_stock_threshold,
                 ]
             );
         }
 
         // Resolve alerts if stock is back to normal
-        if ($quantity > $product->low_stock_threshold) {
+        if ($quantity > $entity->low_stock_threshold) {
             StockAlert::where('product_id', $product->id)
+                ->where('variant_id', $entityId)  // ← ADD THIS
                 ->where('warehouse_id', $warehouse->id)
                 ->where('is_resolved', false)
                 ->update([

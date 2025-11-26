@@ -1606,4 +1606,15 @@ class Product extends Model
             $this->update(['has_variants' => $shouldHaveVariants]);
         }
     }
+
+    /**
+     * Get all variant alerts for this product
+     */
+    public function variantStockAlerts()
+    {
+        return StockAlert::where('product_id', $this->id)
+                        ->whereNotNull('variant_id')
+                        ->where('is_resolved', false)
+                        ->get();
+    }
 }
