@@ -1,5 +1,41 @@
 <?php
+use App\Models\Order;
+use Illuminate\Support\Facades\Cache;
 
+if (!function_exists('get_pending_orders_count')) {
+    /**
+     * Get count of pending orders
+     *
+     * @return int
+     */
+    function get_pending_orders_count(): int
+    {
+        return Cache::remember('pending_orders_count', 300, function () {
+            return Order::where('status_key_code', 'ORDER_PENDING')
+                       ->whereNull('deleted_at')
+                       ->count();
+        });
+    }
+}
+
+if (!function_exists('get_orders_count_by_status')) {
+    /**
+     * Get count of orders by status
+     *
+     * @param string $statusKeyCode
+     * @return int
+     */
+    function get_orders_count_by_status(string $statusKeyCode): int
+    {
+        $cacheKey = "orders_count_{$statusKeyCode}";
+
+        return Cache::remember($cacheKey, 300, function () use ($statusKeyCode) {
+            return Order::where('status_key_code', $statusKeyCode)
+                       ->whereNull('deleted_at')
+                       ->count();
+        });
+    }
+}
 /**
  * Store Settings Helper Functions
  *

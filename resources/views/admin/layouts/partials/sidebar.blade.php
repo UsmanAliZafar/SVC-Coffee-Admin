@@ -195,7 +195,17 @@
                     href="{{ route('admin.orders.index') }}"
                     data-tooltip="Orders">
                         <i class="bi bi-receipt"></i>
-                        <span class="nav-text">Orders</span>
+                        <span class="nav-text">
+                            Orders
+                            @php
+                                $pendingCount = get_pending_orders_count();
+                            @endphp
+                            @if($pendingCount > 0)
+                                <span title="Pending Orders" class="badge bg-secondary ms-2" style="font-size: 0.7rem; vertical-align: middle;">
+                                    {{ $pendingCount }}
+                                </span>
+                            @endif
+                        </span>
                         <i class="bi bi-chevron-down dropdown-arrow"></i>
                     </a>
                     <ul class="submenu">
