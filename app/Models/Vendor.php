@@ -161,36 +161,16 @@ class Vendor extends Model
         return $this->belongsTo(SystemStatus::class, 'status_key_code', 'key_code');
     }
 
-    /**
-     * Get products supplied by this vendor
-     */
-    public function products(): HasMany
+    public function products()
     {
-        return $this->hasMany(Product::class);
+        return $this->hasMany(Product::class, 'vendor_id', 'id');
     }
 
-    /**
-     * Get active products
-     */
-    public function activeProducts(): HasMany
+    public function activeProducts()
     {
-        return $this->products()->where('status_key_code', 'PRODUCT_ACTIVE');
-    }
-
-    /**
-     * Get purchase orders from this vendor
-     */
-    public function purchaseOrders(): HasMany
-    {
-        return $this->hasMany(PurchaseOrder::class);
-    }
-
-    /**
-     * Get vendor reviews
-     */
-    public function reviews(): HasMany
-    {
-        return $this->hasMany(VendorReview::class);
+        return $this->hasMany(Product::class, 'vendor_id', 'id')
+                    ->where('status_key_code', 'PRODUCT_ACTIVE')
+                    ->whereNull('deleted_at');
     }
 
     /**

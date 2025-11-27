@@ -366,6 +366,39 @@
             @endif
             {{-- End Customers Management --}}
 
+            {{-- Vendors Management --}}
+            @if(auth('admin')->user()->hasPermission('vendors.read'))
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.vendors.*') ? 'open' : '' }}">
+                    <a class="nav-link {{ request()->routeIs('admin.vendors.*') ? 'active' : '' }}"
+                    href="{{ route('admin.vendors.index') }}"
+                    data-tooltip="Vendors">
+                        <i class="bi bi-building"></i>
+                        <span class="nav-text">Vendors</span>
+                        <i class="bi bi-chevron-down dropdown-arrow"></i>
+                    </a>
+                    <ul class="submenu">
+                        {{-- All Vendors --}}
+                        <li>
+                            <a href="{{ route('admin.vendors.index') }}"
+                            class="{{ request()->routeIs('admin.vendors.index') ? 'active' : '' }}">
+                                <i class="bi bi-building"></i> All Vendors
+                            </a>
+                        </li>
+
+                        {{-- Add Vendor --}}
+                        @if(auth('admin')->user()->hasPermission('vendors.create'))
+                        <li>
+                            <a href="{{ route('admin.vendors.create') }}"
+                            class="{{ request()->routeIs('admin.vendors.create') ? 'active' : '' }}">
+                                <i class="bi bi-plus-circle"></i> Add Vendor
+                            </a>
+                        </li>
+                        @endif
+                    </ul>
+                </li>
+            @endif
+            {{-- End Vendors Management --}}
+
             {{-- Coupons Management --}}
             @if(auth('admin')->user()->hasPermission('coupons.read'))
                 <li class="nav-item has-dropdown {{ request()->routeIs('admin.coupons.*') ? 'open' : '' }}">
