@@ -321,7 +321,7 @@ class Vendor extends Model
         }
 
         // Return placeholder
-        return asset('images/placeholders/vendor-logo-placeholder.png');
+        return asset('images/placeholders/not_availble.jpg');
     }
 
     /**
