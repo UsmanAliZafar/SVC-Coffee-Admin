@@ -533,26 +533,21 @@
                                 </div>
                             </div>
 
-                            <div class="col-md-6 mb-3">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="order_auto_confirm" name="order_auto_confirm"
-                                           {{ $settings->order_auto_confirm ? 'checked' : '' }}>
-                                    <label class="form-check-label" for="order_auto_confirm">
-                                        Auto-confirm orders
-                                    </label>
+                           <div class="col-md-6 mb-3">
+                                <label for="order_threshold" class="form-label">
+                                    <i class="bi bi-bell me-1"></i>High-Value Order Threshold
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">{{ $settings->currency_symbol }}</span>
+                                    <input type="number" class="form-control @error('order_threshold') is-invalid @enderror"
+                                        id="order_threshold" name="order_threshold"
+                                        value="{{ old('order_threshold', $settings->order_threshold) }}"
+                                        min="0" step="0.01" placeholder="0.00">
+                                    @error('order_threshold')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
-                                <small class="text-muted">Automatically confirm orders upon placement</small>
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="order_notification_email" name="order_notification_email"
-                                           {{ $settings->order_notification_email ? 'checked' : '' }}>
-                                    <label class="form-check-label" for="order_notification_email">
-                                        Send order notification emails
-                                    </label>
-                                </div>
-                                <small class="text-muted">Email notifications for new orders</small>
+                                <small class="text-muted">Admin will be notified when order amount exceeds this value (leave empty to disable)</small>
                             </div>
                         </div>
 

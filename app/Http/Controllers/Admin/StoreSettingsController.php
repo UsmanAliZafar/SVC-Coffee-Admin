@@ -195,8 +195,7 @@ class StoreSettingsController extends Controller
             'order_prefix' => 'required|string|max:12',
             'order_number_start' => 'required|integer|min:1',
             'order_number_length' => 'required|integer|min:4|max:10',
-            'order_auto_confirm' =>'sometimes|accepted',
-            'order_notification_email' => 'sometimes|accepted',
+            'order_threshold' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -217,8 +216,7 @@ class StoreSettingsController extends Controller
             'order_prefix' => $request->order_prefix,
             'order_number_start' => $request->order_number_start,
             'order_number_length' => $request->order_number_length,
-            'order_auto_confirm' => $request->has('order_auto_confirm'),
-            'order_notification_email' => $request->has('order_notification_email'),
+            'order_threshold' => $request->order_threshold,
         ]);
 
         $settings->updated_by = auth('admin')->id();

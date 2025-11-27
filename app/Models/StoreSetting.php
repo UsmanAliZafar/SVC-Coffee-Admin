@@ -43,8 +43,7 @@ class StoreSetting extends Model
         'order_prefix',
         'order_number_start',
         'order_number_length',
-        'order_auto_confirm',
-        'order_notification_email',
+        'order_threshold',
 
         // Tax Settings
         'tax_enabled',
@@ -144,8 +143,6 @@ class StoreSetting extends Model
 
     protected $casts = [
         'business_hours' => 'array',
-        'order_auto_confirm' => 'boolean',
-        'order_notification_email' => 'boolean',
         'tax_enabled' => 'boolean',
         'tax_included_in_price' => 'boolean',
         'shipping_enabled' => 'boolean',
@@ -158,6 +155,7 @@ class StoreSetting extends Model
         'maintenance_mode' => 'boolean',
         'is_active' => 'boolean',
         'tax_rate' => 'decimal:2',
+        'order_threshold' => 'decimal:2',
         'free_shipping_threshold' => 'decimal:2',
         'default_shipping_cost' => 'decimal:2',
         'enable_nationwide_flat_rate' => 'boolean',
@@ -296,6 +294,18 @@ class StoreSetting extends Model
             '0',
             STR_PAD_LEFT
         );
+    }
+
+    /**
+     * Check if order meets the threshold
+     */
+    public function meetsOrderThreshold($orderTotal)
+    {
+        if (!$this->order_threshold) {
+            return true; // No threshold set, all orders allowed
+        }
+
+        return $orderTotal >= $this->order_threshold;
     }
 
     /**
@@ -629,5 +639,17 @@ class StoreSetting extends Model
         }
 
         return implode("\n", $details);
+    }
+
+    /**
+     * Check if order exceeds the threshold (for admin notification)
+     */
+    public function exceedsOrderThreshold($orderTotal)
+    {
+        if (!$this->order_threshold) {
+            return false; // No threshold set, no notification needed
+        }
+
+        return $orderTotal >= $this->order_threshold;
     }
 }

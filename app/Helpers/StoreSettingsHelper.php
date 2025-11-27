@@ -671,53 +671,6 @@ if (!function_exists('email_from_address')) {
     }
 }
 
-if (!function_exists('order_auto_confirm')) {
-    /**
-     * Check if orders are auto-confirmed
-     *
-     * @return bool
-     */
-    function order_auto_confirm(): bool
-    {
-        return store_settings('order_auto_confirm', false);
-    }
-}
-
-if (!function_exists('customer_registration_email_enabled')) {
-    /**
-     * Check if customer registration emails are enabled
-     *
-     * @return bool
-     */
-    function customer_registration_email_enabled(): bool
-    {
-        return store_settings('customer_registration_email', true);
-    }
-}
-
-if (!function_exists('order_confirmation_email_enabled')) {
-    /**
-     * Check if order confirmation emails are enabled
-     *
-     * @return bool
-     */
-    function order_confirmation_email_enabled(): bool
-    {
-        return store_settings('order_confirmation_email', true);
-    }
-}
-
-if (!function_exists('order_shipped_email_enabled')) {
-    /**
-     * Check if order shipped emails are enabled
-     *
-     * @return bool
-     */
-    function order_shipped_email_enabled(): bool
-    {
-        return store_settings('order_shipped_email', true);
-    }
-}
 
 if (!function_exists('low_stock_notifications_enabled')) {
     /**
@@ -975,5 +928,31 @@ if (!function_exists('store_datetime_now')) {
     function store_datetime_now(): string
     {
         return format_store_datetime(now_in_store_timezone());
+    }
+}
+
+if (!function_exists('order_threshold')) {
+    /**
+     * Get the high-value order threshold amount
+     *
+     * @return float
+     */
+    function order_threshold(): float
+    {
+        return (float) store_settings('order_threshold', 0);
+    }
+}
+
+if (!function_exists('exceeds_order_threshold')) {
+    /**
+     * Check if order total exceeds the threshold (for admin notification)
+     *
+     * @param float $orderTotal
+     * @return bool
+     */
+    function exceeds_order_threshold(float $orderTotal): bool
+    {
+        $settings = store_settings();
+        return $settings->exceedsOrderThreshold($orderTotal);
     }
 }
