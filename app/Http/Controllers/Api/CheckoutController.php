@@ -295,17 +295,6 @@ class CheckoutController extends Controller
                 'items_count' => count($cart),
                 'payment_method' => ucfirst($validated['payment_method']),
             ]);
-
-            // ✅ ADD HERE: New order notification to admin
-            app(\App\Services\NotificationService::class)->notify('admin_new_order', [
-                'order_id' => $order->id,
-                'order_number' => $order->order_number,
-                'customer_name' => $order->getCustomerName(),
-                'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
-                'order_source' => 'web',
-                'payment_method' => ucfirst($validated['payment_method']),
-            ]);
-
             // High-value order notification
             if ($order->total_amount >= 500) {
                 app(\App\Services\NotificationService::class)->notify('customer_high_value_order', [
@@ -422,7 +411,8 @@ class CheckoutController extends Controller
             // ============================================================
             // NOTIFICATIONS
             // ============================================================
-            app(\App\Services\NotificationService::class)->notify('order_created', [
+            // 1. Order created notification to admins
+            $this->notificationService->notify('order_created', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
@@ -432,17 +422,19 @@ class CheckoutController extends Controller
                 'payment_method' => ucfirst($validated['payment_method']),
             ]);
 
-            // High-value order notification
+            // 2. High-value order notification (if applicable)
             if ($order->total_amount >= 500) {
-                app(\App\Services\NotificationService::class)->notify('customer_high_value_order', [
+                $this->notificationService->notify('customer_high_value_order', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
+                    'customer_id' => $order->customer_id,
                     'customer_name' => $order->getCustomerName(),
                     'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
                 ]);
             }
 
-            app(\App\Services\NotificationService::class)->notifyCustomer('order_created', $order);
+            // 3. Notify customer
+            $this->notificationService->notifyCustomer('order_created', $order);
 
             // ============================================================
             // PREPARE RESPONSE
@@ -582,7 +574,6 @@ class CheckoutController extends Controller
 
     /**
      * Confirm payment for online orders
-     * ✅ UPDATED: Triggers stock deduction via status change
      */
     public function confirmPayment(Request $request): JsonResponse
     {
@@ -596,7 +587,8 @@ class CheckoutController extends Controller
 
             DB::beginTransaction();
 
-            $transaction = Transaction::with('order.items.product', 'order.items.variant')->findOrFail($validated['transaction_id']);
+            $transaction = Transaction::with('order.items.product', 'order.items.variant')
+                ->findOrFail($validated['transaction_id']);
             $order = $transaction->order;
 
             $oldStatus = $order->status_key_code;
@@ -613,24 +605,32 @@ class CheckoutController extends Controller
             // Update order payment status
             $order->update([
                 'payment_status_key_code' => 'PAYMENT_PAID',
-                'status_key_code' => 'ORDER_CONFIRMED', // ← This triggers stock deduction
+                'status_key_code' => 'ORDER_CONFIRMED',
                 'confirmed_at' => now(),
             ]);
 
-            // ✅ HANDLE STOCK: PENDING → CONFIRMED (Reserve → Deduct)
+            // Handle stock: PENDING → CONFIRMED (Reserve → Deduct)
             $this->handleStatusChange($order, $oldStatus, 'ORDER_CONFIRMED');
 
             DB::commit();
 
-            // Notifications
-            app(\App\Services\NotificationService::class)->notify('payment_confirmed', [
+            // ✅ CORRECTED NOTIFICATIONS
+            // 1. Payment received notification to admins
+            $this->notificationService->notify('payment_received', [  // ← FIXED
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'transaction_number' => $transaction->transaction_number,
-                'amount' => $transaction->getFormattedAmount(),
+                'amount' => $order->getFormattedTotal(),
+                'payment_method' => $transaction->payment_method,
             ]);
 
-            app(\App\Services\NotificationService::class)->notifyCustomer('order_confirmed', $order);
+            // 2. Order confirmed notification
+            $this->notificationService->notify('order_confirmed', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+            ]);
+
+            // 3. Notify customer
+            $this->notificationService->notifyCustomer('order_confirmed', $order);
 
             return response()->json([
                 'success' => true,
@@ -772,10 +772,7 @@ class CheckoutController extends Controller
     }
 
     /**
-     * ✅ Handle payment failure for online orders
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Handle payment failure for online orders
      */
     public function paymentFailed(Request $request): JsonResponse
     {
@@ -805,11 +802,10 @@ class CheckoutController extends Controller
             DB::commit();
 
             // ✅ SEND PAYMENT FAILED NOTIFICATION
-            app(\App\Services\NotificationService::class)->notify('payment_failed', [
+            $this->notificationService->notify('payment_failed', [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'transaction_number' => $transaction->transaction_number,
-                'error_message' => $validated['error_message'] ?? 'Payment failed',
+                'reason' => $validated['error_message'] ?? 'Payment gateway error',  // ← Added
             ]);
 
             return response()->json([
