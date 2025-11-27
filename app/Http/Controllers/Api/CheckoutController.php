@@ -296,7 +296,7 @@ class CheckoutController extends Controller
                 'payment_method' => ucfirst($validated['payment_method']),
             ]);
             // High-value order notification
-            if ($order->total_amount >= 500) {
+            if (exceeds_order_threshold($order->total_amount)) {
                 app(\App\Services\NotificationService::class)->notify('customer_high_value_order', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
@@ -423,7 +423,7 @@ class CheckoutController extends Controller
             ]);
 
             // 2. High-value order notification (if applicable)
-            if ($order->total_amount >= 500) {
+            if (exceeds_order_threshold($order->total_amount)) {
                 $this->notificationService->notify('customer_high_value_order', [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
