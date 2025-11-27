@@ -8,11 +8,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnableCors
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
     public function handle(Request $request, Closure $next): Response
     {
         // Handle preflight OPTIONS requests
@@ -20,8 +15,9 @@ class EnableCors
             return response()->json([], 200)
                 ->header('Access-Control-Allow-Origin', 'https://staging-front.svcarabia.com')
                 ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
-                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, X-Requested-With')
-                ->header('Access-Control-Max-Age', '86400');
+                ->header('Access-Control-Allow-Headers', '*') // Allow ALL headers temporarily
+                ->header('Access-Control-Max-Age', '86400')
+                ->header('Access-Control-Allow-Credentials', 'true');
         }
 
         // Process the request
@@ -30,7 +26,7 @@ class EnableCors
         // Add CORS headers to the response
         $response->headers->set('Access-Control-Allow-Origin', 'https://staging-front.svcarabia.com');
         $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-        $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, X-Requested-With');
+        $response->headers->set('Access-Control-Allow-Headers', '*'); // Allow ALL headers temporarily
         $response->headers->set('Access-Control-Allow-Credentials', 'true');
 
         return $response;
