@@ -23,7 +23,7 @@ namespace App\Http\Controllers\Api;
  * )
  *
  * @OA\Server(
- *     url="https://staging.workforcecommerce.com",
+ *     url="https://staging-dashboard.svcarabia.com",
  *     description="Staging Server"
  * )
  *
