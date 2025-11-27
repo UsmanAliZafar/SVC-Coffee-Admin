@@ -113,6 +113,21 @@
         border-left: 3px solid #6f42c1;
         margin-left: 5px;
     }
+
+    .warehouse-count {
+        margin-left: 5px;
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        border-radius: 10px;
+        }
+
+    .warehouse-tab .warehouse-count {
+        background-color: #6c757d !important;
+    }
+
+    .warehouse-tab.active .warehouse-count {
+        background-color: #5B914C !important;
+    }
 </style>
 @endpush
 
@@ -179,6 +194,7 @@
     <div class="warehouse-tabs">
         <button class="warehouse-tab active" data-warehouse="">
             <i class="bi bi-grid"></i> All Warehouses
+            <span class="badge bg-secondary warehouse-count" id="count-all">0</span>
         </button>
         @foreach($warehouses as $warehouse)
         <button class="warehouse-tab" data-warehouse="{{ $warehouse->id }}">
@@ -186,6 +202,7 @@
             @if($warehouse->is_default)
                 <span class="badge bg-primary">Default</span>
             @endif
+            <span class="badge bg-secondary warehouse-count" title="Total Products/Variantes in Warehouse" id="count-{{ $warehouse->id }}">0</span>
         </button>
         @endforeach
     </div>
@@ -298,7 +315,13 @@
                             @endforeach
                         </select>
                     </div>
-
+                     <!-- ✅ ADD THIS NEW FIELD -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Storage Location</label>
+                        <input type="text" name="location" id="adjustLocation" class="form-control"
+                            placeholder="e.g., Aisle A-5, Shelf 3">
+                        <small class="text-muted">Optional: Specify where this item is stored in the warehouse</small>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Action Type <span class="text-danger">*</span></label>
                         <select name="action_type" id="adjustActionType" class="form-select" required>
@@ -408,6 +431,7 @@ $(document).ready(function() {
     // Load products for dropdowns
     loadProducts();
 
+    loadWarehouseCounts();
     // Warehouse tab clicks
     $('.warehouse-tab').on('click', function() {
         $('.warehouse-tab').removeClass('active');
@@ -698,6 +722,12 @@ function loadProductStock(productId, warehouseId, variantId = null) {
                 $('#warehouseStockInfo').html(stockInfo);
                 $('#currentStockInfo').slideDown();
 
+                if (warehouseStock && warehouseStock.location) {
+                    $('#adjustLocation').val(warehouseStock.location);
+                } else {
+                    $('#adjustLocation').val('');
+                }
+
             } else {
                 console.error('API response indicates failure:', response);
                 $('#currentStockInfo').hide();
@@ -734,6 +764,27 @@ function updateActionHint(actionType) {
     $('#actionHint').text(hint);
 }
 
+// Load warehouse counts
+function loadWarehouseCounts() {
+    $.ajax({
+        url: '{{ route("admin.inventory.warehouse-counts") }}',
+        method: 'GET',
+        success: function(counts) {
+            // Update all warehouse counts
+            $.each(counts, function(key, count) {
+                if (key === 'all') {
+                    $('#count-all').text(count);
+                } else {
+                    $('#count-' + key).text(count);
+                }
+            });
+        },
+        error: function(xhr) {
+            console.error('Failed to load warehouse counts:', xhr);
+        }
+    });
+}
+
 // Apply filters
 function applyFilters() {
     inventoryTable.ajax.reload();
@@ -750,6 +801,7 @@ function resetFilters() {
 function refreshData() {
     inventoryTable.ajax.reload();
     loadStatistics();
+    loadWarehouseCounts();
 }
 
 // Open adjust modal
@@ -892,8 +944,24 @@ $('#transferStockForm').on('submit', function(e) {
 $(document).on('click', '.adjust-product-stock', function() {
     const productId = $(this).data('id');
     const productName = $(this).data('name');
+    const variantId = $(this).data('variant-id'); // Get variant ID if exists
+    const warehouseId = $(this).data('warehouse-id'); // Get warehouse ID if exists
 
+    // Set product
     $('#adjustProductId').val(productId).trigger('change');
+
+    // Wait for variants to load, then set variant if exists
+    if (variantId) {
+        setTimeout(function() {
+            $('#adjustVariantId').val(variantId).trigger('change');
+        }, 500);
+    }
+
+    // Set warehouse if exists
+    if (warehouseId) {
+        $('#adjustWarehouseId').val(warehouseId);
+    }
+
     $('#adjustStockModal').modal('show');
 });
 // Cleanup deleted products button

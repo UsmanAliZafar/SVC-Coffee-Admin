@@ -491,7 +491,9 @@ class ProductsController extends Controller
                             ' . $badge . '
                             <button type="button" class="btn btn-sm btn-link p-0 ms-1 quick-stock-btn"
                                 data-id="' . $product->id . '"
-                                data-name="' . htmlspecialchars($product->name) . '"
+                                data-name="' . htmlspecialchars($product->name, ENT_QUOTES) . '"
+                                data-stock="' . $product->stock_quantity . '"
+                                data-threshold="' . ($product->low_stock_threshold ?? 10) . '"
                                 data-has-variants="' . ($product->has_variants ? '1' : '0') . '"
                                 title="Manage Stock">
                                 <i class="bi bi-pencil-square text-primary"></i>

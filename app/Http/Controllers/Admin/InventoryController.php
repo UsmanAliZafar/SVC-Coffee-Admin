@@ -188,7 +188,25 @@ class InventoryController extends Controller
                     : '<span class="text-muted">0</span>';
             })
             ->addColumn('location', function ($stock) {
-                return $stock->location ?? '<span class="text-muted">—</span>';
+                $product = $stock->product;
+
+                if (!$product) {
+                    return '<span class="text-muted">N/A</span>';
+                }
+
+                if ($product->has_variants && !$stock->variant_id) {
+                    return '<span class="text-muted">—</span>';
+                }
+
+                if ($stock->location) {
+                    return '<span class="badge bg-info">
+                        <i class="bi bi-geo-alt-fill"></i> ' . e($stock->location) . '
+                    </span>';
+                }
+
+                return '<span class="text-muted">
+                    <i class="bi bi-dash-circle"></i> Not Set
+                </span>';
             })
             ->addColumn('actions', function ($stock) {
                 $product = $stock->product;
@@ -243,6 +261,8 @@ class InventoryController extends Controller
                     // ✅ FIXED: Changed class to match blade JavaScript
                     $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-product-stock"
                         data-id="' . $stock->product_id . '"
+                        data-variant-id="' . ($stock->variant_id ?: '') . '"
+                        data-warehouse-id="' . $stock->warehouse_id . '"
                         data-name="' . e($productName) . '"
                         title="Adjust Stock">
                         <i class="bi bi-pencil"></i>
@@ -425,6 +445,7 @@ class InventoryController extends Controller
                     // ✅ FIXED: Changed class to match blade JavaScript
                     $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-product-stock"
                         data-id="' . $item['product_id'] . '"
+                        data-variant-id="' . ($item['variant_id'] ?: '') . '"
                         data-name="' . htmlspecialchars($item['name']) . '"
                         title="Adjust Stock">
                         <i class="bi bi-pencil"></i>
@@ -481,6 +502,46 @@ class InventoryController extends Controller
                 'message' => 'Failed to cleanup orphaned stock: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get warehouse stock counts (AJAX)
+     */
+    public function getWarehouseCounts(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('inventory.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $warehouses = Warehouse::active()->byPriority()->get();
+        $counts = [];
+
+        // Count for "All Warehouses"
+        $allCount = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->count();
+
+        $allCount += ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->count();
+
+        $counts['all'] = $allCount;
+
+        // Count for each warehouse
+        foreach ($warehouses as $warehouse) {
+            $counts[$warehouse->id] = ProductWarehouseStock::where('warehouse_id', $warehouse->id)
+                ->where(function($q) {
+                    $q->whereNotNull('variant_id')
+                    ->orWhereHas('product', function($pq) {
+                        $pq->where('has_variants', false);
+                    });
+                })
+                ->count();
+        }
+
+        return response()->json($counts);
     }
 
     /**
@@ -556,6 +617,7 @@ class InventoryController extends Controller
             'action_type' => 'required|in:set,add,reduce',
             'quantity' => 'required|integer|min:0',
             'reason' => 'nullable|string|max:500',
+            'location' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -585,7 +647,10 @@ class InventoryController extends Controller
                     'available_quantity' => 0,
                 ]
             );
-
+            if ($request->filled('location')) {
+                $stock->location = $request->location;
+                $stock->save();
+            }
             $previousQuantity = $stock->quantity;
             $quantityChange = 0;
 

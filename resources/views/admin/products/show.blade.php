@@ -806,21 +806,43 @@
                 </div>
 
                 @if($product->cost_price)
-                <div class="mb-3">
-                    <div class="info-label">Cost Price</div>
-                    <div class="info-value">{{ $product->curency }} {{ number_format($product->cost_price, 2) }}</div>
-                </div>
-
-                @if($product->price > $product->cost_price)
-                <div class="mb-3">
-                    <div class="info-label">Profit Margin</div>
-                    <div class="info-value text-success">
-                        {{ $product->curency }} {{ number_format($product->price - $product->cost_price, 2) }}
-                        ({{ number_format((($product->price - $product->cost_price) / $product->price) * 100, 2) }}%)
+                    <div class="mb-3">
+                        <div class="info-label">Cost Price</div>
+                        <div class="info-value">{{ $product->curency }} {{ number_format($product->cost_price, 2) }}</div>
                     </div>
-                </div>
-                @endif
-                @endif
+
+                    @php
+                        $effectivePrice = $product->isOnSale() ? $product->sale_price : $product->price;
+                        $difference = $effectivePrice - $product->cost_price;
+                        $isProfit = $difference > 0;
+                        $percentage = $effectivePrice > 0 ? number_format(($difference / $effectivePrice) * 100, 2) : 0;
+                    @endphp
+
+                    @if($isProfit)
+                    <div class="mb-3">
+                        <div class="info-label">Profit Margin</div>
+                        <div class="info-value text-success">
+                            <i class="bi bi-arrow-up-circle"></i> {{ $product->curency }} {{ number_format($difference, 2) }}
+                            ({{ $percentage }}%)
+                        </div>
+                    </div>
+                    @elseif($difference < 0)
+                    <div class="mb-3">
+                        <div class="info-label">Loss</div>
+                        <div class="info-value text-danger">
+                            <i class="bi bi-arrow-down-circle"></i> {{ $product->curency }} {{ number_format(abs($difference), 2) }}
+                            ({{ abs($percentage) }}%)
+                        </div>
+                    </div>
+                    @else
+                    <div class="mb-3">
+                        <div class="info-label">Margin</div>
+                        <div class="info-value text-muted">
+                            <i class="bi bi-dash-circle"></i> Break Even (0%)
+                        </div>
+                    </div>
+                    @endif
+                    @endif
 
                 <div class="mb-0">
                     <div class="info-label">Sort Order</div>

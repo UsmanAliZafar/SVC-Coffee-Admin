@@ -562,7 +562,6 @@ class OrdersController extends Controller
                     [
                         'product_id' => $product->id,
                         'variant_id' => $variant ? $variant->id : null,
-                        'warehouse_id' => $defaultWarehouse->id,
                     ],
                     [
                         'quantity' => 0,
@@ -590,7 +589,7 @@ class OrdersController extends Controller
 
                         return response()->json([
                             'success' => false,
-                            'message' => "Insufficient stock for {$itemName}.\nAvailable: {$warehouseStock->available_quantity}\nRequested: {$quantity}"
+                            'message' => "Insufficient stock for0- {$itemName}.\nAvailable: {$warehouseStock->available_quantity}\nRequested: {$quantity}"
                         ], 400);
                     }
 

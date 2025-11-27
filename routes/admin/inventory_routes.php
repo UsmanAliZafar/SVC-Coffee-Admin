@@ -57,6 +57,8 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
         // Stock alerts
         Route::get('/alerts', [InventoryController::class, 'alerts'])->name('alerts');
         Route::get('/alerts/data', [InventoryController::class, 'getAlertsData'])->name('alerts.data');
+
+        Route::get('/warehouse-counts', [InventoryController::class, 'getWarehouseCounts'])->name('warehouse-counts');
     });
 
     // Update inventory
