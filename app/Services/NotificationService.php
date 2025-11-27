@@ -9,10 +9,16 @@ use App\Jobs\SendNotificationEmail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Models\Order;
+
 class NotificationService
 {
     /**
      * Send notification to admin(s)
+     *
+     * Supports independent channel control:
+     * - In-App only: is_enabled=true, send_email=false
+     * - Email only: is_enabled=false, send_email=true
+     * - Both: is_enabled=true, send_email=true
      *
      * @param string $notificationType e.g., 'order_created', 'stock_low'
      * @param array $data Related data (order_id, product_id, etc.)
@@ -32,27 +38,96 @@ class NotificationService
             return;
         }
 
-        // Get recipients
-        $admins = $this->getRecipients($recipients, $notificationType);
+        // ✅ Get recipients for BOTH channels separately
+        $inAppRecipients = $this->getRecipientsForInApp($recipients, $notificationType);
+        $emailRecipients = $this->getRecipientsForEmail($recipients, $notificationType);
 
-        if ($admins->isEmpty()) {
+        // ✅ Merge to get ALL unique admins who want EITHER in-app OR email
+        $allRecipientIds = $inAppRecipients->pluck('id')
+            ->merge($emailRecipients->pluck('id'))
+            ->unique();
+
+        if ($allRecipientIds->isEmpty()) {
             Log::warning("No recipients found for notification: {$notificationType}");
             return;
         }
 
-        // Send notification to each admin
-        foreach ($admins as $admin) {
-            try {
-                // 1. CREATE IN-APP NOTIFICATION (ALWAYS)
-                $notification = $this->createNotification($admin, $notificationType, $data, $config);
+        // Get all unique recipient admins
+        $allRecipients = AdminUser::whereIn('id', $allRecipientIds)->active()->get();
 
-                // 2. CHECK IF EMAIL SHOULD BE SENT
-                if ($this->shouldSendEmail($admin->id, $notificationType)) {
-                    // Dispatch email job (queued)
-                    SendNotificationEmail::dispatch($notification, $admin);
+        Log::info("Processing notification", [
+            'type' => $notificationType,
+            'total_recipients' => $allRecipients->count(),
+            'in_app_count' => $inAppRecipients->count(),
+            'email_count' => $emailRecipients->count(),
+        ]);
+
+        // Send notification to each admin based on their preferences
+        foreach ($allRecipients as $admin) {
+            try {
+                $notification = null;
+
+                // ✅ CREATE IN-APP NOTIFICATION (if admin wants it)
+                if ($inAppRecipients->contains('id', $admin->id)) {
+                    $notification = $this->createNotification($admin, $notificationType, $data, $config);
+
+                    Log::info("✅ In-app notification created", [
+                        'notification_id' => $notification->id,
+                        'admin_id' => $admin->id,
+                        'admin_name' => $admin->name,
+                        'type' => $notificationType,
+                    ]);
                 }
+
+                // ✅ SEND EMAIL (if admin wants it)
+                if ($emailRecipients->contains('id', $admin->id)) {
+                    // Get their email settings
+                    $setting = NotificationSetting::where('admin_user_id', $admin->id)
+                        ->where('notification_type', $notificationType)
+                        ->first();
+
+                    if ($setting && $setting->send_email) {
+                        // ✅ Create notification if not already created (for email-only scenario)
+                        if (!$notification) {
+                            $notification = $this->createNotification($admin, $notificationType, $data, $config);
+
+                            Log::info("📧 Notification created for email-only", [
+                                'notification_id' => $notification->id,
+                                'admin_id' => $admin->id,
+                                'type' => $notificationType,
+                            ]);
+                        }
+
+                        // Dispatch email job (queued)
+                        SendNotificationEmail::dispatch($notification, $admin);
+
+                        Log::info("✅ Email notification queued", [
+                            'notification_id' => $notification->id,
+                            'admin_id' => $admin->id,
+                            'admin_name' => $admin->name,
+                            'email' => $setting->getEmailAddress(),
+                            'type' => $notificationType,
+                        ]);
+                    }
+                }
+
+                // ✅ Log what was sent
+                $channels = [];
+                if ($inAppRecipients->contains('id', $admin->id)) $channels[] = 'in-app';
+                if ($emailRecipients->contains('id', $admin->id)) $channels[] = 'email';
+
+                Log::info("Notification sent via: " . implode(' + ', $channels), [
+                    'admin_id' => $admin->id,
+                    'admin_name' => $admin->name,
+                    'type' => $notificationType,
+                ]);
+
             } catch (\Exception $e) {
-                Log::error("Failed to send notification to admin {$admin->id}: " . $e->getMessage());
+                Log::error("Failed to send notification to admin {$admin->id}: " . $e->getMessage(), [
+                    'admin_name' => $admin->name ?? 'Unknown',
+                    'type' => $notificationType,
+                    'trace' => $e->getTraceAsString(),
+                ]);
             }
         }
     }
@@ -78,49 +153,40 @@ class NotificationService
     }
 
     /**
-     * Check if email should be sent for this admin and notification type
+     * Get recipients for IN-APP notifications
+     * Returns admins who have is_enabled = true (or all active admins if no settings exist)
      */
-    private function shouldSendEmail(string $adminId, string $notificationType): bool
-    {
-        // Get admin's notification setting
-        $setting = NotificationSetting::where('admin_user_id', $adminId)
-            ->where('notification_type', $notificationType)
-            ->first();
-
-        // ✅ ONLY send email if:
-        // 1. Setting exists
-        // 2. send_email is true
-        // 3. email_address is configured
-        if ($setting && $setting->send_email && !empty($setting->email_address)) {
-            return true;
-        }
-
-        // ❌ DON'T send email if no setting or no email configured
-        return false;
-    }
-
-    // private function shouldSendEmail(string $adminId, string $notificationType): bool
-    // {
-    //     // Get admin's notification setting
-    //     $setting = NotificationSetting::where('admin_user_id', $adminId)
-    //         ->where('notification_type', $notificationType)
-    //         ->first();
-
-    //     if ($setting) {
-    //         return $setting->send_email;
-    //     }
-
-    //     // Use default from config if no setting exists
-    //     return config("notifications.types.{$notificationType}.default_email", false);
-    // }
-
-    /**
-     * Get recipients based on criteria
-     */
-    private function getRecipients($recipients, $notificationType)
+    private function getRecipientsForInApp($recipients, $notificationType)
     {
         if (is_null($recipients)) {
-            // ✅ ONLY get admins who configured this notification
+            // Get admins who want in-app notifications for this type
+            $adminIdsWithSettings = NotificationSetting::where('notification_type', $notificationType)
+                ->where('is_enabled', true)
+                ->pluck('admin_user_id');
+
+            // If no explicit settings, get all active admins (default behavior)
+            if ($adminIdsWithSettings->isEmpty()) {
+                return AdminUser::active()->get();
+            }
+
+            return AdminUser::whereIn('id', $adminIdsWithSettings)->active()->get();
+        }
+
+        if (is_array($recipients)) {
+            return AdminUser::whereIn('id', $recipients)->active()->get();
+        }
+
+        return AdminUser::where('id', $recipients)->active()->get();
+    }
+
+    /**
+     * Get recipients for EMAIL notifications
+     * Returns ONLY admins who explicitly enabled email with valid email address
+     */
+    private function getRecipientsForEmail($recipients, $notificationType)
+    {
+        if (is_null($recipients)) {
+            // ONLY get admins who explicitly configured email for this notification
             $adminIdsWithSettings = NotificationSetting::where('notification_type', $notificationType)
                 ->where('send_email', true)
                 ->whereNotNull('email_address')
@@ -135,10 +201,10 @@ class NotificationService
         }
 
         if (is_array($recipients)) {
-            return AdminUser::whereIn('id', $recipients)->get();
+            return AdminUser::whereIn('id', $recipients)->active()->get();
         }
 
-        return AdminUser::where('id', $recipients)->get();
+        return AdminUser::where('id', $recipients)->active()->get();
     }
 
     /**
