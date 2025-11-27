@@ -246,7 +246,7 @@
 
                 {{-- Order Summary --}}
                 <div class="card border-0 shadow-sm mb-4 sticky-top" style="top: 20px;">
-                    <div class="card-header bg-primary text-white py-3">
+                    <div class="card-header text-white py-3" style="background-color: #5B914C;">
                         <h5 class="mb-0"><i class="bi bi-calculator"></i> Order Summary</h5>
                     </div>
                     <div class="card-body">
@@ -262,14 +262,14 @@
                             <span>Shipping:</span>
                             <strong id="summaryShipping">{{ $order->currency }} 0.00</strong>
                         </div>
-                        <div class="d-flex justify-content-between mb-2">
+                        <div class="d-flex justify-content-between mb-2 text-danger">
                             <span>Discount:</span>
-                            <strong class="text-danger" id="summaryDiscount">-{{ $order->currency }} 0.00</strong>
+                            <strong id="summaryDiscount">-{{ $order->currency }} 0.00</strong>
                         </div>
                         <hr>
                         <div class="d-flex justify-content-between">
                             <h5 class="mb-0">Total:</h5>
-                            <h5 class="mb-0 text-primary" id="summaryTotal">{{ $order->currency }} 0.00</h5>
+                            <h5 class="mb-0" style="color: #5B914C;" id="summaryTotal">{{ $order->currency }} 0.00</h5>
                         </div>
                     </div>
                 </div>
@@ -327,29 +327,92 @@
                         <div class="mb-3">
                             <label for="shipping_amount" class="form-label">Shipping Amount ({{ store_currency_symbol() }})</label>
                             <input type="number" class="form-control" id="shipping_amount" name="shipping_amount"
-                                   value="{{ $order->shipping_amount }}" min="0" step="0.01">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="tax_rate" class="form-label">Tax Rate (%)</label>
-                            <input type="number" class="form-control" id="tax_rate" name="tax_rate"
-                                   value="{{ $order->tax_rate ?? 0 }}" min="0" max="100" step="0.01">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="discount_code" class="form-label">Discount Code</label>
-                            <input type="text" class="form-control" id="discount_code" name="discount_code"
-                                   value="{{ $order->discount_code }}">
+                                value="{{ $order->shipping_amount }}" min="0" step="0.01">
                         </div>
 
                         <div class="mb-0">
-                            <label for="discount_amount" class="form-label">Discount Amount ({{ store_currency_symbol() }})</label>
-                            <input type="number" class="form-control" id="discount_amount" name="discount_amount"
-                                   value="{{ $order->discount_amount }}" min="0" step="0.01">
+                            <label for="tax_rate" class="form-label">Tax Rate (%)</label>
+                            <input type="number" class="form-control" id="tax_rate" name="tax_rate"
+                                value="{{ $order->tax_rate ?? 0 }}" min="0" max="100" step="0.01">
                         </div>
                     </div>
                 </div>
 
+                {{-- ✅ NEW: Discount & Coupon Section --}}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0"><i class="bi bi-tag text-primary"></i> Discount & Coupon</h5>
+                    </div>
+                    <div class="card-body">
+                        {{-- Coupon Code Input --}}
+                        <div class="mb-3">
+                            <label for="coupon_code_input" class="form-label">
+                                Coupon Code <small class="text-muted">(Optional)</small>
+                            </label>
+                            <div class="input-group">
+                                <input type="text"
+                                    class="form-control"
+                                    id="coupon_code_input"
+                                    value="{{ old('discount_code', $order->discount_code) }}"
+                                    placeholder="Enter coupon code"
+                                    style="text-transform: uppercase;">
+                                <button type="button"
+                                        class="btn btn-outline-primary {{ $order->discount_code ? 'd-none' : '' }}"
+                                        id="applyCouponBtn">
+                                    <i class="bi bi-check-circle"></i> Apply
+                                </button>
+                                <button type="button"
+                                        class="btn btn-outline-danger {{ $order->discount_code ? '' : 'd-none' }}"
+                                        id="removeCouponBtn">
+                                    <i class="bi bi-x-circle"></i> Remove
+                                </button>
+                            </div>
+                            <small class="text-muted">Enter a valid coupon code to get discount</small>
+                        </div>
+
+                        {{-- Coupon Success Info --}}
+                        <div id="couponInfo" class="mb-3 {{ $order->discount_code ? '' : 'd-none' }}">
+                            <div class="alert alert-success mb-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <strong id="couponName">{{ $order->discount_code }}</strong> applied
+                                        <br>
+                                        <small>Discount: <span id="couponDiscount">{{ store_currency_symbol() }} {{ number_format($order->discount_amount, 2) }}</span></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Manual Discount Amount --}}
+                        <div class="mb-3">
+                            <label for="discount_amount" class="form-label">
+                                Manual Discount Amount
+                                <small class="text-muted">({{ store_currency_symbol() }})</small>
+                            </label>
+                            <input type="number"
+                                class="form-control"
+                                id="discount_amount"
+                                name="discount_amount"
+                                value="{{ old('discount_amount', $order->discount_amount) }}"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                {{ $order->discount_code ? 'readonly' : '' }}>
+                            <small class="text-muted">Or enter manual discount</small>
+                        </div>
+
+                        {{-- Hidden Fields for Coupon Data --}}
+                        <input type="hidden" name="coupon_id" id="coupon_id" value="">
+                        <input type="hidden" name="discount_code" id="discount_code" value="{{ $order->discount_code }}">
+
+                        {{-- Info Alert --}}
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Note:</strong> Applying a coupon will override manual discount. Remove the coupon to use manual discount.
+                        </div>
+                    </div>
+                </div>
                 {{-- Action Buttons --}}
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-body">
@@ -885,7 +948,7 @@ $(document).ready(function() {
         });
     });
 
-    // Calculate Totals
+    // Calculate Totals (UPDATED FOR COUPON SUPPORT)
     function calculateTotals() {
         let subtotal = 0;
 
@@ -900,7 +963,7 @@ $(document).ready(function() {
         const discountAmount = parseFloat($('#discount_amount').val()) || 0;
 
         const taxAmount = subtotal * (taxRate / 100);
-        const total = subtotal + taxAmount + shippingAmount - discountAmount;
+        const total = Math.max(0, subtotal + taxAmount + shippingAmount - discountAmount);
 
         $('#summarySubtotal').text(currentCurrency + ' ' + subtotal.toFixed(2));
         $('#summaryTax').text(currentCurrency + ' ' + taxAmount.toFixed(2));
@@ -909,7 +972,6 @@ $(document).ready(function() {
         $('#summaryTotal').text(currentCurrency + ' ' + total.toFixed(2));
         $('#taxRateDisplay').text(taxRate);
     }
-
     // Recalculate on changes
     $('#tax_rate, #shipping_amount, #discount_amount').on('input', function() {
         calculateTotals();
@@ -1091,6 +1153,205 @@ $(document).ready(function() {
     // Reset modal form when closed
     $('#addCustomerModal').on('hidden.bs.modal', function() {
         $('#sameAsBilling').prop('checked', false);
+    });
+
+    // ============================================================
+    // COUPON & DISCOUNT MANAGEMENT (EDIT PAGE)
+    // ============================================================
+
+    let appliedCoupon = null;
+
+    // Initialize existing coupon if present
+    @if($order->discount_code)
+    appliedCoupon = {
+        coupon_code: '{{ $order->discount_code }}',
+        discount_amount: {{ $order->discount_amount }}
+    };
+    @endif
+
+    // Auto-uppercase coupon code input
+    $('#coupon_code_input').on('input', function() {
+        $(this).val($(this).val().toUpperCase());
+    });
+
+    // Apply Coupon Button
+    $('#applyCouponBtn').on('click', function() {
+        const couponCode = $('#coupon_code_input').val().trim().toUpperCase();
+
+        if (!couponCode) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Code Entered',
+                text: 'Please enter a coupon code'
+            });
+            return;
+        }
+
+        // Validate that items exist
+        if (orderItems.filter(item => item.action !== 'delete').length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Empty Order',
+                text: 'Order must have at least one item'
+            });
+            return;
+        }
+
+        // Prepare cart items for API
+        const cartItems = [];
+        let subtotal = 0;
+
+        orderItems.forEach(item => {
+            if (item.action !== 'delete') {
+                cartItems.push({
+                    product_id: item.product_id,
+                    variant_id: item.variant_id || null,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price
+                });
+                subtotal += item.subtotal;
+            }
+        });
+
+        // Get customer info
+        const customerId = '{{ $order->customer_id }}' || null;
+        const guestEmail = '{{ $order->guest_email }}' || null;
+
+        // Show loading
+        const btn = $(this);
+        const originalHtml = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Validating...');
+
+        // Validate coupon via AJAX
+        $.ajax({
+            url: '{{ route("admin.orders.validate-coupon") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                coupon_code: couponCode,
+                customer_id: customerId,
+                guest_email: guestEmail,
+                cart_items: cartItems,
+                subtotal: subtotal
+            },
+            success: function(response) {
+                if (response.success) {
+                    appliedCoupon = response.data;
+
+                    // Update UI
+                    $('#couponInfo').removeClass('d-none');
+                    $('#couponName').text(response.data.coupon_name);
+                    $('#couponDiscount').text(response.data.formatted_discount);
+
+                    // Update hidden fields
+                    $('#coupon_id').val(response.data.coupon_id);
+                    $('#discount_code').val(response.data.coupon_code);
+                    $('#discount_amount').val(response.data.discount_amount).prop('readonly', true);
+
+                    // Toggle buttons
+                    $('#applyCouponBtn').addClass('d-none');
+                    $('#removeCouponBtn').removeClass('d-none');
+
+                    // Recalculate totals
+                    calculateTotals();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Coupon Applied!',
+                        text: response.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Invalid Coupon',
+                        text: response.message
+                    });
+                }
+
+                btn.prop('disabled', false).html(originalHtml);
+            },
+            error: function(xhr) {
+                let errorMessage = 'Failed to validate coupon';
+
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: errorMessage
+                });
+
+                btn.prop('disabled', false).html(originalHtml);
+            }
+        });
+    });
+
+    // Remove Coupon Button
+    $('#removeCouponBtn').on('click', function() {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Remove Coupon?',
+            text: 'Are you sure you want to remove this coupon?',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, remove it',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Clear coupon data
+                appliedCoupon = null;
+                $('#coupon_code_input').val('');
+                $('#couponInfo').addClass('d-none');
+                $('#coupon_id').val('');
+                $('#discount_code').val('');
+                $('#discount_amount').val(0).prop('readonly', false);
+
+                // Toggle buttons
+                $('#applyCouponBtn').removeClass('d-none');
+                $('#removeCouponBtn').addClass('d-none');
+
+                // Recalculate totals
+                calculateTotals();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Coupon Removed',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }
+        });
+    });
+
+    // Manual Discount Input Change
+    $('#discount_amount').on('input', function() {
+        if (!$(this).prop('readonly')) {
+            calculateTotals();
+        }
+    });
+
+    // Update Item Price (add to existing item-price change handler)
+    $(document).on('change', '.item-price', function() {
+        const index = $(this).data('index');
+        const newPrice = parseFloat($(this).val());
+
+        if (newPrice < 0) {
+            $(this).val(0);
+            return;
+        }
+
+        orderItems[index].unit_price = newPrice;
+        orderItems[index].subtotal = orderItems[index].quantity * orderItems[index].unit_price;
+        if (orderItems[index].action === 'keep') orderItems[index].action = 'update';
+
+        $(`.hidden-price-${index}`).val(newPrice);
+        $(`.hidden-action-${index}`).val(orderItems[index].action);
+        $(this).closest('.card-body').find('.item-subtotal').text(currentCurrency + ' ' + orderItems[index].subtotal.toFixed(2));
+
+        calculateTotals();
     });
 });
 </script>

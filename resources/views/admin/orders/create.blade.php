@@ -305,7 +305,7 @@
                     </div>
                 </div>
 
-                {{-- Shipping & Discount --}}
+                {{-- Shipping & Tax --}}
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-white border-0 py-3">
                         <h5 class="mb-0"><i class="bi bi-truck text-primary"></i> Shipping & Tax</h5>
@@ -332,17 +332,83 @@
                             <label for="shipping_amount" class="form-label">Shipping Amount ({{ store_currency_symbol() }})</label>
                             <input type="number" class="form-control" id="shipping_amount" name="shipping_amount" value="0" min="0" step="0.01">
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-0">
                             <label for="tax_rate" class="form-label">Tax Rate (%)</label>
                             <input type="number" class="form-control" id="tax_rate" name="tax_rate" value="0" min="0" max="100" step="0.01">
                         </div>
+                    </div>
+                </div>
+
+                {{-- ✅ NEW: Discount & Coupon Section --}}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 py-3">
+                        <h5 class="mb-0"><i class="bi bi-tag text-primary"></i> Discount & Coupon</h5>
+                    </div>
+                    <div class="card-body">
+                        {{-- Coupon Code Input --}}
                         <div class="mb-3">
-                            <label for="discount_code" class="form-label">Discount Code</label>
-                            <input type="text" class="form-control" id="discount_code" name="discount_code">
+                            <label for="coupon_code_input" class="form-label">
+                                Coupon Code <small class="text-muted">(Optional)</small>
+                            </label>
+                            <div class="input-group">
+                                <input type="text"
+                                    class="form-control"
+                                    id="coupon_code_input"
+                                    placeholder="Enter coupon code"
+                                    style="text-transform: uppercase;">
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        id="applyCouponBtn">
+                                    <i class="bi bi-check-circle"></i> Apply
+                                </button>
+                                <button type="button"
+                                        class="btn btn-outline-danger d-none"
+                                        id="removeCouponBtn">
+                                    <i class="bi bi-x-circle"></i> Remove
+                                </button>
+                            </div>
+                            <small class="text-muted">Enter a valid coupon code to get discount</small>
                         </div>
-                        <div class="mb-0">
-                            <label for="discount_amount" class="form-label">Discount Amount ({{ store_currency_symbol() }})</label>
-                            <input type="number" class="form-control" id="discount_amount" name="discount_amount" value="0" min="0" step="0.01">
+
+                        {{-- Coupon Success Info --}}
+                        <div id="couponInfo" class="mb-3 d-none">
+                            <div class="alert alert-success mb-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <strong id="couponName"></strong> applied
+                                        <br>
+                                        <small>Discount: <span id="couponDiscount"></span></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Manual Discount Amount --}}
+                        <div class="mb-3">
+                            <label for="discount_amount" class="form-label">
+                                Manual Discount Amount
+                                <small class="text-muted">({{ store_currency_symbol() }})</small>
+                            </label>
+                            <input type="number"
+                                class="form-control"
+                                id="discount_amount"
+                                name="discount_amount"
+                                value="0"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00">
+                            <small class="text-muted">Or enter manual discount</small>
+                        </div>
+
+                        {{-- Hidden Fields for Coupon Data --}}
+                        <input type="hidden" name="coupon_id" id="coupon_id">
+                        <input type="hidden" name="discount_code" id="discount_code">
+
+                        {{-- Info Alert --}}
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Note:</strong> Applying a coupon will override manual discount. Remove the coupon to use manual discount.
                         </div>
                     </div>
                 </div>
@@ -1050,7 +1116,7 @@ $(document).ready(function() {
         const discountAmount = parseFloat($('#discount_amount').val()) || 0;
 
         const taxAmount = subtotal * (taxRate / 100);
-        const total = subtotal + taxAmount + shippingAmount - discountAmount;
+        const total = Math.max(0, subtotal + taxAmount + shippingAmount - discountAmount);
 
         $('#summarySubtotal').text(currentCurrency + subtotal.toFixed(2));
         $('#summaryTax').text(currentCurrency + taxAmount.toFixed(2));
@@ -1285,6 +1351,177 @@ $(document).ready(function() {
     // Initialize
     $('#noItemsAlert').removeClass('d-none');
     calculateTotals();
+
+    //
+
+    // ============================================================
+    // COUPON & DISCOUNT MANAGEMENT
+    // ============================================================
+
+    let appliedCoupon = null;
+
+    // Auto-uppercase coupon code input
+    $('#coupon_code_input').on('input', function() {
+        $(this).val($(this).val().toUpperCase());
+    });
+
+    // Apply Coupon Button
+    $('#applyCouponBtn').on('click', function() {
+        const couponCode = $('#coupon_code_input').val().trim().toUpperCase();
+
+        if (!couponCode) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Code Entered',
+                text: 'Please enter a coupon code'
+            });
+            return;
+        }
+
+        // Validate that items exist
+        if (orderItems.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Empty Order',
+                text: 'Please add items to the order first'
+            });
+            return;
+        }
+
+        // Prepare cart items for API
+        const cartItems = [];
+        let subtotal = 0;
+
+        orderItems.forEach(item => {
+            cartItems.push({
+                product_id: item.product_id,
+                variant_id: item.variant_id || null,
+                quantity: item.quantity,
+                unit_price: item.unit_price
+            });
+            subtotal += item.subtotal;
+        });
+
+        // Get customer info
+        const customerType = $('input[name="customer_type"]:checked').val();
+        const customerId = customerType === 'existing' ? $('#customer_id').val() : null;
+        const guestEmail = customerType === 'guest' ? $('#guest_email').val() : null;
+
+        // Show loading
+        const btn = $(this);
+        const originalHtml = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Validating...');
+
+        // Validate coupon via AJAX
+        $.ajax({
+            url: '{{ route("admin.orders.validate-coupon") }}',
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                coupon_code: couponCode,
+                customer_id: customerId,
+                guest_email: guestEmail,
+                cart_items: cartItems,
+                subtotal: subtotal
+            },
+            success: function(response) {
+                if (response.success) {
+                    appliedCoupon = response.data;
+
+                    // Update UI
+                    $('#couponInfo').removeClass('d-none');
+                    $('#couponName').text(response.data.coupon_name);
+                    $('#couponDiscount').text(response.data.formatted_discount);
+
+                    // Update hidden fields
+                    $('#coupon_id').val(response.data.coupon_id);
+                    $('#discount_code').val(response.data.coupon_code);
+                    $('#discount_amount').val(response.data.discount_amount).prop('readonly', true);
+
+                    // Toggle buttons
+                    $('#applyCouponBtn').addClass('d-none');
+                    $('#removeCouponBtn').removeClass('d-none');
+
+                    // Recalculate totals
+                    calculateTotals();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Coupon Applied!',
+                        text: response.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Invalid Coupon',
+                        text: response.message
+                    });
+                }
+
+                btn.prop('disabled', false).html(originalHtml);
+            },
+            error: function(xhr) {
+                let errorMessage = 'Failed to validate coupon';
+
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: errorMessage
+                });
+
+                btn.prop('disabled', false).html(originalHtml);
+            }
+        });
+    });
+
+    // Remove Coupon Button
+    $('#removeCouponBtn').on('click', function() {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Remove Coupon?',
+            text: 'Are you sure you want to remove this coupon?',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, remove it',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Clear coupon data
+                appliedCoupon = null;
+                $('#coupon_code_input').val('');
+                $('#couponInfo').addClass('d-none');
+                $('#coupon_id').val('');
+                $('#discount_code').val('');
+                $('#discount_amount').val(0).prop('readonly', false);
+
+                // Toggle buttons
+                $('#applyCouponBtn').removeClass('d-none');
+                $('#removeCouponBtn').addClass('d-none');
+
+                // Recalculate totals
+                calculateTotals();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Coupon Removed',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }
+        });
+    });
+
+    // Manual Discount Input Change
+    $('#discount_amount').on('input', function() {
+        if (!$(this).prop('readonly')) {
+            calculateTotals();
+        }
+    });
 });
 </script>
 @endpush

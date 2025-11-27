@@ -12,6 +12,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 // MODELS
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -22,6 +24,7 @@ use App\Models\Transaction;
 use App\Models\ProductVariant;
 use App\Models\Warehouse;
 use App\Models\ProductWarehouseStock;
+use App\Models\Coupon;
 
 class OrdersController extends Controller
 {
@@ -2290,6 +2293,124 @@ class OrdersController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to load variants: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Validate and apply coupon code (for order creation/editing)
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function validateCoupon(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'coupon_code' => 'required|string|max:50',
+                'customer_id' => 'nullable|uuid',
+                'guest_email' => 'nullable|email',
+                'cart_items' => 'required|array',
+                'cart_items.*.product_id' => 'required|uuid',
+                'cart_items.*.variant_id' => 'nullable|uuid',
+                'cart_items.*.quantity' => 'required|integer|min:1',
+                'cart_items.*.unit_price' => 'required|numeric|min:0',
+                'subtotal' => 'required|numeric|min:0',
+            ]);
+
+            // Find coupon
+            $coupon = Coupon::byCode($validated['coupon_code'])
+                ->active()
+                ->valid()
+                ->first();
+
+            if (!$coupon) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid or expired coupon code',
+                ], 404);
+            }
+
+            // Check if coupon is valid
+            if (!$coupon->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This coupon is no longer valid',
+                ], 400);
+            }
+
+            // Check customer eligibility
+            $customerCheck = $coupon->canBeUsedByCustomer(
+                $validated['customer_id'] ?? null,
+                $validated['guest_email'] ?? null
+            );
+
+            if (!$customerCheck['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $customerCheck['message'],
+                ], 400);
+            }
+
+            // Prepare cart items for validation
+            $cartItems = [];
+            foreach ($validated['cart_items'] as $item) {
+                $cartItems[] = [
+                    'product_id' => $item['product_id'],
+                    'variant_id' => $item['variant_id'] ?? null,
+                    'price' => (float) $item['unit_price'],
+                    'quantity' => (int) $item['quantity'],
+                ];
+            }
+
+            $subtotal = (float) $validated['subtotal'];
+            $itemCount = array_sum(array_column($cartItems, 'quantity'));
+
+            // Check cart applicability
+            $cartCheck = $coupon->isApplicableToCart($cartItems, $subtotal, $itemCount);
+
+            if (!$cartCheck['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $cartCheck['message'],
+                ], 400);
+            }
+
+            // Calculate discount
+            $discountDetails = $coupon->calculateDiscount($cartItems, $subtotal);
+            $discountAmount = (float) ($discountDetails['discount_amount'] ?? 0);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Coupon applied successfully!',
+                'data' => [
+                    'coupon_id' => $coupon->id,
+                    'coupon_code' => $coupon->code,
+                    'coupon_name' => $coupon->name,
+                    'discount_type' => $coupon->discount_type,
+                    'discount_amount' => $discountAmount,
+                    'formatted_discount' => store_currency_symbol() . ' ' . number_format($discountAmount, 2),
+                    'free_shipping' => $discountDetails['free_shipping'] ?? false,
+                ],
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $e->errors(),
+            ], 422);
+
+        } catch (\Exception $e) {
+            \Log::error('Coupon validation failed', [
+                'error' => $e->getMessage(),
+                'code' => $validated['coupon_code'] ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to validate coupon',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
