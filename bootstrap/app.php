@@ -17,18 +17,21 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->append(\App\Http\Middleware\EnableCors::class);
+        // Put EnableCors first, before other middleware
+        $middleware->prepend(\App\Http\Middleware\EnableCors::class);
+
+        // Or apply it specifically to API routes
+        $middleware->group('api', [
+            \App\Http\Middleware\EnableCors::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ]);
+
         // Register custom middleware aliases
         $middleware->alias([
             'admin.auth' => \App\Http\Middleware\AdminAuth::class,
             'admin.permission' => \App\Http\Middleware\CheckPermission::class,
             'admin.guest' => \App\Http\Middleware\RedirectIfAdminAuthenticated::class,
-            //
             'api.key' => \App\Http\Middleware\ApiKeyAuth::class,
-        ]);
-
-        $middleware->group('api', [
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
