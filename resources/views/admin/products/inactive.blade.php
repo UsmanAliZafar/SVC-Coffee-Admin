@@ -100,7 +100,7 @@
     <!-- Info Alert -->
     <div class="alert alert-secondary alert-dismissible fade show" role="alert">
         <i class="bi bi-info-circle"></i>
-        <strong>Inactive Products:</strong> These products are marked as inactive and are not visible to customers on your website. You can activate them anytime.
+        <strong>Inactive Products:</strong> These products are marked as inactive or discontinued and are not visible to customers on your website. You can activate them anytime.
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 
@@ -318,7 +318,7 @@ $(document).ready(function() {
             url: '{{ route("admin.products.data") }}',
             data: function(d) {
                 // FORCE INACTIVE STATUS FILTER - THIS IS THE KEY LINE
-                d.status = 'PRODUCT_INACTIVE';
+                d.status = 'PRODUCT_DISCONTINUED';
 
                 // Include other filters
                 d.category_id = $('#categoryFilter').val();
@@ -674,7 +674,7 @@ $(document).ready(function() {
         $.ajax({
             url: '{{ route("admin.products.statistics") }}',
             data: {
-                status: 'PRODUCT_INACTIVE'
+                status: 'PRODUCT_DISCONTINUED'
             },
             success: function(response) {
                 $('#totalInactive').text(response.total || 0);

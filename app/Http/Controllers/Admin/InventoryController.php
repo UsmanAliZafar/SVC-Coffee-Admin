@@ -117,8 +117,10 @@ class InventoryController extends Controller
         if ($warehouseId) {
             return $this->getWarehouseStockDataTable($query);
         } else {
-            return $this->getAllProductsStockDataTable($query);
+            $search = $request->filled('search') ? $request->search : null;
+            return $this->getAllProductsStockDataTable($query, $search);
         }
+
     }
 
     /**
@@ -263,7 +265,7 @@ class InventoryController extends Controller
      * DataTable for all products stock
      * FIXED: Shows variants instead of parent products
      */
-    private function getAllProductsStockDataTable($query)
+    private function getAllProductsStockDataTable($query, $search = null)
     {
         // Collect both simple products and variants
         $items = collect();
@@ -297,10 +299,35 @@ class InventoryController extends Controller
         // 2. Get ALL variants from variant products
         $variantProducts = Product::with(['variants.warehouseStock.warehouse', 'category'])
             ->where('track_inventory', true)
-            ->where('has_variants', true)
-            ->get();
+            ->where('has_variants', true);
+
+        // ✅ FIX: Apply search filter to variant products
+        if ($search) {
+            $variantProducts->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%")
+                ->orWhereHas('variants', function($vq) use ($search) {
+                    $vq->where('variant_name', 'like', "%{$search}%")
+                        ->orWhere('variant_value', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        $variantProducts = $variantProducts->get();
 
         foreach ($variantProducts as $product) {
+            $variants = $product->variants()->active();
+
+            // ✅ FIX: Apply search filter to individual variants
+            if ($search) {
+                $variants->where(function($q) use ($search) {
+                    $q->where('variant_name', 'like', "%{$search}%")
+                    ->orWhere('variant_value', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
+
             foreach ($product->variants()->active()->get() as $variant) {
                 $warehouseTotal = $variant->warehouseStock()->sum('quantity');
                 $total = $warehouseTotal > 0 ? $warehouseTotal : $variant->stock_quantity;

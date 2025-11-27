@@ -86,6 +86,7 @@ class ProductsController extends Controller
 
         // Apply filters
         if ($request->filled('status')) {
+            // dd($request->status);
             $query->where('status_key_code', $request->status);
         }
 
