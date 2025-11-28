@@ -204,6 +204,36 @@
         font-size: 0.85rem;
         color: #6c757d;
     }
+
+    .priority-slider {
+        width: 100%;
+        -webkit-appearance: none;
+        height: 6px;
+        border-radius: 5px;
+        background: #d7dcdf;
+        outline: none;
+    }
+
+    .priority-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #5B914C;
+        cursor: pointer;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .priority-slider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #5B914C;
+        cursor: pointer;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
 </style>
 @endpush
 
@@ -538,16 +568,16 @@
 <script>
 // Store original values for change detection
 const originalValues = {
-    name: '{{ $warehouse->name }}',
-    code: '{{ $warehouse->code }}',
-    email: '{{ $warehouse->email }}',
-    phone: '{{ $warehouse->phone }}',
-    address: '{{ $warehouse->address }}',
-    city: '{{ $warehouse->city }}',
-    state: '{{ $warehouse->state }}',
-    country: '{{ $warehouse->country }}',
-    postal_code: '{{ $warehouse->postal_code }}',
-    notes: '{{ $warehouse->notes }}',
+    name: {!! json_encode($warehouse->name) !!},
+    code: {!! json_encode($warehouse->code) !!},
+    email: {!! json_encode($warehouse->email) !!},
+    phone: {!! json_encode($warehouse->phone) !!},
+    address: {!! json_encode($warehouse->address) !!},
+    city: {!! json_encode($warehouse->city) !!},
+    state: {!! json_encode($warehouse->state) !!},
+    country: {!! json_encode($warehouse->country) !!},
+    postal_code: {!! json_encode($warehouse->postal_code) !!},
+    notes: {!! json_encode($warehouse->notes) !!},
     is_active: '{{ $warehouse->is_active }}',
     is_default: '{{ $warehouse->is_default ? 1 : 0 }}',
     priority: '{{ $warehouse->priority }}'
@@ -573,6 +603,18 @@ $(document).ready(function() {
         const value = $(this).val();
         $('#priorityValue').text(value);
         updatePreview();
+    });
+     // Set initial value
+    updatePriorityValue();
+
+    // Bind input event
+    $('#priority').on('input', function() {
+        updatePriorityValue();
+    });
+
+    // Also bind change event as fallback
+    $('#priority').on('change', function() {
+        updatePriorityValue();
     });
 
     // Form field changes - detect and update preview
@@ -633,6 +675,10 @@ function detectChanges() {
     }
 }
 
+function updatePriorityValue() {
+    const value = $('#priority').val();
+    $('#priorityValue').text(value);
+}
 // Update preview
 function updatePreview() {
     // Name

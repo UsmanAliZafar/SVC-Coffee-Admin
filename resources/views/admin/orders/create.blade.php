@@ -83,32 +83,40 @@
                                     <option value="{{ $customer->id }}"
                                             data-email="{{ $customer->email }}"
                                             data-phone="{{ $customer->phone }}"
+                                            data-company="{{ $customer->company_name }}"
                                             data-billing="{{ json_encode([
                                                 'first_name' => $customer->first_name,
                                                 'last_name' => $customer->last_name,
+                                                'company' => $customer->company_name,
                                                 'address_line1' => $customer->billing_address_line1,
                                                 'address_line2' => $customer->billing_address_line2,
                                                 'city' => $customer->billing_city,
                                                 'state' => $customer->billing_state,
                                                 'postal_code' => $customer->billing_postal_code,
-                                                'country' => $customer->billing_country
+                                                'country' => $customer->billing_country,
+                                                'phone' => $customer->phone
                                             ]) }}"
                                             data-shipping="{{ json_encode([
                                                 'first_name' => $customer->first_name,
                                                 'last_name' => $customer->last_name,
+                                                'company' => $customer->company_name,
                                                 'address_line1' => $customer->shipping_address_line1,
                                                 'address_line2' => $customer->shipping_address_line2,
                                                 'city' => $customer->shipping_city,
                                                 'state' => $customer->shipping_state,
                                                 'postal_code' => $customer->shipping_postal_code,
-                                                'country' => $customer->shipping_country
+                                                'country' => $customer->shipping_country,
+                                                'phone' => $customer->phone
                                             ]) }}">
                                         {{ $customer->getFullName() }} - {{ $customer->email }}
+                                        @if($customer->company_name)
+                                            ({{ $customer->company_name }})
+                                        @endif
                                     </option>
                                     @endforeach
                                 </select>
                             </div>
-                             <button type="button" class="btn btn-success" id="addCustomerBtn" title="Add New Customer">
+                            <button type="button" class="btn btn-success" id="addCustomerBtn" title="Add New Customer">
                                 <i class="bi bi-plus-circle"></i> Add Customer
                             </button>
                             <small class="text-muted">Or click "Add Customer" to create a new customer</small>
@@ -145,6 +153,24 @@
                         </div>
                     </div>
                     <div class="card-body">
+                        {{-- ✅ NEW: Tax Summary Header --}}
+                        <div class="alert alert-info mb-3 d-none" id="taxSummaryAlert">
+                            <div class="row text-center">
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Taxable Items</small>
+                                    <strong id="taxableItemsCount">0</strong>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Total Tax (Inclusive)</small>
+                                    <strong id="inclusiveTaxTotal" class="text-success">{{ store_currency_symbol() }}0.00</strong>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Total Tax (Exclusive)</small>
+                                    <strong id="exclusiveTaxTotal" class="text-danger">{{ store_currency_symbol() }}0.00</strong>
+                                </div>
+                            </div>
+                        </div>
+
                         <div id="orderItemsContainer">
                             {{-- Items will be added dynamically --}}
                         </div>
@@ -192,7 +218,7 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="shipping_country" class="form-label">Country <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="shipping_country" name="shipping_country" value="United States" required>
+                                <input type="text" class="form-control" id="shipping_country" name="shipping_country" value="" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="shipping_phone" class="form-label">Phone</label>
@@ -281,25 +307,64 @@
                         <h5 class="mb-0"><i class="bi bi-calculator"></i> Order Summary</h5>
                     </div>
                     <div class="card-body">
+                        {{-- Subtotal (excluding all taxes) --}}
                         <div class="d-flex justify-content-between mb-2">
                             <span>Subtotal:</span>
                             <strong id="summarySubtotal">{{ store_currency_symbol() }}0.00</strong>
                         </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Tax (<span id="taxRateDisplay">0</span>%):</span>
-                            <strong id="summaryTax">{{ store_currency_symbol() }}0.00</strong>
+
+                        {{-- ✅ NEW: Product-level inclusive tax (already in price) --}}
+                        <div class="d-flex justify-content-between mb-2 text-success">
+                            <span>
+                                <i class="bi bi-info-circle" title="Tax already included in product prices"></i>
+                                Tax (Inclusive):
+                            </span>
+                            <strong id="summaryInclusiveTax">{{ store_currency_symbol() }}0.00</strong>
                         </div>
+
+                        {{-- ✅ NEW: Product-level exclusive tax (to be added) --}}
+                        <div class="d-flex justify-content-between mb-2 text-danger">
+                            <span>
+                                <i class="bi bi-plus-circle" title="Tax to be added to total"></i>
+                                Tax (Exclusive):
+                            </span>
+                            <strong id="summaryExclusiveTax">{{ store_currency_symbol() }}0.00</strong>
+                        </div>
+
+                        {{-- Order-level tax (admin override) --}}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>
+                                Additional Tax (<span id="taxRateDisplay">0</span>%):
+                            </span>
+                            <strong id="summaryAdditionalTax">{{ store_currency_symbol() }}0.00</strong>
+                        </div>
+
+                        {{-- Shipping --}}
                         <div class="d-flex justify-content-between mb-2">
                             <span>Shipping:</span>
                             <strong id="summaryShipping">{{ store_currency_symbol() }}0.00</strong>
                         </div>
+
+                        {{-- Discount --}}
                         <div class="d-flex justify-content-between mb-2">
                             <span>Discount:</span>
                             <strong class="text-danger" id="summaryDiscount">-{{ store_currency_symbol() }}0.00</strong>
                         </div>
+
                         <hr>
+
+                        {{-- ✅ ENHANCED: Total breakdown --}}
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="text-muted">Base Amount:</small>
+                            <small class="text-muted" id="summaryBaseAmount">{{ store_currency_symbol() }}0.00</small>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <small class="text-muted">All Taxes:</small>
+                            <small class="text-muted" id="summaryTotalTax">{{ store_currency_symbol() }}0.00</small>
+                        </div>
+
                         <div class="d-flex justify-content-between">
-                            <h5 class="mb-0">Total:</h5>
+                            <h5 class="mb-0">Grand Total:</h5>
                             <h5 class="mb-0 text-primary" id="summaryTotal">{{ store_currency_symbol() }}0.00</h5>
                         </div>
                     </div>
@@ -684,7 +749,7 @@
 
                         <div class="col-md-6 mb-3">
                             <label for="modal_shipping_country" class="form-label">Country</label>
-                            <input type="text" class="form-control" id="modal_shipping_country" name="shipping_country" value="Pakistan">
+                            <input type="text" class="form-control" id="modal_shipping_country" name="shipping_country" value="">
                         </div>
 
                         {{-- Additional Options --}}
@@ -735,8 +800,92 @@
 $(document).ready(function() {
     let orderItems = [];
     let itemCounter = 0;
-    let selectedVariant = null; // ✅ NEW: Track selected variant
+    let selectedVariant = null;
+    const currencySymbol = '{{ store_currency_symbol() }}';
+    // ============================================================
+    // ENHANCED ITEM STRUCTURE WITH TAX INFO
+    // ============================================================
+    function createItemStructure(productData, variantData, quantity, price) {
+        return {
+            id: itemCounter++,
+            product_id: productData.id,
+            variant_id: variantData ? variantData.id : null,
+            name: variantData
+                ? `${productData.name} - ${variantData.name}`
+                : productData.name,
+            sku: variantData ? variantData.sku : productData.sku,
+            image: variantData ? variantData.image : productData.image,
+            quantity: quantity,
+            unit_price: price,
+            subtotal: quantity * price,
+            has_variant: variantData !== null,
+            max_stock: variantData ? variantData.stock : productData.stock,
 
+            // ✅ TAX INFORMATION
+            is_taxable: productData.is_taxable || false,
+            tax_type: productData.tax_type || 'exclusive',
+            tax_rate: productData.tax_rate || 0,
+            tax_amount: 0, // Calculated below
+            base_price_excluding_tax: 0, // Calculated below
+            price_including_tax: 0 // Calculated below
+        };
+    }
+
+    // ✅ CALCULATE ITEM TAX
+    function calculateItemTax(item) {
+        if (!item.is_taxable || item.tax_rate <= 0) {
+            item.tax_amount = 0;
+            item.base_price_excluding_tax = item.unit_price;
+            item.price_including_tax = item.unit_price;
+            return item;
+        }
+
+        const taxRate = item.tax_rate / 100;
+
+        if (item.tax_type === 'inclusive') {
+            // Tax already in price - extract it
+            item.base_price_excluding_tax = item.unit_price / (1 + taxRate);
+            item.tax_amount = item.unit_price - item.base_price_excluding_tax;
+            item.price_including_tax = item.unit_price;
+        } else {
+            // Tax to be added
+            item.base_price_excluding_tax = item.unit_price;
+            item.tax_amount = item.unit_price * taxRate;
+            item.price_including_tax = item.unit_price + item.tax_amount;
+        }
+
+        // Total tax for quantity
+        item.tax_amount = item.tax_amount * item.quantity;
+
+        return item;
+    }
+
+    // ✅ LOAD PRODUCT TAX INFO VIA AJAX
+    function loadProductTaxInfo(productId, callback) {
+        $.ajax({
+            url: `/admin/orders/products/${productId}/tax-info`,
+            type: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    callback(response.tax_info);
+                } else {
+                    callback({
+                        is_taxable: false,
+                        tax_type: 'exclusive',
+                        tax_rate: 0
+                    });
+                }
+            },
+            error: function() {
+                callback({
+                    is_taxable: false,
+                    tax_type: 'exclusive',
+                    tax_rate: 0
+                });
+            }
+        });
+    }
+    //-------------------
     // Toggle Customer Type
     $('input[name="customer_type"]').on('change', function() {
         if ($(this).val() === 'existing') {
@@ -752,7 +901,7 @@ $(document).ready(function() {
         }
     });
 
-    // Customer Selection - Auto-fill addresses (same as before)
+    //Customer Selection - Auto-fill ALL addresses
     $('#customer_id').on('change', function() {
         const selectedOption = $(this).find('option:selected');
 
@@ -760,31 +909,74 @@ $(document).ready(function() {
             const shippingData = selectedOption.data('shipping');
             const billingData = selectedOption.data('billing');
 
+            // ============================================================
+            // AUTO-FILL SHIPPING ADDRESS
+            // ============================================================
             if (shippingData) {
                 $('#shipping_first_name').val(shippingData.first_name || '');
                 $('#shipping_last_name').val(shippingData.last_name || '');
+                $('#shipping_company').val(shippingData.company || ''); // If you have this field
                 $('#shipping_address_line1').val(shippingData.address_line1 || '');
                 $('#shipping_address_line2').val(shippingData.address_line2 || '');
                 $('#shipping_city').val(shippingData.city || '');
                 $('#shipping_state').val(shippingData.state || '');
                 $('#shipping_postal_code').val(shippingData.postal_code || '');
                 $('#shipping_country').val(shippingData.country || 'United States');
+                $('#shipping_phone').val(shippingData.phone || '');
             }
 
+            // ============================================================
+            // AUTO-FILL BILLING ADDRESS (if not same as shipping)
+            // ============================================================
             if (!$('#billing_same_as_shipping').is(':checked') && billingData) {
                 $('#billing_first_name').val(billingData.first_name || '');
                 $('#billing_last_name').val(billingData.last_name || '');
+                $('#billing_company').val(billingData.company || ''); // If you have this field
                 $('#billing_address_line1').val(billingData.address_line1 || '');
                 $('#billing_address_line2').val(billingData.address_line2 || '');
                 $('#billing_city').val(billingData.city || '');
                 $('#billing_state').val(billingData.state || '');
                 $('#billing_postal_code').val(billingData.postal_code || '');
                 $('#billing_country').val(billingData.country || 'United States');
+                $('#billing_phone').val(billingData.phone || '');
             }
+
+            // ============================================================
+            // VISUAL FEEDBACK
+            // ============================================================
+            // Show success indicator
+            Swal.fire({
+                icon: 'success',
+                title: 'Customer Selected',
+                text: 'Shipping and billing addresses loaded!',
+                timer: 1500,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+
+            // Highlight filled fields briefly
+            $('.form-control[id^="shipping_"], .form-control[id^="billing_"]').each(function() {
+                if ($(this).val()) {
+                    $(this).addClass('bg-light border-success');
+                    setTimeout(() => {
+                        $(this).removeClass('bg-light border-success');
+                    }, 2000);
+                }
+            });
+        } else {
+            // Customer deselected - clear fields
+            clearAddressFields();
         }
     });
 
-    // Toggle Billing Address (same as before)
+    // ✅ NEW: Helper function to clear address fields
+    function clearAddressFields() {
+        $('#shipping_first_name, #shipping_last_name, #shipping_address_line1, #shipping_address_line2, #shipping_city, #shipping_state, #shipping_postal_code, #shipping_country, #shipping_phone').val('');
+        $('#billing_first_name, #billing_last_name, #billing_address_line1, #billing_address_line2, #billing_city, #billing_state, #billing_postal_code, #billing_country, #billing_phone').val('');
+    }
+
+    // Toggle Billing Address
     $('#billing_same_as_shipping').on('change', function() {
         if ($(this).is(':checked')) {
             $('#billingAddressSection').slideUp();
@@ -799,8 +991,12 @@ $(document).ready(function() {
         $('#addItemModal').modal('show');
         $('#productSearch').val('');
         $('#productSelect option').show();
+        $('#productSelect').val('');
         $('#variantSection').hide();
         $('#selectedVariantPreview').hide();
+        $('#itemQuantity').val(1);
+        $('#itemPrice').val('');
+        $('#stockInfo').text('');
         selectedVariant = null;
     });
 
@@ -818,7 +1014,9 @@ $(document).ready(function() {
         });
     });
 
-    // ✅ NEW: Product Selection - Load Variants if Product Has Them
+    // ============================================================
+    // PRODUCT SELECTION - LOAD VARIANTS + TAX INFO
+    // ============================================================
     $('#productSelect').on('change', function() {
         const selectedOption = $(this).find('option:selected');
         const price = selectedOption.data('price');
@@ -828,15 +1026,24 @@ $(document).ready(function() {
 
         selectedVariant = null;
         $('#itemPrice').val(price);
+        $('#itemQuantity').val(1);
+
+        if (!productId) {
+            $('#taxInfoPreview').addClass('d-none');
+            return;
+        }
+
+        // ✅ LOAD TAX INFO
+        loadProductTaxInfo(productId, function(taxInfo) {
+            displayTaxPreview(taxInfo, price);
+        });
 
         if (hasVariants && productId) {
-            // Product has variants - load them
             $('#variantSection').show();
             $('#variantSelect').html('<option value="">Loading variants...</option>');
             $('#stockInfo').text('');
             $('#selectedVariantPreview').hide();
 
-            // Load variants via AJAX
             $.ajax({
                 url: `/admin/orders/products/${productId}/variants`,
                 type: 'GET',
@@ -872,14 +1079,73 @@ $(document).ready(function() {
                 }
             });
         } else {
-            // No variants - show main product stock
             $('#variantSection').hide();
             $('#selectedVariantPreview').hide();
-            $('#stockInfo').text(`Available stock: ${stock}`);
+            const stockColor = stock > 10 ? 'success' : (stock > 0 ? 'warning' : 'danger');
+            $('#stockInfo').html(`<i class="bi bi-box-seam text-${stockColor}"></i> Available stock: <strong class="text-${stockColor}">${stock}</strong>`);
         }
     });
 
-    // ✅ NEW: Variant Selection - Update Price and Show Preview
+    // ✅ DISPLAY TAX PREVIEW IN MODAL
+    function displayTaxPreview(taxInfo, price) {
+        const $preview = $('#taxInfoPreview');
+
+        if (!taxInfo.is_taxable) {
+            $preview.html(`
+                <div class="alert alert-secondary mb-0">
+                    <i class="bi bi-x-circle"></i> <strong>Non-Taxable</strong> - No tax applies to this product
+                </div>
+            `).removeClass('d-none');
+            return;
+        }
+
+        const taxRate = taxInfo.tax_rate / 100;
+        let taxAmount, basePrice, totalPrice;
+
+        if (taxInfo.tax_type === 'inclusive') {
+            basePrice = price / (1 + taxRate);
+            taxAmount = price - basePrice;
+            totalPrice = price;
+        } else {
+            basePrice = price;
+            taxAmount = price * taxRate;
+            totalPrice = price + taxAmount;
+        }
+
+        const badgeClass = taxInfo.tax_type === 'inclusive' ? 'bg-success' : 'bg-danger';
+        const icon = taxInfo.tax_type === 'inclusive' ? 'check-circle' : 'plus-circle';
+
+        $preview.html(`
+            <div class="alert alert-light border mb-0">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span><i class="bi bi-receipt"></i> <strong>Tax Info</strong></span>
+                    <span class="badge ${badgeClass}">
+                        <i class="bi bi-${icon}"></i> ${taxInfo.tax_rate}% ${taxInfo.tax_type.toUpperCase()}
+                    </span>
+                </div>
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Base Price:</td>
+                        <td class="text-end"><strong>${currencySymbol}${basePrice.toFixed(2)}</strong></td>
+                    </tr>
+                    <tr class="${taxInfo.tax_type === 'inclusive' ? 'text-success' : 'text-danger'}">
+                        <td>Tax Amount:</td>
+                        <td class="text-end"><strong>${currencySymbol}${taxAmount.toFixed(2)}</strong></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Total Price:</strong></td>
+                        <td class="text-end"><strong>${currencySymbol}${totalPrice.toFixed(2)}</strong></td>
+                    </tr>
+                </table>
+                ${taxInfo.tax_type === 'inclusive'
+                    ? '<small class="text-muted"><i class="bi bi-info-circle"></i> Tax is already included in the price</small>'
+                    : '<small class="text-muted"><i class="bi bi-exclamation-triangle"></i> Tax will be added at checkout</small>'
+                }
+            </div>
+        `).removeClass('d-none');
+    }
+
+    // Variant Selection - Update Price and Show Preview
     $('#variantSelect').on('change', function() {
         const selectedOption = $(this).find('option:selected');
 
@@ -896,8 +1162,9 @@ $(document).ready(function() {
             // Update price
             $('#itemPrice').val(selectedVariant.price);
 
-            // Update stock info
-            $('#stockInfo').text(`Available stock: ${selectedVariant.stock}`);
+            // Update stock info with color coding
+            const stockColor = selectedVariant.stock > 10 ? 'success' : (selectedVariant.stock > 0 ? 'warning' : 'danger');
+            $('#stockInfo').html(`<i class="bi bi-box-seam text-${stockColor}"></i> Available stock: <strong class="text-${stockColor}">${selectedVariant.stock}</strong>`);
 
             // Show preview
             $('#variantPreviewImage').attr('src', selectedVariant.image);
@@ -912,7 +1179,33 @@ $(document).ready(function() {
         }
     });
 
-    // ✅ UPDATED: Confirm Add Item - WITH VARIANT SUPPORT
+    // ✅ REAL-TIME QUANTITY VALIDATION
+    $('#itemQuantity').on('input', function() {
+        const quantity = parseInt($(this).val()) || 0;
+        const selectedProduct = $('#productSelect option:selected');
+        const hasVariants = selectedProduct.data('has-variants') === true || selectedProduct.data('has-variants') === 'true';
+
+        let availableStock = 0;
+
+        if (hasVariants && selectedVariant) {
+            availableStock = selectedVariant.stock;
+        } else if (!hasVariants) {
+            availableStock = selectedProduct.data('stock');
+        }
+
+        if (quantity > availableStock) {
+            $(this).addClass('is-invalid');
+            $(this).next('.invalid-feedback').remove();
+            $(this).after(`<div class="invalid-feedback d-block">Requested quantity (${quantity}) exceeds available stock (${availableStock})</div>`);
+        } else {
+            $(this).removeClass('is-invalid');
+            $(this).next('.invalid-feedback').remove();
+        }
+    });
+
+    // ============================================================
+    // ADD ITEM WITH TAX INFO
+    // ============================================================
     $('#confirmAddItem').on('click', function() {
         const selectedProduct = $('#productSelect option:selected');
 
@@ -927,7 +1220,6 @@ $(document).ready(function() {
 
         const hasVariants = selectedProduct.data('has-variants') === true || selectedProduct.data('has-variants') === 'true';
 
-        // Check if variant is required but not selected
         if (hasVariants && !selectedVariant) {
             Swal.fire({
                 icon: 'warning',
@@ -949,48 +1241,199 @@ $(document).ready(function() {
             return;
         }
 
-        // ✅ Build item object with variant support
-        const item = {
-            id: itemCounter++,
-            product_id: selectedProduct.val(),
-            variant_id: selectedVariant ? selectedVariant.id : null, // ← NEW
-            name: selectedVariant
-                ? `${selectedProduct.data('name')} - ${selectedVariant.name}`
-                : selectedProduct.data('name'),
-            sku: selectedVariant ? selectedVariant.sku : selectedProduct.data('sku'),
-            image: selectedVariant ? selectedVariant.image : selectedProduct.data('image'),
-            quantity: quantity,
-            unit_price: price,
-            subtotal: quantity * price,
-            has_variant: selectedVariant !== null
-        };
+        // Stock validation (existing code)
+        let availableStock = 0;
+        let stockSource = '';
 
-        orderItems.push(item);
-        renderOrderItems();
-        calculateTotals();
+        if (hasVariants && selectedVariant) {
+            availableStock = selectedVariant.stock;
+            stockSource = `${selectedProduct.data('name')} (${selectedVariant.name})`;
+        } else {
+            availableStock = selectedProduct.data('stock');
+            stockSource = selectedProduct.data('name');
+        }
 
-        $('#addItemModal').modal('hide');
+        const productId = selectedProduct.val();
+        const variantId = selectedVariant ? selectedVariant.id : null;
+
+        let existingQuantity = 0;
+        orderItems.forEach(item => {
+            if (item.product_id === productId && item.variant_id === variantId) {
+                existingQuantity += item.quantity;
+            }
+        });
+
+        const totalRequestedQuantity = existingQuantity + quantity;
+
+        if (totalRequestedQuantity > availableStock) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Insufficient Stock',
+                html: `
+                    <p><strong>${stockSource}</strong></p>
+                    <hr>
+                    <table class="table table-sm">
+                        <tr>
+                            <td class="text-start">Available Stock:</td>
+                            <td class="text-end"><strong>${availableStock}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-start">Already in Order:</td>
+                            <td class="text-end"><strong>${existingQuantity}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-start">Trying to Add:</td>
+                            <td class="text-end"><strong>${quantity}</strong></td>
+                        </tr>
+                        <tr class="table-danger">
+                            <td class="text-start"><strong>Total Needed:</strong></td>
+                            <td class="text-end"><strong>${totalRequestedQuantity}</strong></td>
+                        </tr>
+                    </table>
+                `,
+                confirmButtonColor: '#dc3545'
+            });
+            return;
+        }
+
+        // Duplicate check (existing code)
+        let duplicateIndex = -1;
+        orderItems.forEach((item, index) => {
+            if (item.product_id === productId && item.variant_id === variantId) {
+                duplicateIndex = index;
+            }
+        });
+
+        if (duplicateIndex !== -1) {
+            const existingItem = orderItems[duplicateIndex];
+            const newTotalQty = existingItem.quantity + quantity;
+
+            Swal.fire({
+                icon: 'question',
+                title: 'Product Already Added',
+                html: `
+                    <p><strong>${existingItem.name}</strong> is already in the order.</p>
+                    <hr>
+                    <table class="table table-sm">
+                        <tr>
+                            <td class="text-start">Current Quantity:</td>
+                            <td class="text-end"><strong>${existingItem.quantity}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-start">Adding:</td>
+                            <td class="text-end"><strong>+${quantity}</strong></td>
+                        </tr>
+                        <tr class="table-success">
+                            <td class="text-start"><strong>New Quantity:</strong></td>
+                            <td class="text-end"><strong>${newTotalQty}</strong></td>
+                        </tr>
+                    </table>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Increase Quantity',
+                cancelButtonText: 'No, Cancel',
+                confirmButtonColor: '#5B914C'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    orderItems[duplicateIndex].quantity = newTotalQty;
+                    orderItems[duplicateIndex].subtotal = newTotalQty * orderItems[duplicateIndex].unit_price;
+                    orderItems[duplicateIndex] = calculateItemTax(orderItems[duplicateIndex]);
+
+                    renderOrderItems();
+                    calculateTotals();
+
+                    $('#addItemModal').modal('hide');
+                    resetAddItemModal();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Quantity Updated!',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            });
+            return;
+        }
+
+        // ✅ CREATE NEW ITEM WITH TAX
+        loadProductTaxInfo(productId, function(taxInfo) {
+            const productData = {
+                id: productId,
+                name: selectedProduct.data('name'),
+                sku: selectedProduct.data('sku'),
+                image: selectedProduct.data('image'),
+                stock: availableStock,
+                is_taxable: taxInfo.is_taxable,
+                tax_type: taxInfo.tax_type,
+                tax_rate: taxInfo.tax_rate
+            };
+
+            const variantData = selectedVariant ? {
+                id: selectedVariant.id,
+                name: selectedVariant.name,
+                sku: selectedVariant.sku,
+                image: selectedVariant.image,
+                stock: selectedVariant.stock
+            } : null;
+
+            let item = createItemStructure(productData, variantData, quantity, price);
+            item = calculateItemTax(item);
+
+            orderItems.push(item);
+            renderOrderItems();
+            calculateTotals();
+
+            $('#addItemModal').modal('hide');
+            resetAddItemModal();
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Item Added!',
+                text: `${item.name} added to order`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        });
+    });
+
+    // Helper function to reset modal
+    function resetAddItemModal() {
         $('#itemQuantity').val(1);
         $('#itemPrice').val('');
         $('#productSelect').val('');
         $('#variantSelect').val('');
         $('#variantSection').hide();
         $('#selectedVariantPreview').hide();
+        $('#taxInfoPreview').addClass('d-none');
+        $('#itemQuantity').removeClass('is-invalid');
+        $('#itemQuantity').next('.invalid-feedback').remove();
         selectedVariant = null;
-    });
+    }
 
-    // ✅ UPDATED: Render Order Items - WITH VARIANT INDICATION
+    // ============================================================
+    // RENDER ORDER ITEMS WITH TAX INFO
+    // ============================================================
     function renderOrderItems() {
         if (orderItems.length === 0) {
             $('#orderItemsContainer').html('');
             $('#noItemsAlert').removeClass('d-none');
+            $('#taxSummaryAlert').addClass('d-none');
             return;
         }
 
         $('#noItemsAlert').addClass('d-none');
+        $('#taxSummaryAlert').removeClass('d-none');
+
         let html = '';
 
         orderItems.forEach((item, index) => {
+            const taxBadge = item.is_taxable
+                ? `<span class="badge ${item.tax_type === 'inclusive' ? 'bg-success' : 'bg-danger'} badge-sm">
+                    ${item.tax_rate}% ${item.tax_type === 'inclusive' ? 'INC' : 'EXC'}
+                   </span>`
+                : '<span class="badge bg-secondary badge-sm">No Tax</span>';
+
             html += `
                 <div class="card order-item-card mb-3">
                     <div class="card-body">
@@ -1001,14 +1444,29 @@ $(document).ready(function() {
                             <div class="col">
                                 <h6 class="mb-1">
                                     ${item.name}
-                                    ${item.has_variant ? '<span class="badge bg-info badge-sm ms-2">Variant</span>' : ''}
+                                    ${item.has_variant ? '<span class="badge bg-info badge-sm ms-1">Variant</span>' : ''}
+                                    ${taxBadge}
                                 </h6>
                                 <small class="text-muted">SKU: ${item.sku}</small>
+                                <br>
+                                <small class="text-muted">Max Stock: <strong>${item.max_stock}</strong></small>
+                                ${item.is_taxable ? `
+                                    <br>
+                                    <small class="text-muted">
+                                        Tax: ${currencySymbol}${item.tax_amount.toFixed(2)}
+                                        ${item.tax_type === 'inclusive' ? '(included)' : '(extra)'}
+                                    </small>
+                                ` : ''}
                             </div>
                             <div class="col-auto text-center">
                                 <small class="text-muted d-block">Quantity</small>
                                 <input type="number" class="form-control form-control-sm item-quantity"
-                                       data-index="${index}" value="${item.quantity}" min="1" style="width: 80px;">
+                                       data-index="${index}"
+                                       data-max="${item.max_stock}"
+                                       value="${item.quantity}"
+                                       min="1"
+                                       max="${item.max_stock}"
+                                       style="width: 80px;">
                             </div>
                             <div class="col-auto text-center">
                                 <small class="text-muted d-block">Unit Price</small>
@@ -1017,7 +1475,7 @@ $(document).ready(function() {
                             </div>
                             <div class="col-auto text-end">
                                 <small class="text-muted d-block">Subtotal</small>
-                                <strong class="item-subtotal">{{ store_currency_symbol() }}${item.subtotal.toFixed(2)}</strong>
+                                <strong class="item-subtotal">${currencySymbol}${item.subtotal.toFixed(2)}</strong>
                             </div>
                             <div class="col-auto">
                                 <button type="button" class="btn btn-sm btn-outline-danger remove-item" data-index="${index}">
@@ -1037,26 +1495,81 @@ $(document).ready(function() {
         $('#orderItemsContainer').html(html);
     }
 
-    // Update Item Quantity (same as before)
+    // ============================================================
+    // UPDATE ITEM QUANTITY WITH TAX RECALCULATION
+    // ============================================================
     $(document).on('change', '.item-quantity', function() {
         const index = $(this).data('index');
-        const newQuantity = parseInt($(this).val());
+        const maxStock = $(this).data('max');
+        let newQuantity = parseInt($(this).val());
 
         if (newQuantity < 1) {
             $(this).val(1);
-            return;
+            newQuantity = 1;
+        }
+
+        if (newQuantity > maxStock) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Exceeds Available Stock',
+                html: `Available stock: <strong>${maxStock}</strong>`,
+                confirmButtonColor: '#dc3545'
+            });
+
+            $(this).val(maxStock);
+            newQuantity = maxStock;
         }
 
         orderItems[index].quantity = newQuantity;
         orderItems[index].subtotal = orderItems[index].quantity * orderItems[index].unit_price;
+        orderItems[index] = calculateItemTax(orderItems[index]);
 
         $(`.hidden-quantity-${index}`).val(newQuantity);
-        $(this).closest('.card-body').find('.item-subtotal').text('$' + orderItems[index].subtotal.toFixed(2));
+        $(this).closest('.card-body').find('.item-subtotal').text(currencySymbol + orderItems[index].subtotal.toFixed(2));
 
         calculateTotals();
     });
 
-    // Update Item Price (same as before)
+    // Update Item Price
+    $(document).on('change', '.item-price', function() {
+        const index = $(this).data('index');
+        const newPrice = parseFloat($(this).val());
+
+        if (newPrice < 0) {
+            $(this).val(0);
+            return;
+        }
+
+        orderItems[index].unit_price = newPrice;
+        orderItems[index].subtotal = orderItems[index].quantity * orderItems[index].unit_price;
+        orderItems[index] = calculateItemTax(orderItems[index]);
+
+        $(`.hidden-price-${index}`).val(newPrice);
+        $(this).closest('.card-body').find('.item-subtotal').text(currencySymbol + orderItems[index].subtotal.toFixed(2));
+
+        calculateTotals();
+    });
+
+    // Remove Item
+    $(document).on('click', '.remove-item', function() {
+        const index = $(this).data('index');
+
+        Swal.fire({
+            icon: 'warning',
+            title: 'Remove Item?',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            confirmButtonText: 'Yes, remove it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                orderItems.splice(index, 1);
+                renderOrderItems();
+                calculateTotals();
+            }
+        });
+    });
+
+    // Update Item Price
     $(document).on('change', '.item-price', function() {
         const index = $(this).data('index');
         const newPrice = parseFloat($(this).val());
@@ -1070,12 +1583,12 @@ $(document).ready(function() {
         orderItems[index].subtotal = orderItems[index].quantity * orderItems[index].unit_price;
 
         $(`.hidden-price-${index}`).val(newPrice);
-        $(this).closest('.card-body').find('.item-subtotal').text('$' + orderItems[index].subtotal.toFixed(2));
+        $(this).closest('.card-body').find('.item-subtotal').text(currencySymbol + orderItems[index].subtotal.toFixed(2));
 
         calculateTotals();
     });
 
-    // Remove Item (same as before)
+    // Remove Item
     $(document).on('click', '.remove-item', function() {
         const index = $(this).data('index');
 
@@ -1096,34 +1609,69 @@ $(document).ready(function() {
         });
     });
 
-    // Calculate Totals (same as before)
-    let currentCurrency = '{{ store_currency_symbol() }}';
+    // Calculate Totals
+    let currentCurrency = currencySymbol;
     $('#currency').on('change', function() {
         const selected = $(this).find('option:selected').text();
-        currentCurrency = selected.match(/\(([^)]+)\)/)[1];
+        const match = selected.match(/\(([^)]+)\)/);
+        if (match) {
+            currentCurrency = match[1];
+        }
         calculateTotals();
     });
 
+    // ============================================================
+    // CALCULATE TOTALS WITH PRODUCT-LEVEL TAX
+    // ============================================================
     function calculateTotals() {
         let subtotal = 0;
+        let inclusiveTaxTotal = 0;
+        let exclusiveTaxTotal = 0;
+        let taxableItemsCount = 0;
 
         orderItems.forEach(item => {
             subtotal += item.subtotal;
+
+            if (item.is_taxable) {
+                taxableItemsCount++;
+                if (item.tax_type === 'inclusive') {
+                    inclusiveTaxTotal += item.tax_amount;
+                } else {
+                    exclusiveTaxTotal += item.tax_amount;
+                }
+            }
         });
 
-        const taxRate = parseFloat($('#tax_rate').val()) || 0;
+        // Update tax summary
+        $('#taxableItemsCount').text(taxableItemsCount);
+        $('#inclusiveTaxTotal').text(currencySymbol + inclusiveTaxTotal.toFixed(2));
+        $('#exclusiveTaxTotal').text(currencySymbol + exclusiveTaxTotal.toFixed(2));
+
+        // Order-level additional tax (admin override)
+        const additionalTaxRate = parseFloat($('#tax_rate').val()) || 0;
         const shippingAmount = parseFloat($('#shipping_amount').val()) || 0;
         const discountAmount = parseFloat($('#discount_amount').val()) || 0;
 
-        const taxAmount = subtotal * (taxRate / 100);
-        const total = Math.max(0, subtotal + taxAmount + shippingAmount - discountAmount);
+        const additionalTaxAmount = subtotal * (additionalTaxRate / 100);
 
-        $('#summarySubtotal').text(currentCurrency + subtotal.toFixed(2));
-        $('#summaryTax').text(currentCurrency + taxAmount.toFixed(2));
-        $('#summaryShipping').text(currentCurrency + shippingAmount.toFixed(2));
-        $('#summaryDiscount').text('-' + currentCurrency + discountAmount.toFixed(2));
-        $('#summaryTotal').text(currentCurrency + total.toFixed(2));
-        $('#taxRateDisplay').text(taxRate);
+        // Total tax = inclusive (already in price) + exclusive (to add) + additional (admin)
+        const totalTax = inclusiveTaxTotal + exclusiveTaxTotal + additionalTaxAmount;
+
+        // Final total
+        const total = Math.max(0, subtotal + exclusiveTaxTotal + additionalTaxAmount + shippingAmount - discountAmount);
+
+        // Update summary
+        $('#summarySubtotal').text(currencySymbol + subtotal.toFixed(2));
+        $('#summaryInclusiveTax').text(currencySymbol + inclusiveTaxTotal.toFixed(2));
+        $('#summaryExclusiveTax').text(currencySymbol + exclusiveTaxTotal.toFixed(2));
+        $('#summaryAdditionalTax').text(currencySymbol + additionalTaxAmount.toFixed(2));
+        $('#summaryShipping').text(currencySymbol + shippingAmount.toFixed(2));
+        $('#summaryDiscount').text('-' + currencySymbol + discountAmount.toFixed(2));
+
+        $('#summaryBaseAmount').text(currencySymbol + (subtotal - inclusiveTaxTotal).toFixed(2));
+        $('#summaryTotalTax').text(currencySymbol + totalTax.toFixed(2));
+        $('#summaryTotal').text(currencySymbol + total.toFixed(2));
+        $('#taxRateDisplay').text(additionalTaxRate);
     }
 
     // Recalculate on changes
@@ -1131,7 +1679,7 @@ $(document).ready(function() {
         calculateTotals();
     });
 
-    // Form Submission (same as before)
+    // Form Submission
     $('#createOrderForm').on('submit', function(e) {
         e.preventDefault();
 
@@ -1214,7 +1762,7 @@ $(document).ready(function() {
         });
     });
 
-    // Add Customer Modal (keep existing code)
+    // Add Customer Modal
     $('#addCustomerBtn').on('click', function() {
         $('#addCustomerModal').modal('show');
     });
@@ -1230,14 +1778,13 @@ $(document).ready(function() {
         }
     });
 
-     // Submit Add Customer Form
+    // Submit Add Customer Form
     $('#addCustomerForm').on('submit', function(e) {
         e.preventDefault();
 
         const saveBtn = $('#saveCustomerBtn');
         const originalText = saveBtn.html();
 
-        // Disable button and show loading
         saveBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Saving...');
 
         $.ajax({
@@ -1254,7 +1801,6 @@ $(document).ready(function() {
                         showConfirmButton: false
                     });
 
-                    // Add new customer to dropdown
                     const newCustomer = response.customer;
                     const newOption = new Option(
                         `${newCustomer.first_name} ${newCustomer.last_name} - ${newCustomer.email}`,
@@ -1263,7 +1809,6 @@ $(document).ready(function() {
                         true
                     );
 
-                    // Set data attributes for auto-fill
                     $(newOption).attr({
                         'data-email': newCustomer.email,
                         'data-phone': newCustomer.phone || '',
@@ -1291,11 +1836,9 @@ $(document).ready(function() {
 
                     $('#customer_id').append(newOption).trigger('change');
 
-                    // Close modal and reset form
                     $('#addCustomerModal').modal('hide');
                     $('#addCustomerForm')[0].reset();
 
-                    // Auto-fill shipping address if data exists
                     if (newCustomer.shipping_address_line1) {
                         $('#shipping_first_name').val(newCustomer.first_name);
                         $('#shipping_last_name').val(newCustomer.last_name);
@@ -1315,7 +1858,6 @@ $(document).ready(function() {
                     });
                 }
 
-                // Re-enable button
                 saveBtn.prop('disabled', false).html(originalText);
             },
             error: function(xhr) {
@@ -1336,59 +1878,48 @@ $(document).ready(function() {
                     html: errorMessage
                 });
 
-                // Re-enable button
                 saveBtn.prop('disabled', false).html(originalText);
             }
         });
     });
 
-    // Reset modal form when closed
     $('#addCustomerModal').on('hidden.bs.modal', function() {
         $('#addCustomerForm')[0].reset();
         $('#sameAsBilling').prop('checked', false);
     });
 
-    // Initialize
-    $('#noItemsAlert').removeClass('d-none');
-    calculateTotals();
-
-    //
-
     // ============================================================
-    // COUPON & DISCOUNT MANAGEMENT
+    // COUPON & DISCOUNT MANAGEMENT (Keep existing code)
     // ============================================================
-
     let appliedCoupon = null;
 
-    // Auto-uppercase coupon code input
     $('#coupon_code_input').on('input', function() {
         $(this).val($(this).val().toUpperCase());
     });
 
-    // Apply Coupon Button
     $('#applyCouponBtn').on('click', function() {
         const couponCode = $('#coupon_code_input').val().trim().toUpperCase();
 
         if (!couponCode) {
-            Swal.fire({
+            showCouponMessage({
                 icon: 'warning',
                 title: 'No Code Entered',
-                text: 'Please enter a coupon code'
+                message: 'Please enter a coupon code',
+                type: 'warning'
             });
             return;
         }
 
-        // Validate that items exist
         if (orderItems.length === 0) {
-            Swal.fire({
+            showCouponMessage({
                 icon: 'warning',
                 title: 'Empty Order',
-                text: 'Please add items to the order first'
+                message: 'Please add items to the order first',
+                type: 'warning'
             });
             return;
         }
 
-        // Prepare cart items for API
         const cartItems = [];
         let subtotal = 0;
 
@@ -1402,17 +1933,14 @@ $(document).ready(function() {
             subtotal += item.subtotal;
         });
 
-        // Get customer info
         const customerType = $('input[name="customer_type"]:checked').val();
         const customerId = customerType === 'existing' ? $('#customer_id').val() : null;
         const guestEmail = customerType === 'guest' ? $('#guest_email').val() : null;
 
-        // Show loading
         const btn = $(this);
         const originalHtml = btn.html();
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Validating...');
 
-        // Validate coupon via AJAX
         $.ajax({
             url: '{{ route("admin.orders.validate-coupon") }}',
             type: 'POST',
@@ -1428,59 +1956,244 @@ $(document).ready(function() {
                 if (response.success) {
                     appliedCoupon = response.data;
 
-                    // Update UI
                     $('#couponInfo').removeClass('d-none');
                     $('#couponName').text(response.data.coupon_name);
                     $('#couponDiscount').text(response.data.formatted_discount);
 
-                    // Update hidden fields
+                    if (response.data.description) {
+                        $('#couponDescription').text(response.data.description).removeClass('d-none');
+                    }
+
                     $('#coupon_id').val(response.data.coupon_id);
                     $('#discount_code').val(response.data.coupon_code);
                     $('#discount_amount').val(response.data.discount_amount).prop('readonly', true);
 
-                    // Toggle buttons
                     $('#applyCouponBtn').addClass('d-none');
                     $('#removeCouponBtn').removeClass('d-none');
 
-                    // Recalculate totals
                     calculateTotals();
 
-                    Swal.fire({
-                        icon: 'success',
+                    showCouponMessage({
+                        icon: response.icon || 'success',
                         title: 'Coupon Applied!',
-                        text: response.message,
-                        timer: 2000,
-                        showConfirmButton: false
+                        message: response.message,
+                        type: response.message_type || 'success',
+                        timer: 3000
                     });
                 } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Invalid Coupon',
-                        text: response.message
-                    });
+                    handleCouponError(response);
                 }
 
                 btn.prop('disabled', false).html(originalHtml);
             },
             error: function(xhr) {
-                let errorMessage = 'Failed to validate coupon';
+                const response = xhr.responseJSON;
 
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMessage = xhr.responseJSON.message;
+                if (response) {
+                    // Check if it's a validation error (status 422)
+                    if (xhr.status === 422 && response.errors) {
+                        handleValidationErrors(response.errors, response.message);
+                    } else {
+                        handleCouponError(response);
+                    }
+                } else {
+                    showCouponMessage({
+                        icon: 'error',
+                        title: 'Connection Error',
+                        message: 'Failed to connect to the server. Please check your internet connection.',
+                        type: 'error'
+                    });
                 }
-
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: errorMessage
-                });
 
                 btn.prop('disabled', false).html(originalHtml);
             }
         });
     });
 
-    // Remove Coupon Button
+    // Helper function to display coupon messages
+    function showCouponMessage(options) {
+        const config = {
+            icon: options.icon || 'info',
+            title: options.title || 'Notice',
+            showConfirmButton: options.timer ? false : true,
+            timer: options.timer || null,
+            customClass: {
+                popup: 'coupon-message-popup',
+                title: `coupon-message-${options.type || 'info'}`
+            }
+        };
+
+        // Use html or text based on what's provided
+        if (options.html) {
+            config.html = options.html;
+        } else {
+            config.text = options.message || '';
+        }
+
+        Swal.fire(config);
+    }
+
+    // NEW: Helper function to handle validation errors
+    function handleValidationErrors(errors, mainMessage = 'Validation Error') {
+        let errorHtml = '<div class="text-left">';
+        errorHtml += '<p class="mb-3"><strong>' + mainMessage + '</strong></p>';
+        errorHtml += '<ul class="list-unstyled mb-0">';
+
+        // Loop through each field's errors
+        Object.keys(errors).forEach(function(field) {
+            const fieldErrors = errors[field];
+
+            // Format field name (e.g., guest_email -> Guest Email)
+            const fieldName = field.split('_').map(word =>
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+
+            fieldErrors.forEach(function(error) {
+                errorHtml += `<li class="mb-2">
+                    <i class="fas fa-exclamation-circle text-danger"></i>
+                    <strong>${fieldName}:</strong> ${error}
+                </li>`;
+            });
+        });
+
+        errorHtml += '</ul></div>';
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Validation Failed',
+            html: errorHtml,
+            confirmButtonText: 'OK',
+            customClass: {
+                popup: 'coupon-message-popup',
+                title: 'coupon-message-error',
+                confirmButton: 'btn btn-primary'
+            },
+            buttonsStyling: false
+        });
+    }
+
+    // Helper function to handle coupon errors
+    function handleCouponError(response) {
+        let title = 'Coupon Error';
+        let message = response.message || 'Failed to validate coupon';
+        let icon = response.icon || 'error';
+        let htmlContent = null;
+
+        // Handle specific error types
+        switch (response.message_type) {
+            case 'not_found':
+                title = 'Invalid Coupon';
+                break;
+
+            case 'expired':
+                title = 'Coupon Expired';
+                break;
+
+            case 'customer_ineligible':
+                title = 'Not Eligible';
+                if (response.details) {
+                    htmlContent = `<p>${message}</p><div class="mt-2 text-muted small">${response.details}</div>`;
+                }
+                break;
+
+            case 'cart_requirements_not_met':
+                title = 'Requirements Not Met';
+                htmlContent = '<div class="text-left">';
+                htmlContent += `<p>${message}</p>`;
+
+                // Add requirement details if available
+                if (response.requirements) {
+                    const req = response.requirements;
+                    htmlContent += '<div class="alert alert-info mt-3 mb-0 small">';
+
+                    if (req.minimum_amount && req.current_amount < req.minimum_amount) {
+                        const currency = '{{ store_currency_symbol() }}';
+                        htmlContent += `<div class="mb-2">
+                            <strong>Minimum Amount Required:</strong> ${currency} ${parseFloat(req.minimum_amount).toFixed(2)}<br>
+                            <strong>Current Cart Amount:</strong> ${currency} ${parseFloat(req.current_amount).toFixed(2)}<br>
+                            <strong>Need to add:</strong> ${currency} ${(parseFloat(req.minimum_amount) - parseFloat(req.current_amount)).toFixed(2)}
+                        </div>`;
+                    }
+
+                    if (req.minimum_items && req.current_items < req.minimum_items) {
+                        htmlContent += `<div>
+                            <strong>Minimum Items Required:</strong> ${req.minimum_items}<br>
+                            <strong>Current Items in Cart:</strong> ${req.current_items}<br>
+                            <strong>Need to add:</strong> ${req.minimum_items - req.current_items} more item(s)
+                        </div>`;
+                    }
+
+                    htmlContent += '</div>';
+                }
+                htmlContent += '</div>';
+                break;
+
+            case 'validation_error':
+                // This case is now handled by handleValidationErrors function
+                if (response.errors) {
+                    handleValidationErrors(response.errors, message);
+                    return; // Exit early since we're using a different handler
+                }
+                title = 'Validation Error';
+                break;
+
+            case 'system_error':
+                title = 'System Error';
+                message = 'An unexpected error occurred. Please try again or contact support.';
+                break;
+        }
+
+        showCouponMessage({
+            icon: icon,
+            title: title,
+            html: htmlContent || null,
+            message: htmlContent ? null : message,
+            type: response.message_type || 'error'
+        });
+    }
+
+    // Optional: Add custom CSS for better styling
+    const couponMessageStyles = `
+        <style>
+        .coupon-message-popup {
+            border-radius: 8px;
+        }
+        .coupon-message-success {
+            color: #5B914C !important;
+        }
+        .coupon-message-error {
+            color: #dc3545 !important;
+        }
+        .coupon-message-warning {
+            color: #ffc107 !important;
+        }
+        .coupon-message-info {
+            color: #17a2b8 !important;
+        }
+        .swal2-html-container {
+            text-align: left !important;
+        }
+        .swal2-html-container ul {
+            padding-left: 0;
+        }
+        .swal2-html-container .list-unstyled li {
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-left: 3px solid #dc3545;
+            border-radius: 4px;
+        }
+        </style>
+        `;
+
+    // Inject styles into the page
+    if (!document.getElementById('coupon-message-styles')) {
+        const styleElement = document.createElement('div');
+        styleElement.id = 'coupon-message-styles';
+        styleElement.innerHTML = couponMessageStyles;
+        document.head.appendChild(styleElement);
+    }
+
     $('#removeCouponBtn').on('click', function() {
         Swal.fire({
             icon: 'warning',
@@ -1491,7 +2204,6 @@ $(document).ready(function() {
             cancelButtonText: 'Cancel'
         }).then((result) => {
             if (result.isConfirmed) {
-                // Clear coupon data
                 appliedCoupon = null;
                 $('#coupon_code_input').val('');
                 $('#couponInfo').addClass('d-none');
@@ -1499,11 +2211,9 @@ $(document).ready(function() {
                 $('#discount_code').val('');
                 $('#discount_amount').val(0).prop('readonly', false);
 
-                // Toggle buttons
                 $('#applyCouponBtn').removeClass('d-none');
                 $('#removeCouponBtn').addClass('d-none');
 
-                // Recalculate totals
                 calculateTotals();
 
                 Swal.fire({
@@ -1516,12 +2226,15 @@ $(document).ready(function() {
         });
     });
 
-    // Manual Discount Input Change
     $('#discount_amount').on('input', function() {
         if (!$(this).prop('readonly')) {
             calculateTotals();
         }
     });
+
+    // Initialize
+    $('#noItemsAlert').removeClass('d-none');
+    calculateTotals();
 });
 </script>
 @endpush

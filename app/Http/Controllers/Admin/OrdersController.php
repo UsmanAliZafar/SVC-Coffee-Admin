@@ -418,17 +418,42 @@ class OrdersController extends Controller
             }
 
             // ============================================================
-            // STEP 2: CALCULATE TOTALS (same as before)
+            // STEP 2: CALCULATE TOTALS (WITH PRODUCT-LEVEL TAX)
             // ============================================================
             $subtotal = 0;
+            $totalItemTax = 0;
+            $exclusiveTax = 0;
+
+            // Calculate subtotal and item-level taxes
             foreach ($validated['items'] as $item) {
-                $subtotal += $item['unit_price'] * $item['quantity'];
+                $product = Product::find($item['product_id']);
+                $itemSubtotal = $item['unit_price'] * $item['quantity'];
+                $subtotal += $itemSubtotal;
+
+                // Calculate item tax
+                if ($product && $product->is_taxable && $product->tax_percentage > 0) {
+                    $itemTax = ($itemSubtotal * $product->tax_percentage) / 100;
+                    $totalItemTax += $itemTax;
+
+                    // Track exclusive tax separately (will be added to total)
+                    if ($product->tax_type === 'exclusive') {
+                        $exclusiveTax += $itemTax;
+                    }
+                }
             }
 
-            $taxAmount = $subtotal * (($validated['tax_rate'] ?? 0) / 100);
+            // Calculate additional tax (order-level)
+            $additionalTax = $subtotal * (($validated['tax_rate'] ?? 0) / 100);
+
+            // Total tax = all item taxes + additional tax
+            $taxAmount = $totalItemTax + $additionalTax;
+
             $discountAmount = $validated['discount_amount'] ?? 0;
             $shippingAmount = $validated['shipping_amount'] ?? 0;
-            $totalAmount = $subtotal + $taxAmount + $shippingAmount - $discountAmount;
+
+            // Grand total = subtotal + exclusive tax + additional tax + shipping - discount
+            // (inclusive tax is already in subtotal, so we don't add it again)
+            $totalAmount = $subtotal + $exclusiveTax + $additionalTax + $shippingAmount - $discountAmount;
 
             // ============================================================
             // STEP 3: CREATE ORDER (same as before)
@@ -474,8 +499,19 @@ class OrdersController extends Controller
                 $itemImage = $variant ? $variant->image_path : $product->main_image;
 
                 $itemSubtotal = $itemData['unit_price'] * $itemData['quantity'];
-                $itemTaxAmount = $product->is_taxable ? ($itemSubtotal * (($product->tax_percentage ?? 0) / 100)) : 0;
-                $itemTotal = $itemSubtotal + $itemTaxAmount;
+
+                // ✅ Calculate tax based on product tax settings
+                $itemTaxAmount = 0;
+                if ($product->is_taxable && $product->tax_percentage > 0) {
+                    $itemTaxAmount = ($itemSubtotal * $product->tax_percentage) / 100;
+                }
+
+                // ✅ Calculate item total based on tax type
+                if ($product->tax_type === 'exclusive') {
+                    $itemTotal = $itemSubtotal + $itemTaxAmount; // Add tax for exclusive
+                } else {
+                    $itemTotal = $itemSubtotal; // Tax already included for inclusive
+                }
 
                 $orderItem = OrderItem::create([
                     'order_id' => $order->id,
@@ -836,6 +872,31 @@ class OrdersController extends Controller
         }
     }
 
+    /**
+     * Get product tax information (for order creation)
+     */
+    public function getProductTaxInfo($productId)
+    {
+        try {
+            $product = Product::findOrFail($productId);
+
+            return response()->json([
+                'success' => true,
+                'tax_info' => [
+                    'is_taxable' => $product->is_taxable,
+                    'tax_type' => $product->tax_type,
+                    'tax_percentage' => $product->tax_percentage ?? 0,
+                    'tax_rate' => $product->tax_percentage ?? 0,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load tax info'
+            ], 500);
+        }
+    }
     /**
      * Handle status change with 2-stage stock management
      * NO PAYMENT CHECKS - Pure status-based

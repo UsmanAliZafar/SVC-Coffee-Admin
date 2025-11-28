@@ -140,6 +140,7 @@
                                     <th>Product</th>
                                     <th style="width: 100px;">Quantity</th>
                                     <th style="width: 120px;">Unit Price</th>
+                                    <th style="width: 100px;">Tax</th>
                                     <th style="width: 120px;">Total</th>
                                 </tr>
                             </thead>
@@ -160,6 +161,9 @@
                                         @if($item->product_sku)
                                         <br><small class="text-muted">SKU: {{ $item->product_sku }}</small>
                                         @endif
+                                        @if($item->variant_id)
+                                        <br><span class="badge bg-info badge-sm">Variant</span>
+                                        @endif
                                         @if($item->hasVariant())
                                         <br><small class="text-muted">{{ $item->getVariantOptionsString() }}</small>
                                         @endif
@@ -167,7 +171,31 @@
                                     <td>
                                         <span class="badge bg-secondary">{{ $item->quantity }}</span>
                                     </td>
-                                    <td>{{ $order->currency ?? '$' }} {{ number_format($item->unit_price, 2) }}</td>
+                                    <td>
+                                        {{ $order->currency ?? '$' }} {{ number_format($item->unit_price, 2) }}
+                                        {{-- ✅ NEW: Show tax info for unit price --}}
+                                        @if($item->is_taxable && $item->tax_rate > 0)
+                                        <br>
+                                        <small class="badge {{ $item->product && $item->product->tax_type === 'inclusive' ? 'bg-success' : 'bg-danger' }} badge-sm">
+                                            {{ $item->tax_rate }}%
+                                            {{ $item->product && $item->product->tax_type === 'inclusive' ? 'INC' : 'EXC' }}
+                                        </small>
+                                        @endif
+                                    </td>
+                                    {{-- ✅ NEW: Tax Column --}}
+                                    <td>
+                                        @if($item->is_taxable && $item->tax_amount > 0)
+                                            <span class="{{ $item->product && $item->product->tax_type === 'inclusive' ? 'text-success' : 'text-danger' }}">
+                                                {{ $order->currency ?? '$' }} {{ number_format($item->tax_amount, 2) }}
+                                            </span>
+                                            <br>
+                                            <small class="text-muted">
+                                                {{ $item->product && $item->product->tax_type === 'inclusive' ? 'Included' : 'Added' }}
+                                            </small>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
                                     <td><strong>{{ $order->currency ?? '$' }} {{ number_format($item->total, 2) }}</strong></td>
                                 </tr>
                                 @endforeach
@@ -176,6 +204,7 @@
                     </div>
                 </div>
             </div>
+
 
             {{-- Order Timeline --}}
             <div class="card border-0 shadow-sm mb-4">
@@ -306,32 +335,170 @@
                 <div class="card-body">
                     <table class="table table-sm mb-0">
                         <tbody>
+                            {{-- Subtotal --}}
                             <tr>
                                 <td>Subtotal:</td>
-                                <td class="text-end"><strong>{{ $order->currency ?? '$' }} {{ number_format($order->subtotal, 2) }}</strong></td>
+                                <td class="text-end"><strong>{{ $order->currency }} {{ number_format($order->subtotal, 2) }}</strong></td>
                             </tr>
+
+                            {{-- ✅ CALCULATE: All tax components --}}
+                            @php
+                                // Get item-level taxes (these are already saved in order_items)
+                                $inclusiveTax = $order->items->filter(function($item) {
+                                    return $item->is_taxable &&
+                                        $item->product &&
+                                        $item->product->tax_type === 'inclusive';
+                                })->sum('tax_amount');
+
+                                $exclusiveTax = $order->items->filter(function($item) {
+                                    return $item->is_taxable &&
+                                        $item->product &&
+                                        $item->product->tax_type === 'exclusive';
+                                })->sum('tax_amount');
+
+                                // ✅ Calculate additional tax from order tax_rate
+                                $additionalTax = 0;
+                                if (!empty($order->tax_rate) && $order->tax_rate > 0) {
+                                    $additionalTax = ($order->subtotal * $order->tax_rate) / 100;
+                                }
+
+                                // Total tax calculation
+                                $totalTaxCalculated = $inclusiveTax + $exclusiveTax + $additionalTax;
+                            @endphp
+
+                            {{-- Show Inclusive Tax (informational - already in subtotal) --}}
+                            @if($inclusiveTax > 0)
+                            <tr class="text-success">
+                                <td>
+                                    <i class="bi bi-info-circle" data-bs-toggle="tooltip" title="Tax included in product prices"></i>
+                                    Tax (Inclusive):
+                                </td>
+                                <td class="text-end">
+                                    <strong>{{ $order->currency }} {{ number_format($inclusiveTax, 2) }}</strong>
+                                    <br><small class="text-muted">Already included in subtotal</small>
+                                </td>
+                            </tr>
+                            @endif
+
+                            {{-- Show Exclusive Tax (added to subtotal) --}}
+                            @if($exclusiveTax > 0)
+                            <tr class="text-danger">
+                                <td>
+                                    <i class="bi bi-plus-circle" data-bs-toggle="tooltip" title="Tax added to product prices"></i>
+                                    Tax (Exclusive):
+                                </td>
+                                <td class="text-end">
+                                    <strong>{{ $order->currency }} {{ number_format($exclusiveTax, 2) }}</strong>
+                                    <br><small class="text-muted">Added to total</small>
+                                </td>
+                            </tr>
+                            @endif
+
+                            {{-- Show Additional Tax (added to subtotal) --}}
+                            @if($additionalTax > 0)
+                            <tr>
+                                <td>
+                                    <i class="bi bi-percent"></i>
+                                    Additional Tax:
+                                    <br><small class="text-muted">({{ number_format($order->tax_rate, 2) }}% of subtotal)</small>
+                                </td>
+                                <td class="text-end">
+                                    <strong>{{ $order->currency }} {{ number_format($additionalTax, 2) }}</strong>
+                                </td>
+                            </tr>
+                            @endif
+
+                            {{-- Discount --}}
                             @if($order->discount_amount > 0)
                             <tr>
                                 <td>
+                                    <i class="bi bi-tag-fill text-danger"></i>
                                     Discount
                                     @if($order->discount_code)
-                                    <br><small class="text-muted">({{ $order->discount_code }})</small>
+                                    <br><small class="text-muted">Code: {{ $order->discount_code }}</small>
                                     @endif
                                 </td>
-                                <td class="text-end text-danger"><strong>-{{ $order->currency ?? '$' }} {{ number_format($order->discount_amount, 2) }}</strong></td>
+                                <td class="text-end text-danger">
+                                    <strong>-{{ $order->currency }} {{ number_format($order->discount_amount, 2) }}</strong>
+                                </td>
                             </tr>
                             @endif
+
+                            {{-- Shipping --}}
                             <tr>
-                                <td>Tax:</td>
-                                <td class="text-end"><strong>{{ $order->currency ?? '$' }} {{ number_format($order->tax_amount, 2) }}</strong></td>
+                                <td>
+                                    <i class="bi bi-truck"></i>
+                                    Shipping:
+                                    @if($order->shipping_method)
+                                    <br><small class="text-muted">{{ ucfirst(str_replace('_', ' ', $order->shipping_method)) }}</small>
+                                    @endif
+                                </td>
+                                <td class="text-end">
+                                    <strong>{{ $order->currency }} {{ number_format($order->shipping_amount, 2) }}</strong>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>Shipping:</td>
-                                <td class="text-end"><strong>{{ $order->currency ?? '$' }} {{ number_format($order->shipping_amount, 2) }}</strong></td>
+
+                            {{-- Total Tax Summary (Breakdown only) --}}
+                            @if($totalTaxCalculated > 0)
+                            <tr class="table-light">
+                                <td>
+                                    <strong><i class="bi bi-calculator"></i> Total Tax:</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        @php
+                                            $taxParts = [];
+                                            if($inclusiveTax > 0) $taxParts[] = 'Inc: ' . $order->currency .' '. number_format($inclusiveTax, 2);
+                                            if($exclusiveTax > 0) $taxParts[] = 'Exc: ' . $order->currency .' '. number_format($exclusiveTax, 2);
+                                            if($additionalTax > 0) $taxParts[] = 'Add: ' . $order->currency .' '. number_format($additionalTax, 2);
+                                            echo implode(' + ', $taxParts);
+                                        @endphp
+                                    </small>
+                                </td>
+                                <td class="text-end">
+                                    <strong>{{ $order->currency }} {{ number_format($totalTaxCalculated, 2) }}</strong>
+                                </td>
                             </tr>
-                            <tr class="border-top">
-                                <td><strong>Total:</strong></td>
-                                <td class="text-end"><h5 class="mb-0 text-success">{{ $order->currency ?? '$' }} {{ number_format($order->total_amount, 2) }}</h5></td>
+                            @endif
+
+                            {{-- ✅ Grand Total (CALCULATED - includes additional tax) --}}
+                            <tr class="border-top border-2 bg-light">
+                                <td>
+                                    <strong><i class="bi bi-cash-stack text-success"></i> Grand Total:</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        Subtotal
+                                        @if($exclusiveTax > 0) + Excl Tax @endif
+                                        @if($additionalTax > 0) + Add Tax @endif
+                                        @if($order->shipping_amount > 0) + Shipping @endif
+                                        @if($order->discount_amount > 0) - Discount @endif
+                                    </small>
+                                </td>
+                                <td class="text-end">
+                                    @php
+                                        // ✅ RECALCULATE total to include additional tax
+                                        $calculatedTotal = $order->subtotal + $exclusiveTax + $additionalTax + $order->shipping_amount - $order->discount_amount;
+                                    @endphp
+
+                                    <h5 class="mb-0 text-success">
+                                        {{ $order->currency }} {{ number_format($calculatedTotal, 2) }}
+                                    </h5>
+
+                                    {{-- ✅ Show calculation breakdown --}}
+                                    <small class="text-muted d-block mt-1" style="font-size: 10px;">
+                                        ({{ $order->currency }}{{ number_format($order->subtotal, 2) }}
+                                        @if($exclusiveTax > 0) + {{ $order->currency }} {{ number_format($exclusiveTax, 2) }} @endif
+                                        @if($additionalTax > 0) + {{ $order->currency }} {{ number_format($additionalTax, 2) }} @endif
+                                        @if($order->shipping_amount > 0) + {{ $order->currency }} {{ number_format($order->shipping_amount, 2) }} @endif
+                                        @if($order->discount_amount > 0) - {{ $order->currency }} {{ number_format($order->discount_amount, 2) }} @endif)
+                                    </small>
+
+                                    {{-- ✅ Show DB value if different (for debugging) --}}
+                                    @if(abs($calculatedTotal - $order->total_amount) > 0.01)
+                                    <small class="text-warning d-block mt-1 d-none">
+                                        <i class="bi bi-exclamation-triangle"></i> DB Total: {{ $order->currency }} {{ number_format($order->total_amount, 2) }}
+                                    </small>
+                                    @endif
+                                </td>
                             </tr>
                         </tbody>
                     </table>

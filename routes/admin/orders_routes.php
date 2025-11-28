@@ -43,6 +43,8 @@ Route::prefix('orders')->name('orders.')->group(function () {
         Route::get('/reports/data', [OrdersController::class, 'reportsData'])->name('reports.data');
         Route::post('/validate-coupon', [OrdersController::class, 'validateCoupon'])->name('validate-coupon');
         // Individual order views (dynamic routes MUST BE LAST)
+        // In admin routes group
+        Route::get('/products/{product}/tax-info', [OrdersController::class, 'getProductTaxInfo'])->name('product-tax-info');
         Route::get('/{id}', [OrdersController::class, 'show'])->name('show');
         Route::get('/{id}/invoice', [OrdersController::class, 'invoice'])->name('invoice');
         Route::get('/{id}/shipping-label', [OrdersController::class, 'shippingLabel'])->name('shipping-label');

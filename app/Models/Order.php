@@ -666,6 +666,7 @@ class Order extends Model
         return match($this->payment_status_key_code) {
             'PAYMENT_PENDING' => '<span class="badge bg-warning">Pending</span>',
             'PAYMENT_PAID' => '<span class="badge bg-success">Paid</span>',
+            'PAYMENT_PROCESSING' => '<span class="badge bg-info">Processing</span>',
             'PAYMENT_PARTIALLY_PAID' => '<span class="badge bg-info">Partially Paid</span>',
             'PAYMENT_FAILED' => '<span class="badge bg-danger">Failed</span>',
             'PAYMENT_REFUNDED' => '<span class="badge bg-dark">Refunded</span>',
