@@ -31,6 +31,10 @@ Route::prefix('customers')->name('customers.')->group(function () {
         Route::get('/active', [CustomersController::class, 'activeCustomers'])->name('active');
         Route::get('/blocked', [CustomersController::class, 'blockedCustomers'])->name('blocked');
         Route::get('/inactive', [CustomersController::class, 'inactiveCustomers'])->name('inactive');
+        // Add these to your routes file
+        Route::post('{id}/sync-stats', [CustomersController::class, 'syncOrderStats'])->name('sync-stats');
+        Route::post('bulk-sync-stats', [CustomersController::class, 'bulkSyncStats'])->name('bulk-sync-stats');
+        Route::post('bulk-action', [CustomersController::class, 'bulkAction'])->name('bulk-action');
     });
 
     // Analytics & Reports

@@ -12,6 +12,7 @@ use Yajra\DataTables\Facades\DataTables;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\SystemStatus;
+use Carbon\Carbon;
 
 class CustomersController extends Controller
 {
@@ -25,6 +26,8 @@ class CustomersController extends Controller
             'active_customers' => Customer::active()->count(),
             'new_customers_this_month' => Customer::thisMonth()->count(),
             'total_lifetime_value' => Customer::sum('total_spent'),
+            'verified_customers' => Customer::verified()->count(),
+            'newsletter_subscribers' => Customer::newsletterSubscribers()->count(),
         ];
 
         return view('admin.customers.index', compact('stats'));
@@ -55,6 +58,10 @@ class CustomersController extends Controller
             $query->where('is_newsletter_subscribed', $request->newsletter === 'true');
         }
 
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            $query->dateRange($request->date_from, $request->date_to);
+        }
+
         if ($request->filled('search')) {
             $searchTerm = is_array($request->search) ? $request->search['value'] : $request->search;
             if (!empty($searchTerm)) {
@@ -67,13 +74,26 @@ class CustomersController extends Controller
                 return '<input type="checkbox" class="customer-checkbox" value="' . $customer->id . '">';
             })
             ->addColumn('customer_info', function ($customer) {
-                $html = '<div>';
-                $html .= '<strong>' . htmlspecialchars($customer->getFullName()) . '</strong><br>';
-                $html .= '<small class="text-muted"><i class="bi bi-envelope"></i> ' . htmlspecialchars($customer->email) . '</small>';
+                $html = '<div class="d-flex align-items-center">';
+                $html .= '<div class="avatar-circle bg-primary text-white me-2">' . strtoupper(substr($customer->first_name, 0, 1)) . '</div>';
+                $html .= '<div>';
+                $html .= '<strong>' . htmlspecialchars($customer->getFullName()) . '</strong>';
+
+                if ($customer->is_verified) {
+                    $html .= ' <i class="bi bi-check-circle-fill text-success" title="Verified"></i>';
+                }
+
+                $html .= '<br><small class="text-muted"><i class="bi bi-envelope"></i> ' . htmlspecialchars($customer->email) . '</small>';
+
                 if ($customer->phone) {
                     $html .= '<br><small class="text-muted"><i class="bi bi-telephone"></i> ' . htmlspecialchars($customer->phone) . '</small>';
                 }
-                $html .= '</div>';
+
+                if ($customer->company_name) {
+                    $html .= '<br><small class="text-muted"><i class="bi bi-building"></i> ' . htmlspecialchars($customer->company_name) . '</small>';
+                }
+
+                $html .= '</div></div>';
                 return $html;
             })
             ->addColumn('customer_type', function ($customer) {
@@ -83,8 +103,11 @@ class CustomersController extends Controller
                 return $customer->getStatusBadge();
             })
             ->addColumn('orders_info', function ($customer) {
-                $html = '<span class="badge bg-primary">' . $customer->total_orders . ' orders</span><br>';
-                $html .= '<small class="text-muted">Total: $' . number_format($customer->total_spent, 2) . '</small>';
+                $html = '<div>';
+                $html .= '<span class="badge bg-primary">' . $customer->total_orders . ' orders</span><br>';
+                $html .= '<small class="text-muted">Total: ' . store_currency_symbol() . number_format($customer->total_spent, 2) . '</small><br>';
+                $html .= '<small class="text-muted">Avg: ' . store_currency_symbol() . number_format($customer->average_order_value, 2) . '</small>';
+                $html .= '</div>';
                 return $html;
             })
             ->addColumn('segment', function ($customer) {
@@ -101,12 +124,14 @@ class CustomersController extends Controller
             })
             ->addColumn('last_order', function ($customer) {
                 if ($customer->last_order_at) {
-                    return $customer->last_order_at->format('M d, Y') . '<br><small class="text-muted">' . $customer->last_order_at->diffForHumans() . '</small>';
+                    return '<span title="' . $customer->last_order_at->format('M d, Y H:i') . '">' .
+                           $customer->last_order_at->diffForHumans() . '</span>';
                 }
                 return '<span class="text-muted">Never</span>';
             })
             ->addColumn('created_at_formatted', function ($customer) {
-                return $customer->created_at->format('M d, Y') . '<br><small class="text-muted">' . $customer->created_at->diffForHumans() . '</small>';
+                return '<span title="' . $customer->created_at->format('M d, Y H:i') . '">' .
+                       $customer->created_at->diffForHumans() . '</span>';
             })
             ->addColumn('actions', function ($customer) {
                 $actions = '<div class="btn-group btn-group-sm" role="group">';
@@ -117,6 +142,9 @@ class CustomersController extends Controller
 
                 if (auth('admin')->user()->hasPermission('customers.update')) {
                     $actions .= '<a href="' . route('admin.customers.edit', $customer->id) . '" class="btn btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>';
+
+                    // Sync button
+                    $actions .= '<button type="button" class="btn btn-outline-info sync-customer-btn" data-id="' . $customer->id . '" title="Sync Orders"><i class="bi bi-arrow-repeat"></i></button>';
 
                     // Toggle status button
                     if ($customer->isActive()) {
@@ -162,22 +190,42 @@ class CustomersController extends Controller
                 'password' => 'nullable|string|min:8|confirmed',
                 'customer_type' => 'nullable|in:individual,business,wholesale,vip',
                 'status_key_code' => 'nullable|string|exists:system_statuses,key_code',
+
+                // Billing Address Fields
                 'billing_address_line1' => 'nullable|string|max:255',
                 'billing_address_line2' => 'nullable|string|max:255',
                 'billing_city' => 'nullable|string|max:100',
                 'billing_state' => 'nullable|string|max:100',
                 'billing_postal_code' => 'nullable|string|max:20',
                 'billing_country' => 'nullable|string|max:100',
+
+                // Shipping Address Fields
                 'shipping_address_line1' => 'nullable|string|max:255',
                 'shipping_address_line2' => 'nullable|string|max:255',
                 'shipping_city' => 'nullable|string|max:100',
                 'shipping_state' => 'nullable|string|max:100',
                 'shipping_postal_code' => 'nullable|string|max:20',
                 'shipping_country' => 'nullable|string|max:100',
+
+                // Business Information
+                'tax_id' => 'nullable|string|max:50',
+                'vat_number' => 'nullable|string|max:50',
+                'business_registration' => 'nullable|string|max:100',
+
+                // Preferences
+                'preferred_language' => 'nullable|string|max:10',
+                'preferred_currency' => 'nullable|string|max:3',
+
+                // Subscriptions
                 'is_newsletter_subscribed' => 'nullable|boolean',
                 'is_sms_subscribed' => 'nullable|boolean',
                 'is_verified' => 'nullable|boolean',
+
+                // Additional Info
+                'acquisition_source' => 'nullable|string|max:100',
                 'notes' => 'nullable|string',
+                'tags' => 'nullable|array',
+                'tags.*' => 'string|max:50',
             ]);
 
             DB::beginTransaction();
@@ -191,6 +239,16 @@ class CustomersController extends Controller
                 $validated['status_key_code'] = 'CUSTOMER_ACTIVE';
             }
 
+            // Set default currency from store
+            if (empty($validated['preferred_currency'])) {
+                $validated['preferred_currency'] = store_currency_code(); // e.g., 'USD', 'EUR', etc.
+            }
+
+            // Set verification status and timestamp
+            if (!empty($validated['is_verified']) && $validated['is_verified']) {
+                $validated['email_verified_at'] = now();
+            }
+
             $customer = Customer::create($validated);
 
             DB::commit();
@@ -201,7 +259,7 @@ class CustomersController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Customer created successfully',
-                    'customer' => $customer  // ← Include customer data for modal
+                    'customer' => $customer->load(['status'])
                 ]);
             }
 
@@ -256,7 +314,8 @@ class CustomersController extends Controller
             },
             'orders.items',
             'referrals',
-            'referrer'
+            'referrer',
+            'addresses'
         ])->findOrFail($id);
 
         // Get statistics
@@ -265,15 +324,21 @@ class CustomersController extends Controller
             'total_spent' => $customer->total_spent,
             'average_order_value' => $customer->average_order_value,
             'pending_orders' => $customer->orders()->where('status_key_code', 'ORDER_PENDING')->count(),
+            'completed_orders' => $customer->orders()->where('status_key_code', 'ORDER_COMPLETED')->count(),
+            'cancelled_orders' => $customer->orders()->where('status_key_code', 'ORDER_CANCELLED')->count(),
             'lifetime_value' => $customer->getLifetimeValue(),
             'days_since_last_order' => $customer->getDaysSinceLastOrder(),
+            'days_since_registration' => $customer->getDaysSinceRegistration(),
             'segment' => $customer->getSegment(),
+            'login_count' => $customer->login_count,
+            'referrals_count' => $customer->referrals->count(),
         ];
 
         // Get top purchased products
         $topProducts = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->where('orders.customer_id', $customer->id)
+            ->whereIn('orders.status_key_code', ['ORDER_COMPLETED', 'ORDER_DELIVERED'])
             ->select(
                 'order_items.product_name',
                 DB::raw('SUM(order_items.quantity) as total_quantity'),
@@ -284,7 +349,21 @@ class CustomersController extends Controller
             ->limit(5)
             ->get();
 
-        return view('admin.customers.show', compact('customer', 'stats', 'topProducts'));
+        // Get monthly spending trend (last 6 months)
+        $monthlySpending = DB::table('orders')
+            ->where('customer_id', $customer->id)
+            ->whereIn('status_key_code', ['ORDER_COMPLETED', 'ORDER_DELIVERED'])
+            ->where('created_at', '>=', now()->subMonths(6))
+            ->select(
+                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+                DB::raw('SUM(total_amount) as total'),
+                DB::raw('COUNT(*) as order_count')
+            )
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+
+        return view('admin.customers.show', compact('customer', 'stats', 'topProducts', 'monthlySpending'));
     }
 
     /**
@@ -315,19 +394,56 @@ class CustomersController extends Controller
                 'password' => 'nullable|string|min:8|confirmed',
                 'customer_type' => 'required|in:individual,business,wholesale,vip',
                 'status_key_code' => 'required|string|exists:system_statuses,key_code',
+
+                // Billing Address Fields
                 'billing_address_line1' => 'nullable|string|max:255',
+                'billing_address_line2' => 'nullable|string|max:255',
                 'billing_city' => 'nullable|string|max:100',
                 'billing_state' => 'nullable|string|max:100',
                 'billing_postal_code' => 'nullable|string|max:20',
                 'billing_country' => 'nullable|string|max:100',
+
+                // Shipping Address Fields
+                'shipping_address_line1' => 'nullable|string|max:255',
+                'shipping_address_line2' => 'nullable|string|max:255',
+                'shipping_city' => 'nullable|string|max:100',
+                'shipping_state' => 'nullable|string|max:100',
+                'shipping_postal_code' => 'nullable|string|max:20',
+                'shipping_country' => 'nullable|string|max:100',
+
+                // Business Information
+                'tax_id' => 'nullable|string|max:50',
+                'vat_number' => 'nullable|string|max:50',
+                'business_registration' => 'nullable|string|max:100',
+
+                // Preferences
+                'preferred_language' => 'nullable|string|max:10',
+                'preferred_currency' => 'nullable|string|max:3',
+
+                // Subscriptions
                 'is_newsletter_subscribed' => 'boolean',
                 'is_sms_subscribed' => 'boolean',
+                'is_verified' => 'boolean',
+
+                // Additional Info
+                'acquisition_source' => 'nullable|string|max:100',
                 'notes' => 'nullable|string',
+                'tags' => 'nullable|array',
+                'tags.*' => 'string|max:50',
             ]);
 
             // Remove password if not provided
             if (empty($validated['password'])) {
                 unset($validated['password']);
+            }
+
+            // Handle verification status
+            if (isset($validated['is_verified'])) {
+                if ($validated['is_verified'] && !$customer->is_verified) {
+                    $validated['email_verified_at'] = now();
+                } elseif (!$validated['is_verified']) {
+                    $validated['email_verified_at'] = null;
+                }
             }
 
             DB::beginTransaction();
@@ -336,18 +452,46 @@ class CustomersController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Customer updated successfully',
-                'redirect' => route('admin.customers.show', $customer->id)
-            ]);
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Customer updated successfully',
+                    'redirect' => route('admin.customers.show', $customer->id)
+                ]);
+            }
+
+            return redirect()
+                ->route('admin.customers.show', $customer->id)
+                ->with('success', 'Customer updated successfully');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $e->errors()
+                ], 422);
+            }
+
+            return back()
+                ->withErrors($e->errors())
+                ->withInput();
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update customer: ' . $e->getMessage()
-            ], 500);
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to update customer: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return back()
+                ->with('error', 'Failed to update customer: ' . $e->getMessage())
+                ->withInput();
         }
     }
 
@@ -429,6 +573,117 @@ class CustomersController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update status: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Sync customer order statistics
+     * This will recalculate: total_orders, total_spent, average_order_value,
+     * first_order_at, last_order_at, and set preferred_currency
+     */
+    public function syncOrderStats($id)
+    {
+        try {
+            $customer = Customer::findOrFail($id);
+
+            DB::beginTransaction();
+
+            // Get completed and delivered orders only
+            $orders = $customer->orders()
+                ->whereIn('status_key_code', ['ORDER_COMPLETED', 'ORDER_DELIVERED'])
+                ->get();
+
+            $totalOrders = $orders->count();
+            $totalSpent = $orders->sum('total_amount');
+            $averageOrderValue = $totalOrders > 0 ? $totalSpent / $totalOrders : 0;
+
+            $firstOrder = $orders->sortBy('created_at')->first();
+            $lastOrder = $orders->sortByDesc('created_at')->first();
+
+            // Update customer statistics
+            $updateData = [
+                'total_orders' => $totalOrders,
+                'total_spent' => $totalSpent,
+                'average_order_value' => $averageOrderValue,
+                'first_order_at' => $firstOrder ? $firstOrder->created_at : null,
+                'last_order_at' => $lastOrder ? $lastOrder->created_at : null,
+            ];
+
+            // Set preferred currency from store if not already set
+            if (empty($customer->preferred_currency)) {
+                $updateData['preferred_currency'] = store_currency_code();
+            }
+
+            $customer->update($updateData);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer statistics synchronized successfully',
+                'data' => [
+                    'total_orders' => $totalOrders,
+                    'total_spent' => store_currency_symbol() . number_format($totalSpent, 2),
+                    'average_order_value' => store_currency_symbol() . number_format($averageOrderValue, 2),
+                    'first_order_at' => $firstOrder ? $firstOrder->created_at->format('M d, Y') : 'N/A',
+                    'last_order_at' => $lastOrder ? $lastOrder->created_at->format('M d, Y') : 'N/A',
+                    'segment' => $customer->fresh()->getSegment(),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to sync customer statistics: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk sync all customers' order statistics
+     */
+    public function bulkSyncStats(Request $request)
+    {
+        try {
+            $customerIds = $request->input('customer_ids', []);
+
+            if (empty($customerIds)) {
+                // Sync all customers if no specific IDs provided
+                $customers = Customer::all();
+            } else {
+                // Sync only selected customers
+                $customers = Customer::whereIn('id', $customerIds)->get();
+            }
+
+            DB::beginTransaction();
+
+            $syncCount = 0;
+            foreach ($customers as $customer) {
+                $customer->updateStatistics();
+
+                // Set preferred currency if not set
+                if (empty($customer->preferred_currency)) {
+                    $customer->update(['preferred_currency' => store_currency_code()]);
+                }
+
+                $syncCount++;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully synchronized {$syncCount} customer(s)",
+                'synced_count' => $syncCount
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to bulk sync customers: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -528,6 +783,8 @@ class CustomersController extends Controller
             'new_this_month' => Customer::thisMonth()->count(),
             'total_lifetime_value' => Customer::sum('total_spent'),
             'avg_customer_value' => Customer::avg('total_spent'),
+            'high_value_customers' => Customer::highValue(5000)->count(),
+            'at_risk_customers' => Customer::atRisk(90)->count(),
         ];
 
         return view('admin.customers.reports', compact('stats'));
@@ -552,7 +809,7 @@ class CustomersController extends Controller
             }
 
             $totalCustomers = $query->count();
-            $activeCustomers = $query->where('status_key_code', 'CUSTOMER_ACTIVE')->count();
+            $activeCustomers = (clone $query)->where('status_key_code', 'CUSTOMER_ACTIVE')->count();
             $totalRevenue = Customer::sum('total_spent');
 
             // Customer growth trend
@@ -572,16 +829,23 @@ class CustomersController extends Controller
                 return $group->count();
             });
 
+            // Customer type distribution
+            $customerTypes = Customer::select('customer_type', DB::raw('COUNT(*) as count'))
+                ->groupBy('customer_type')
+                ->get()
+                ->pluck('count', 'customer_type');
+
             return response()->json([
                 'success' => true,
                 'total_customers' => $totalCustomers,
                 'active_customers' => $activeCustomers,
                 'total_revenue' => $totalRevenue,
                 'growth_trend' => [
-                    'labels' => $growthTrend->pluck('date')->map(fn($d) => \Carbon\Carbon::parse($d)->format('M d'))->toArray(),
+                    'labels' => $growthTrend->pluck('date')->map(fn($d) => Carbon::parse($d)->format('M d'))->toArray(),
                     'data' => $growthTrend->pluck('count')->toArray(),
                 ],
                 'segments' => $segments,
+                'customer_types' => $customerTypes,
             ]);
 
         } catch (\Exception $e) {
@@ -604,9 +868,17 @@ class CustomersController extends Controller
             $query->where('status_key_code', $request->status);
         }
 
+        if ($request->filled('customer_type')) {
+            $query->where('customer_type', $request->customer_type);
+        }
+
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            $query->dateRange($request->date_from, $request->date_to);
+        }
+
         $customers = $query->get();
 
-        $filename = 'customers_' . date('Y-m-d_His') . '.csv';
+        $filename = 'customers_export_' . date('Y-m-d_His') . '.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
@@ -617,8 +889,23 @@ class CustomersController extends Controller
 
             // Headers
             fputcsv($file, [
-                'ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Type', 'Status',
-                'Total Orders', 'Total Spent', 'Created At'
+                'ID',
+                'First Name',
+                'Last Name',
+                'Email',
+                'Phone',
+                'Company',
+                'Type',
+                'Status',
+                'Total Orders',
+                'Total Spent',
+                'Average Order Value',
+                'First Order',
+                'Last Order',
+                'Segment',
+                'Verified',
+                'Newsletter',
+                'Registered At'
             ]);
 
             // Data
@@ -629,10 +916,17 @@ class CustomersController extends Controller
                     $customer->last_name,
                     $customer->email,
                     $customer->phone,
-                    $customer->customer_type,
+                    $customer->company_name,
+                    $customer->getCustomerTypeLabel(),
                     $customer->status_key_code,
                     $customer->total_orders,
                     $customer->total_spent,
+                    $customer->average_order_value,
+                    $customer->first_order_at ? $customer->first_order_at->format('Y-m-d') : 'N/A',
+                    $customer->last_order_at ? $customer->last_order_at->format('Y-m-d') : 'N/A',
+                    $customer->getSegment(),
+                    $customer->is_verified ? 'Yes' : 'No',
+                    $customer->is_newsletter_subscribed ? 'Yes' : 'No',
                     $customer->created_at->format('Y-m-d H:i:s'),
                 ]);
             }
@@ -641,5 +935,141 @@ class CustomersController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Bulk actions handler
+     */
+    public function bulkAction(Request $request)
+    {
+        try {
+            $action = $request->input('action');
+            $customerIds = $request->input('customer_ids', []);
+
+            if (empty($customerIds)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No customers selected'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            $count = 0;
+
+            switch ($action) {
+                case 'activate':
+                    $count = Customer::whereIn('id', $customerIds)
+                        ->update(['status_key_code' => 'CUSTOMER_ACTIVE']);
+                    $message = "Successfully activated {$count} customer(s)";
+                    break;
+
+                case 'deactivate':
+                    $count = Customer::whereIn('id', $customerIds)
+                        ->update(['status_key_code' => 'CUSTOMER_INACTIVE']);
+                    $message = "Successfully deactivated {$count} customer(s)";
+                    break;
+
+                case 'block':
+                    $count = Customer::whereIn('id', $customerIds)
+                        ->update(['status_key_code' => 'CUSTOMER_BLOCKED']);
+                    $message = "Successfully blocked {$count} customer(s)";
+                    break;
+
+                case 'verify':
+                    $count = Customer::whereIn('id', $customerIds)
+                        ->update([
+                            'is_verified' => true,
+                            'email_verified_at' => now()
+                        ]);
+                    $message = "Successfully verified {$count} customer(s)";
+                    break;
+
+                case 'subscribe_newsletter':
+                    $count = Customer::whereIn('id', $customerIds)
+                        ->update(['is_newsletter_subscribed' => true]);
+                    $message = "Successfully subscribed {$count} customer(s) to newsletter";
+                    break;
+
+                case 'unsubscribe_newsletter':
+                    $count = Customer::whereIn('id', $customerIds)
+                        ->update(['is_newsletter_subscribed' => false]);
+                    $message = "Successfully unsubscribed {$count} customer(s) from newsletter";
+                    break;
+
+                case 'delete':
+                    // Check if any selected customer has orders
+                    $customersWithOrders = Customer::whereIn('id', $customerIds)
+                        ->has('orders')
+                        ->count();
+
+                    if ($customersWithOrders > 0) {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => "{$customersWithOrders} customer(s) have existing orders and cannot be deleted"
+                        ], 400);
+                    }
+
+                    $count = Customer::whereIn('id', $customerIds)->delete();
+                    $message = "Successfully deleted {$count} customer(s)";
+                    break;
+
+                default:
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid bulk action'
+                    ], 400);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'affected_count' => $count
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Bulk action failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get customer quick stats (AJAX)
+     */
+    public function getQuickStats($id)
+    {
+        try {
+            $customer = Customer::with(['orders'])->findOrFail($id);
+
+            $stats = [
+                'total_orders' => $customer->total_orders,
+                'total_spent' => store_currency_symbol() . number_format($customer->total_spent, 2),
+                'average_order_value' => store_currency_symbol() . number_format($customer->average_order_value, 2),
+                'pending_orders' => $customer->orders()->where('status_key_code', 'ORDER_PENDING')->count(),
+                'completed_orders' => $customer->orders()->where('status_key_code', 'ORDER_COMPLETED')->count(),
+                'lifetime_value' => store_currency_symbol() . number_format($customer->getLifetimeValue(), 2),
+                'segment' => $customer->getSegment(),
+                'days_since_last_order' => $customer->getDaysSinceLastOrder(),
+                'is_at_risk' => $customer->isAtRisk(90),
+            ];
+
+            return response()->json([
+                'success' => true,
+                'stats' => $stats
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load customer stats: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
