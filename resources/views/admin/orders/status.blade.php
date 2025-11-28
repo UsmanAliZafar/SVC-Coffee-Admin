@@ -187,6 +187,43 @@
         </div>
     </div>
 </div>
+
+{{-- Quick Status Update Modal (Single Order) --}}
+<div class="modal fade" id="quickStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Update</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="quickUpdateOrderId">
+                <div class="mb-3">
+                    <label class="form-label">Order Status</label>
+                    <select class="form-select" id="quickStatusSelect">
+                        <option value="">-- No Change --</option>
+                        @foreach($statusList as $status)
+                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Payment Status</label>
+                    <select class="form-select" id="quickPaymentSelect">
+                        <option value="">-- No Change --</option>
+                        @foreach($paymentStatusList as $status)
+                        <option value="{{ $status->key_code }}">{{ $status->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmQuickUpdate">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('styles')
@@ -406,6 +443,83 @@ $(document).ready(function() {
                     icon: 'info',
                     title: 'Coming Soon',
                     text: 'Bulk delete functionality will be implemented.'
+                });
+            }
+        });
+    });
+
+    // ====================================
+    // QUICK UPDATE SINGLE ORDER
+    // ====================================
+    $(document).on('click', '.quick-update-btn', function() {
+        const orderId = $(this).data('id');
+        const currentStatus = $(this).data('status');
+        const currentPayment = $(this).data('payment');
+
+        $('#quickUpdateOrderId').val(orderId);
+        $('#quickStatusSelect').val(currentStatus);
+        $('#quickPaymentSelect').val(currentPayment);
+        $('#quickStatusModal').modal('show');
+    });
+
+    $('#confirmQuickUpdate').on('click', function() {
+        const orderId = $('#quickUpdateOrderId').val();
+        const statusCode = $('#quickStatusSelect').val();
+        const paymentCode = $('#quickPaymentSelect').val();
+
+        if (!statusCode && !paymentCode) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No Changes',
+                text: 'Please select at least one status to update'
+            });
+            return;
+        }
+
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
+
+        const data = {
+            _token: '{{ csrf_token() }}'
+        };
+
+        if (statusCode) data.status_key_code = statusCode;
+        if (paymentCode) data.payment_status_key_code = paymentCode;
+
+        $.ajax({
+            url: `/admin/orders/${orderId}/quick-update-status`,
+            type: 'POST',
+            data: data,
+            success: function(response) {
+                $('#quickStatusModal').modal('hide');
+                $('#confirmQuickUpdate').prop('disabled', false).html('Update');
+
+                if (response.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: response.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    // Reload table without resetting pagination
+                    ordersTable.ajax.reload(null, false);
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: response.message
+                    });
+                }
+            },
+            error: function(xhr) {
+                $('#quickStatusModal').modal('hide');
+                $('#confirmQuickUpdate').prop('disabled', false).html('Update');
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'An error occurred'
                 });
             }
         });

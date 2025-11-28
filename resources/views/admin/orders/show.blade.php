@@ -82,7 +82,7 @@
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item update-status" href="#" data-status="ORDER_CONFIRMED">Confirm Order</a></li>
                                 <li><a class="dropdown-item update-status" href="#" data-status="ORDER_PROCESSING">Mark as Processing</a></li>
-                                <li><a class="dropdown-item update-status" href="#" data-status="ORDER_PACKED">Mark as Packed</a></li>
+                                {{-- <li><a class="dropdown-item update-status" href="#" data-status="ORDER_PACKED">Mark as Packed</a></li> --}}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item update-status" href="#" data-status="ORDER_SHIPPED">Mark as Shipped</a></li>
                                 <li><a class="dropdown-item update-status" href="#" data-status="ORDER_DELIVERED">Mark as Delivered</a></li>

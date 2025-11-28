@@ -90,7 +90,67 @@ class OrdersController extends Controller
         if ($request->filled('search')) {
             $searchTerm = is_array($request->search) ? $request->search['value'] : $request->search;
             if (!empty($searchTerm)) {
-                $query->search($searchTerm);
+                $query->where(function($q) use ($searchTerm) {
+                    // Order fields
+                    $q->where('order_number', 'like', "%{$searchTerm}%")
+                    ->orWhere('invoice_number', 'like', "%{$searchTerm}%")
+                    ->orWhere('transaction_id', 'like', "%{$searchTerm}%")
+
+                    // Customer fields (guest)
+                    ->orWhere('guest_name', 'like', "%{$searchTerm}%")
+                    ->orWhere('guest_email', 'like', "%{$searchTerm}%")
+                    ->orWhere('guest_phone', 'like', "%{$searchTerm}%")
+
+                    // Billing fields
+                    ->orWhere('billing_first_name', 'like', "%{$searchTerm}%")
+                    ->orWhere('billing_last_name', 'like', "%{$searchTerm}%")
+                    // ->orWhere('billing_email', 'like', "%{$searchTerm}%")
+                    ->orWhere('billing_phone', 'like', "%{$searchTerm}%")
+                    ->orWhere('billing_company', 'like', "%{$searchTerm}%")
+
+                    // Shipping fields
+                    ->orWhere('shipping_first_name', 'like', "%{$searchTerm}%")
+                    ->orWhere('shipping_last_name', 'like', "%{$searchTerm}%")
+                    ->orWhere('shipping_phone', 'like', "%{$searchTerm}%")
+                    ->orWhere('shipping_company', 'like', "%{$searchTerm}%")
+                    ->orWhere('shipping_city', 'like', "%{$searchTerm}%")
+                    ->orWhere('shipping_country', 'like', "%{$searchTerm}%")
+
+                    // Payment fields
+                    ->orWhere('payment_method', 'like', "%{$searchTerm}%")
+                    ->orWhere('payment_gateway', 'like', "%{$searchTerm}%")
+                    ->orWhere('discount_code', 'like', "%{$searchTerm}%")
+
+                    // Shipping tracking
+                    ->orWhere('shipping_tracking_number', 'like', "%{$searchTerm}%")
+                    ->orWhere('shipping_carrier', 'like', "%{$searchTerm}%")
+
+                    // Notes
+                    ->orWhere('customer_notes', 'like', "%{$searchTerm}%")
+                    ->orWhere('admin_notes', 'like', "%{$searchTerm}%")
+
+                    // Customer relationship (registered customers)
+                    ->orWhereHas('customer', function($customerQuery) use ($searchTerm) {
+                        $customerQuery->where('first_name', 'like', "%{$searchTerm}%")
+                                    ->orWhere('last_name', 'like', "%{$searchTerm}%")
+                                    ->orWhere('email', 'like', "%{$searchTerm}%")
+                                    ->orWhere('phone', 'like', "%{$searchTerm}%")
+                                    ->orWhere('company_name', 'like', "%{$searchTerm}%")
+                                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$searchTerm}%"]);
+                    })
+
+                    // Order items relationship
+                    ->orWhereHas('items', function($itemQuery) use ($searchTerm) {
+                        $itemQuery->where('product_name', 'like', "%{$searchTerm}%")
+                                ->orWhere('product_sku', 'like', "%{$searchTerm}%");
+                    });
+
+                    // Search by amount (if numeric)
+                    if (is_numeric($searchTerm)) {
+                        $q->orWhere('total_amount', '=', $searchTerm)
+                        ->orWhere('subtotal', '=', $searchTerm);
+                    }
+                });
             }
         }
 
@@ -1665,8 +1725,8 @@ class OrdersController extends Controller
     {
         $statusKey = 'ORDER_' . strtoupper($status);
         $statusList = SystemStatus::where('module', 'orders')->get();
-
-        return view('admin.orders.status', compact('status', 'statusKey', 'statusList'));
+        $paymentStatusList = SystemStatus::where('module', 'payments')->get();
+        return view('admin.orders.status', compact('status', 'statusKey', 'statusList','paymentStatusList'));
     }
 
     /**
