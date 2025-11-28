@@ -36,13 +36,18 @@ class OrderDeliveredMail extends Mailable
 
     public function content(): Content
     {
+        // FIX: Check if delivered_at is null and use current time
+        $deliveredDate = $this->order->delivered_at
+            ? $this->order->delivered_at->format('F d, Y h:i A')
+            : now()->format('F d, Y h:i A');
+
         return new Content(
             view: 'emails.customer.order-delivered',
             with: [
                 'order' => $this->order,
                 'customerName' => $this->order->getCustomerName(),
                 'orderNumber' => $this->order->order_number,
-                'deliveredDate' => $this->order->delivered_at->format('F d, Y h:i A'),
+                'deliveredDate' => $deliveredDate, // ✅ Fixed null issue
                 'totalAmount' => $this->order->getFormattedTotal(),
                 'items' => $this->order->items,
                 'reviewUrl' => route('customer.orders.review', $this->order->id),
