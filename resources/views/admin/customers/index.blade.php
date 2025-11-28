@@ -282,7 +282,7 @@
                             <option value="CUSTOMER_ACTIVE">Active</option>
                             <option value="CUSTOMER_INACTIVE">Inactive</option>
                             <option value="CUSTOMER_BLOCKED">Blocked</option>
-                            <option value="CUSTOMER_PENDING">Pending</option>
+                            {{-- <option value="CUSTOMER_PENDING">Pending</option> --}}
                         </select>
                     </div>
                     <div class="col-md-2">
