@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
+use App\Services\CustomerStatsService;
+use App\Jobs\SyncCustomerStats;
 // MODELS
 use App\Models\Customer;
 use App\Models\Order;
@@ -16,6 +18,12 @@ use Carbon\Carbon;
 
 class CustomersController extends Controller
 {
+    protected CustomerStatsService $statsService;
+
+    public function __construct(CustomerStatsService $statsService)
+    {
+        $this->statsService = $statsService;
+    }
     /**
      * Display customers listing page
      */
@@ -641,49 +649,116 @@ class CustomersController extends Controller
         }
     }
 
-    /**
-     * Bulk sync all customers' order statistics
-     */
     public function bulkSyncStats(Request $request)
     {
         try {
             $customerIds = $request->input('customer_ids', []);
+            $syncAll = $request->input('sync_all', false);
 
-            if (empty($customerIds)) {
-                // Sync all customers if no specific IDs provided
-                $customers = Customer::all();
-            } else {
-                // Sync only selected customers
-                $customers = Customer::whereIn('id', $customerIds)->get();
-            }
+            // Option 1: Process immediately (for small batches)
+            if (!$syncAll && count($customerIds) <= 50) {
+                $result = $this->statsService->syncMultipleCustomers($customerIds);
 
-            DB::beginTransaction();
-
-            $syncCount = 0;
-            foreach ($customers as $customer) {
-                $customer->updateStatistics();
-
-                // Set preferred currency if not set
-                if (empty($customer->preferred_currency)) {
-                    $customer->update(['preferred_currency' => store_currency_code()]);
+                $message = "Successfully synchronized {$result['success']} customer(s)";
+                if ($result['failed'] > 0) {
+                    $message .= " ({$result['failed']} failed)";
                 }
 
-                $syncCount++;
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'data' => $result,
+                ]);
             }
 
-            DB::commit();
+            // Option 2: Queue for background processing (for large batches)
+            if ($syncAll) {
+                SyncCustomerStats::dispatch(); // Sync all customers
+                $message = 'All customer statistics sync queued successfully';
+            } else {
+                SyncCustomerStats::dispatch($customerIds);
+                $message = count($customerIds) . ' customer statistics sync queued successfully';
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => "Successfully synchronized {$syncCount} customer(s)",
-                'synced_count' => $syncCount
+                'message' => $message,
+                'queued' => true,
+                'count' => $syncAll ? 'all' : count($customerIds),
             ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            \Log::error('Bulk sync customer statistics failed', [
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to bulk sync customers: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get customer statistics preview (without updating database)
+     *
+     * @param string $id Customer ID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getStatsPreview($id)
+    {
+        try {
+            $customer = \App\Models\Customer::findOrFail($id);
+            $calculated = $this->statsService->calculateStats($customer);
+            $needsSync = !$this->statsService->validateStats($customer);
+
+            return response()->json([
+                'success' => true,
+                'current' => [
+                    'total_orders' => $customer->total_orders,
+                    'total_spent' => $customer->total_spent,
+                    'average_order_value' => $customer->average_order_value,
+                ],
+                'calculated' => $calculated,
+                'needs_sync' => $needsSync,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get stats preview: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Find customers with outdated statistics
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function findOutdatedStats()
+    {
+        try {
+            $customers = $this->statsService->findCustomersNeedingSync(100);
+
+            return response()->json([
+                'success' => true,
+                'count' => $customers->count(),
+                'customers' => $customers->map(function ($customer) {
+                    return [
+                        'id' => $customer->id,
+                        'name' => $customer->getFullName(),
+                        'email' => $customer->email,
+                        'total_orders' => $customer->total_orders,
+                        'last_sync' => $customer->updated_at->diffForHumans(),
+                    ];
+                }),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to find outdated stats: ' . $e->getMessage()
             ], 500);
         }
     }
