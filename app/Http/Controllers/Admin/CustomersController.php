@@ -249,7 +249,7 @@ class CustomersController extends Controller
 
             // Set default currency from store
             if (empty($validated['preferred_currency'])) {
-                $validated['preferred_currency'] = store_currency_code(); // e.g., 'USD', 'EUR', etc.
+                $validated['preferred_currency'] = store_currency_symbol(); // e.g., 'USD', 'EUR', etc.
             }
 
             // Set verification status and timestamp
