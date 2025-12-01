@@ -15,13 +15,13 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             PermissionSeeder::class,
-            AdminUserSeeder::class,
+            // AdminUserSeeder::class,
             SystemStatusSeeder::class,
-            DefaultWarehouseSeeder::class,
-            CouponSeeder::class,
-            PageSeeder::class,
-            StoreSettingSeeder::class,
-            ContactUsSeeder::class,
+            // DefaultWarehouseSeeder::class,
+            // CouponSeeder::class,
+            // PageSeeder::class,
+            // StoreSettingSeeder::class,
+            // ContactUsSeeder::class,
         ]);
     }
 }
