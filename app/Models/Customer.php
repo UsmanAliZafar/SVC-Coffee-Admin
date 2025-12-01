@@ -194,14 +194,6 @@ class Customer extends Authenticatable
     }
 
     /**
-     * Get the customer group
-     */
-    public function customerGroup(): BelongsTo
-    {
-        return $this->belongsTo(CustomerGroup::class, 'customer_group_id');
-    }
-
-    /**
      * Get all orders for this customer
      */
     public function orders(): HasMany
@@ -215,14 +207,6 @@ class Customer extends Authenticatable
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class, 'customer_id');
-    }
-
-    /**
-     * Get all addresses for this customer
-     */
-    public function addresses(): HasMany
-    {
-        return $this->hasMany(CustomerAddress::class, 'customer_id');
     }
 
     /**

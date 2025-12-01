@@ -323,7 +323,6 @@ class CustomersController extends Controller
             'orders.items',
             'referrals',
             'referrer',
-            'addresses'
         ])->findOrFail($id);
 
         // Get statistics
