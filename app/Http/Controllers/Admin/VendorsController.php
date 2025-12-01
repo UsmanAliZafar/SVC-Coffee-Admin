@@ -210,7 +210,7 @@ class VendorsController extends Controller
             // Sync total purchases (if you have purchase_orders table)
             $totalPurchases = DB::table('purchase_orders')
                 ->where('vendor_id', $id)
-                ->where('status', 'completed')
+                ->where('status_key_code', 'completed')
                 ->sum('total_amount') ?? 0;
 
             // Update vendor

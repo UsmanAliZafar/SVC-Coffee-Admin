@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class Vendor extends Model
 {
@@ -109,6 +110,17 @@ class Vendor extends Model
                     ->whereNull('deleted_at');
     }
 
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class, 'vendor_id', 'id');
+    }
+
+    public function completedPurchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class, 'vendor_id', 'id')
+                    ->where('status_key_code', 'PO_COMPLETED');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(AdminUser::class, 'created_by');
@@ -189,7 +201,7 @@ class Vendor extends Model
 
     public function getFormattedTotalPurchases(): string
     {
-        return store_currency_symbol() . ' ' . number_format($this->total_purchases, 2);
+        return $this->currency . ' ' . number_format($this->total_purchases, 2);
     }
 
     /**
@@ -202,17 +214,42 @@ class Vendor extends Model
     }
 
     /**
-     * Sync total purchases from orders
+     * Sync total purchases from completed purchase orders
      */
     public function syncTotalPurchases(): void
     {
-        // Assuming you have purchase_orders or similar table
-        $total = \DB::table('purchase_orders')
-            ->where('vendor_id', $this->id)
-            ->where('status', 'completed')
+        $total = $this->purchaseOrders()
+            ->where('status_key_code', 'PO_COMPLETED')
             ->sum('total_amount');
 
-        $this->update(['total_purchases' => $total]);
+        $this->update(['total_purchases' => $total ?? 0]);
+    }
+
+    /**
+     * Sync orders count from purchase orders
+     */
+    public function syncOrdersCount(): void
+    {
+        $count = $this->purchaseOrders()->count();
+        $this->update(['orders_count' => $count]);
+    }
+
+    /**
+     * Sync all statistics
+     */
+    public function syncAllStatistics(): void
+    {
+        $productsCount = $this->products()->count();
+        $ordersCount = $this->purchaseOrders()->count();
+        $totalPurchases = $this->purchaseOrders()
+            ->where('status_key_code', 'PO_COMPLETED')
+            ->sum('total_amount');
+
+        $this->update([
+            'products_count' => $productsCount,
+            'orders_count' => $ordersCount,
+            'total_purchases' => $totalPurchases ?? 0
+        ]);
     }
 
     /**
@@ -239,6 +276,14 @@ class Vendor extends Model
         $this->increment('total_purchases', $amount);
     }
 
+    /**
+     * Increment orders count
+     */
+    public function incrementOrdersCount(int $count = 1): void
+    {
+        $this->increment('orders_count', $count);
+    }
+
     public function activate(): bool
     {
         return $this->update(['status_key_code' => 'VENDOR_ACTIVE']);
@@ -247,5 +292,24 @@ class Vendor extends Model
     public function deactivate(): bool
     {
         return $this->update(['status_key_code' => 'VENDOR_INACTIVE']);
+    }
+
+    /**
+     * Check if has complete address
+     */
+    public function hasCompleteAddress(): bool
+    {
+        return !empty($this->address) &&
+               !empty($this->city) &&
+               !empty($this->country);
+    }
+
+    /**
+     * Check if has bank details
+     */
+    public function hasBankDetails(): bool
+    {
+        return !empty($this->bank_name) &&
+               !empty($this->bank_account_number);
     }
 }
