@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
@@ -42,21 +41,12 @@ class VendorsController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        // REMOVE withCount - use the existing products_count column instead
         $query = Vendor::with(['status'])
             ->orderBy('created_at', 'desc');
 
         // Apply filters
         if ($request->filled('status')) {
             $query->where('status_key_code', $request->status);
-        }
-
-        if ($request->filled('is_verified')) {
-            $query->where('is_verified', $request->is_verified);
-        }
-
-        if ($request->filled('is_featured')) {
-            $query->where('is_featured', $request->is_featured);
         }
 
         if ($request->filled('country')) {
@@ -79,12 +69,6 @@ class VendorsController extends Controller
                     return '<input type="checkbox" class="form-check-input vendor-checkbox" value="' . $vendor->id . '">';
                 }
                 return '';
-            })
-            ->addColumn('logo_display', function($vendor) {
-                return '<img src="' . $vendor->getLogoUrl() . '"
-                            alt="' . htmlspecialchars($vendor->name) . '"
-                            class="img-thumbnail"
-                            style="width: 50px; height: 50px; object-fit: cover;">';
             })
             ->addColumn('vendor_info', function($vendor) {
                 $html = '<div>';
@@ -115,34 +99,26 @@ class VendorsController extends Controller
                 return '<span class="text-muted">—</span>';
             })
             ->addColumn('products_count', function($vendor) {
-                // Use the existing products_count column from database
                 $count = $vendor->products_count ?? 0;
                 return '<span class="badge bg-primary">' . $count . '</span>';
             })
-            ->addColumn('rating_display', function($vendor) {
-                if ($vendor->rating) {
-                    return $vendor->getRatingStars();
-                }
-                return '<span class="text-muted">No ratings</span>';
+            ->addColumn('total_purchases', function($vendor) {
+                return '<span class="badge bg-success">' . $vendor->getFormattedTotalPurchases() . '</span>';
             })
             ->addColumn('status_badge', function($vendor) {
                 return $vendor->getStatusBadge();
             })
-            ->addColumn('badges', function($vendor) {
-                $badges = [];
-
-                if ($vendor->is_verified) {
-                    $badges[] = '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Verified</span>';
-                }
-
-                if ($vendor->is_featured) {
-                    $badges[] = '<span class="badge bg-warning"><i class="bi bi-star"></i> Featured</span>';
-                }
-
-                return implode(' ', $badges);
-            })
             ->addColumn('actions', function($vendor) {
                 $actions = '<div class="btn-group" role="group">';
+
+                // Sync Individual Button
+                if (auth('admin')->user()->hasPermission('vendors.update')) {
+                    $actions .= '<button type="button" class="btn btn-sm btn-outline-info sync-vendor-btn"
+                        data-id="' . $vendor->id . '"
+                        title="Sync Product Count & Purchases">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </button>';
+                }
 
                 if (auth('admin')->user()->hasPermission('vendors.read')) {
                     $actions .= '<a href="' . route('admin.vendors.show', $vendor->id) . '" class="btn btn-sm btn-info" title="View">
@@ -166,12 +142,12 @@ class VendorsController extends Controller
 
                 return $actions;
             })
-            ->rawColumns(['checkbox', 'logo_display', 'vendor_info', 'location', 'products_count', 'rating_display', 'status_badge', 'badges', 'actions'])
+            ->rawColumns(['checkbox', 'vendor_info', 'location', 'products_count', 'total_purchases', 'status_badge', 'actions'])
             ->make(true);
     }
 
     /**
-     * Sync products count for all vendors
+     * Sync ALL vendors' products count
      */
     public function syncProductsCount(Request $request)
     {
@@ -215,6 +191,53 @@ class VendorsController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Sync INDIVIDUAL vendor's products count and total purchases
+     */
+    public function syncIndividual($id)
+    {
+        if (!auth('admin')->user()->hasPermission('vendors.update')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        try {
+            $vendor = Vendor::findOrFail($id);
+
+            // Sync products count
+            $productsCount = $vendor->products()->count();
+
+            // Sync total purchases (if you have purchase_orders table)
+            $totalPurchases = DB::table('purchase_orders')
+                ->where('vendor_id', $id)
+                ->where('status', 'completed')
+                ->sum('total_amount') ?? 0;
+
+            // Update vendor
+            $vendor->update([
+                'products_count' => $productsCount,
+                'total_purchases' => $totalPurchases
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Synced successfully!",
+                'data' => [
+                    'products_count' => $productsCount,
+                    'total_purchases' => number_format($totalPurchases, 2)
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error syncing vendor: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to sync. Please try again.'
+            ], 500);
+        }
+    }
+
     /**
      * Show the form for creating a new vendor
      */
@@ -246,7 +269,6 @@ class VendorsController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:vendors,slug',
             'company_name' => 'nullable|string|max:255',
             'email' => 'required|email|max:255|unique:vendors,email',
             'phone' => 'nullable|string|max:50',
@@ -263,11 +285,7 @@ class VendorsController extends Controller
             'bank_account_number' => 'nullable|string|max:100',
             'bank_account_name' => 'nullable|string|max:255',
             'bank_routing_number' => 'nullable|string|max:100',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'banner_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable|string',
-            'payment_terms' => 'nullable|string',
-            'credit_limit' => 'nullable|numeric|min:0',
             'currency' => 'nullable|string|max:10',
             'status_key_code' => 'required|string',
         ]);
@@ -283,37 +301,7 @@ class VendorsController extends Controller
         DB::beginTransaction();
 
         try {
-            $vendorData = $request->except(['logo', 'banner_image', 'social_media']);
-
-            // Handle logo upload
-            if ($request->hasFile('logo')) {
-                $logo = $request->file('logo');
-                $logoName = time() . '_logo_' . Str::random(10) . '.' . $logo->extension();
-                $logoPath = $logo->storeAs('vendors/logos', $logoName, 'public');
-                $vendorData['logo'] = $logoPath;
-            }
-
-            // Handle banner upload
-            if ($request->hasFile('banner_image')) {
-                $banner = $request->file('banner_image');
-                $bannerName = time() . '_banner_' . Str::random(10) . '.' . $banner->extension();
-                $bannerPath = $banner->storeAs('vendors/banners', $bannerName, 'public');
-                $vendorData['banner_image'] = $bannerPath;
-            }
-
-            // Handle social media
-            $socialMedia = [];
-            if ($request->filled('facebook')) $socialMedia['facebook'] = $request->facebook;
-            if ($request->filled('twitter')) $socialMedia['twitter'] = $request->twitter;
-            if ($request->filled('instagram')) $socialMedia['instagram'] = $request->instagram;
-            if ($request->filled('linkedin')) $socialMedia['linkedin'] = $request->linkedin;
-
-            $vendorData['social_media'] = $socialMedia;
-
-            // Convert checkboxes
-            $vendorData['is_featured'] = $request->has('is_featured');
-            $vendorData['is_verified'] = $request->has('is_verified');
-
+            $vendorData = $request->all();
             $vendorData['created_by'] = auth('admin')->id();
 
             $vendor = Vendor::create($vendorData);
@@ -387,7 +375,6 @@ class VendorsController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:vendors,slug,' . $id,
             'company_name' => 'nullable|string|max:255',
             'email' => 'required|email|max:255|unique:vendors,email,' . $id,
             'phone' => 'nullable|string|max:50',
@@ -404,11 +391,7 @@ class VendorsController extends Controller
             'bank_account_number' => 'nullable|string|max:100',
             'bank_account_name' => 'nullable|string|max:255',
             'bank_routing_number' => 'nullable|string|max:100',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'banner_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable|string',
-            'payment_terms' => 'nullable|string',
-            'credit_limit' => 'nullable|numeric|min:0',
             'currency' => 'nullable|string|max:10',
             'status_key_code' => 'required|string',
         ]);
@@ -424,47 +407,7 @@ class VendorsController extends Controller
         DB::beginTransaction();
 
         try {
-            $vendorData = $request->except(['logo', 'banner_image', 'social_media']);
-
-            // Handle logo upload
-            if ($request->hasFile('logo')) {
-                // Delete old logo
-                if ($vendor->logo && Storage::disk('public')->exists($vendor->logo)) {
-                    Storage::disk('public')->delete($vendor->logo);
-                }
-
-                $logo = $request->file('logo');
-                $logoName = time() . '_logo_' . Str::random(10) . '.' . $logo->extension();
-                $logoPath = $logo->storeAs('vendors/logos', $logoName, 'public');
-                $vendorData['logo'] = $logoPath;
-            }
-
-            // Handle banner upload
-            if ($request->hasFile('banner_image')) {
-                // Delete old banner
-                if ($vendor->banner_image && Storage::disk('public')->exists($vendor->banner_image)) {
-                    Storage::disk('public')->delete($vendor->banner_image);
-                }
-
-                $banner = $request->file('banner_image');
-                $bannerName = time() . '_banner_' . Str::random(10) . '.' . $banner->extension();
-                $bannerPath = $banner->storeAs('vendors/banners', $bannerName, 'public');
-                $vendorData['banner_image'] = $bannerPath;
-            }
-
-            // Handle social media
-            $socialMedia = [];
-            if ($request->filled('facebook')) $socialMedia['facebook'] = $request->facebook;
-            if ($request->filled('twitter')) $socialMedia['twitter'] = $request->twitter;
-            if ($request->filled('instagram')) $socialMedia['instagram'] = $request->instagram;
-            if ($request->filled('linkedin')) $socialMedia['linkedin'] = $request->linkedin;
-
-            $vendorData['social_media'] = $socialMedia;
-
-            // Convert checkboxes
-            $vendorData['is_featured'] = $request->has('is_featured');
-            $vendorData['is_verified'] = $request->has('is_verified');
-
+            $vendorData = $request->all();
             $vendorData['updated_by'] = auth('admin')->id();
 
             $vendor->update($vendorData);
@@ -508,16 +451,6 @@ class VendorsController extends Controller
                 ], 400);
             }
 
-            // Delete logo
-            if ($vendor->logo && Storage::disk('public')->exists($vendor->logo)) {
-                Storage::disk('public')->delete($vendor->logo);
-            }
-
-            // Delete banner
-            if ($vendor->banner_image && Storage::disk('public')->exists($vendor->banner_image)) {
-                Storage::disk('public')->delete($vendor->banner_image);
-            }
-
             $vendor->delete();
 
             DB::commit();
@@ -550,9 +483,8 @@ class VendorsController extends Controller
             'total' => Vendor::count(),
             'active' => Vendor::where('status_key_code', 'VENDOR_ACTIVE')->count(),
             'inactive' => Vendor::where('status_key_code', 'VENDOR_INACTIVE')->count(),
-            'verified' => Vendor::where('is_verified', true)->count(),
-            'featured' => Vendor::where('is_featured', true)->count(),
-            'total_products' => Vendor::withCount('products')->get()->sum('products_count'),
+            'total_products' => Vendor::sum('products_count'),
+            'total_purchases' => Vendor::sum('total_purchases'),
         ];
 
         return response()->json($stats);
@@ -590,14 +522,6 @@ class VendorsController extends Controller
                     continue; // Skip vendors with products
                 }
 
-                // Delete images
-                if ($vendor->logo && Storage::disk('public')->exists($vendor->logo)) {
-                    Storage::disk('public')->delete($vendor->logo);
-                }
-                if ($vendor->banner_image && Storage::disk('public')->exists($vendor->banner_image)) {
-                    Storage::disk('public')->delete($vendor->banner_image);
-                }
-
                 $vendor->delete();
             }
 
@@ -619,62 +543,6 @@ class VendorsController extends Controller
     }
 
     /**
-     * Toggle vendor verification
-     */
-    public function toggleVerified($id)
-    {
-        if (!auth('admin')->user()->hasPermission('vendors.update')) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-        }
-
-        try {
-            $vendor = Vendor::findOrFail($id);
-            $vendor->is_verified = !$vendor->is_verified;
-            $vendor->save();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Vendor verification status updated',
-                'is_verified' => $vendor->is_verified
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update verification: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Toggle vendor featured status
-     */
-    public function toggleFeatured($id)
-    {
-        if (!auth('admin')->user()->hasPermission('vendors.update')) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-        }
-
-        try {
-            $vendor = Vendor::findOrFail($id);
-            $vendor->is_featured = !$vendor->is_featured;
-            $vendor->save();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Featured status updated',
-                'is_featured' => $vendor->is_featured
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update featured status: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
      * Get countries list
      */
     private function getCountriesList(): array
@@ -683,7 +551,6 @@ class VendorsController extends Controller
             'United States', 'Canada', 'United Kingdom', 'Australia',
             'Germany', 'France', 'Italy', 'Spain', 'China', 'Japan',
             'India', 'Pakistan', 'Bangladesh', 'Brazil', 'Mexico',
-            // Add more as needed
         ];
     }
 }

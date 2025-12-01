@@ -18,9 +18,9 @@
             </nav>
         </div>
         <div class="d-flex gap-2">
-            {{-- ADD SYNC BUTTON HERE --}}
-            <button type="button" class="btn btn-outline-primary" id="syncProductsCountBtn" title="Sync Product Counts">
-                <i class="bi bi-arrow-repeat"></i> Sync Counts
+            {{-- Sync All Button --}}
+            <button type="button" class="btn btn-outline-primary" id="syncAllBtn" title="Sync All Product Counts">
+                <i class="bi bi-arrow-repeat"></i> Sync All Counts
             </button>
 
             @if(auth('admin')->user()->hasPermission('vendors.create'))
@@ -41,12 +41,12 @@
         <div class="card-body">
             <div class="row g-3">
                 <!-- Search -->
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <input type="text" class="form-control" id="searchInput" placeholder="Search vendors...">
                 </div>
 
                 <!-- Status Filter -->
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <select class="form-select" id="statusFilter">
                         <option value="">All Status</option>
                         <option value="VENDOR_ACTIVE">Active</option>
@@ -56,26 +56,8 @@
                     </select>
                 </div>
 
-                <!-- Verified Filter -->
-                <div class="col-md-2">
-                    <select class="form-select" id="verifiedFilter">
-                        <option value="">All Vendors</option>
-                        <option value="1">Verified Only</option>
-                        <option value="0">Unverified Only</option>
-                    </select>
-                </div>
-
-                <!-- Featured Filter -->
-                <div class="col-md-2">
-                    <select class="form-select" id="featuredFilter">
-                        <option value="">All Vendors</option>
-                        <option value="1">Featured Only</option>
-                        <option value="0">Not Featured</option>
-                    </select>
-                </div>
-
                 <!-- Country Filter -->
-                <div class="col-md-3">
+                <div class="col-md-5">
                     <select class="form-select" id="countryFilter">
                         <option value="">All Countries</option>
                         <option value="SA">Saudi Arabia</option>
@@ -111,14 +93,12 @@
                                     <input type="checkbox" class="form-check-input" id="selectAll">
                                 </th>
                             @endif
-                            <th width="60">Logo</th>
                             <th>Vendor Info</th>
                             <th>Location</th>
                             <th width="80">Products</th>
-                            <th width="120">Rating</th>
+                            <th width="120">Total Purchases</th>
                             <th width="100">Status</th>
-                            <th width="150">Badges</th>
-                            <th width="120">Actions</th>
+                            <th width="180">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -144,10 +124,10 @@
         border: 2px solid #5B914C;
         background-color: #f8f9fa;
     }
-    #syncProductsCountBtn {
+    #syncAllBtn, .sync-vendor-btn {
         position: relative;
     }
-    #syncProductsCountBtn.syncing i {
+    #syncAllBtn.syncing i, .sync-vendor-btn.syncing i {
         animation: spin 1s linear infinite;
     }
     @keyframes spin {
@@ -172,8 +152,6 @@ $(document).ready(function() {
                 url: '{{ route("admin.vendors.data") }}',
                 data: function(d) {
                     d.status = $('#statusFilter').val();
-                    d.is_verified = $('#verifiedFilter').val();
-                    d.is_featured = $('#featuredFilter').val();
                     d.country = $('#countryFilter').val();
                     d.search = $('#searchInput').val();
                 }
@@ -182,16 +160,14 @@ $(document).ready(function() {
                 @if(auth('admin')->user()->hasPermission('vendors.delete'))
                 { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
                 @endif
-                { data: 'logo_display', name: 'logo_display', orderable: false, searchable: false },
                 { data: 'vendor_info', name: 'name' },
                 { data: 'location', name: 'city' },
                 { data: 'products_count', name: 'products_count' },
-                { data: 'rating_display', name: 'rating' },
+                { data: 'total_purchases', name: 'total_purchases' },
                 { data: 'status_badge', name: 'status_key_code' },
-                { data: 'badges', name: 'badges', orderable: false, searchable: false },
                 { data: 'actions', name: 'actions', orderable: false, searchable: false }
             ],
-            order: [[2, 'desc']],
+            order: [[1, 'asc']],
             pageLength: 25,
             drawCallback: function() {
                 loadStatistics();
@@ -208,7 +184,7 @@ $(document).ready(function() {
             method: 'GET',
             success: function(response) {
                 let html = `
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="card statistics-card" data-filter="">
                             <div class="card-body text-center">
                                 <h3 class="mb-0">${response.total}</h3>
@@ -216,7 +192,7 @@ $(document).ready(function() {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="card statistics-card" data-filter="VENDOR_ACTIVE">
                             <div class="card-body text-center">
                                 <h3 class="mb-0 text-success">${response.active}</h3>
@@ -224,35 +200,19 @@ $(document).ready(function() {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-2">
-                        <div class="card statistics-card" data-filter="VENDOR_INACTIVE">
-                            <div class="card-body text-center">
-                                <h3 class="mb-0 text-danger">${response.inactive}</h3>
-                                <p class="text-muted mb-0"><small>Inactive</small></p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="card statistics-card" data-filter="verified">
-                            <div class="card-body text-center">
-                                <h3 class="mb-0 text-primary">${response.verified}</h3>
-                                <p class="text-muted mb-0"><small>Verified</small></p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="card statistics-card" data-filter="featured">
-                            <div class="card-body text-center">
-                                <h3 class="mb-0 text-warning">${response.featured}</h3>
-                                <p class="text-muted mb-0"><small>Featured</small></p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="card statistics-card">
                             <div class="card-body text-center">
                                 <h3 class="mb-0 text-info">${response.total_products}</h3>
                                 <p class="text-muted mb-0"><small>Total Products</small></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card statistics-card">
+                            <div class="card-body text-center">
+                                <h3 class="mb-0 text-primary">$${response.total_purchases.toFixed(2)}</h3>
+                                <p class="text-muted mb-0"><small>Total Purchases</small></p>
                             </div>
                         </div>
                     </div>
@@ -265,7 +225,7 @@ $(document).ready(function() {
     loadStatistics();
 
     // Filter handlers
-    $('#statusFilter, #verifiedFilter, #featuredFilter, #countryFilter').on('change', function() {
+    $('#statusFilter, #countryFilter').on('change', function() {
         table.ajax.reload();
     });
 
@@ -284,15 +244,7 @@ $(document).ready(function() {
         $('.statistics-card').removeClass('active');
         $(this).addClass('active');
 
-        if (filter === 'verified') {
-            $('#verifiedFilter').val('1').trigger('change');
-        } else if (filter === 'featured') {
-            $('#featuredFilter').val('1').trigger('change');
-        } else {
-            $('#statusFilter').val(filter).trigger('change');
-            $('#verifiedFilter').val('');
-            $('#featuredFilter').val('');
-        }
+        $('#statusFilter').val(filter).trigger('change');
     });
 
     // Select all checkboxes
@@ -314,6 +266,98 @@ $(document).ready(function() {
         }
     }
 
+    // =====================================================
+    // SYNC ALL BUTTON HANDLER
+    // =====================================================
+    $('#syncAllBtn').on('click', function() {
+        const $btn = $(this);
+
+        $btn.prop('disabled', true).addClass('syncing');
+
+        Swal.fire({
+            title: 'Syncing All...',
+            text: 'Please wait while we sync all vendor counts',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        $.ajax({
+            url: '{{ route("admin.vendors.sync-products-count") }}',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: response.message,
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+
+                table.ajax.reload();
+                loadStatistics();
+            },
+            error: function(xhr) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'Failed to sync',
+                });
+            },
+            complete: function() {
+                $btn.prop('disabled', false).removeClass('syncing');
+            }
+        });
+    });
+
+    // =====================================================
+    // SYNC INDIVIDUAL VENDOR BUTTON HANDLER
+    // =====================================================
+    $(document).on('click', '.sync-vendor-btn', function() {
+        const $btn = $(this);
+        const vendorId = $btn.data('id');
+
+        $btn.prop('disabled', true).addClass('syncing');
+
+        $.ajax({
+            url: `/admin/vendors/${vendorId}/sync`,
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Synced!',
+                    html: `
+                        <p>Products: <strong>${response.data.products_count}</strong></p>
+                        <p>Total Purchases: <strong>$${response.data.total_purchases}</strong></p>
+                    `,
+                    timer: 2500,
+                    showConfirmButton: false
+                });
+
+                table.ajax.reload(null, false); // Don't reset pagination
+                loadStatistics();
+            },
+            error: function(xhr) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'Failed to sync',
+                    timer: 2000
+                });
+            },
+            complete: function() {
+                $btn.prop('disabled', false).removeClass('syncing');
+            }
+        });
+    });
+
     // Bulk Delete
     $('#bulkDeleteBtn').on('click', function() {
         const selectedIds = $('.vendor-checkbox:checked').map(function() {
@@ -327,7 +371,7 @@ $(document).ready(function() {
 
         Swal.fire({
             title: 'Are you sure?',
-            text: `You are about to delete ${selectedIds.length} vendor(s). This action cannot be undone!`,
+            text: `You are about to delete ${selectedIds.length} vendor(s)!`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
@@ -339,7 +383,7 @@ $(document).ready(function() {
                     url: '{{ route("admin.vendors.bulk-delete") }}',
                     method: 'POST',
                     data: {
-                        ids: selectedIds,
+                        vendor_ids: selectedIds,
                         _token: '{{ csrf_token() }}'
                     },
                     success: function(response) {
@@ -348,7 +392,7 @@ $(document).ready(function() {
                         $('#selectAll').prop('checked', false);
                     },
                     error: function(xhr) {
-                        Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to delete vendors', 'error');
+                        Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to delete', 'error');
                     }
                 });
             }
@@ -380,62 +424,9 @@ $(document).ready(function() {
                         table.ajax.reload();
                     },
                     error: function(xhr) {
-                        Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to delete vendor', 'error');
+                        Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to delete', 'error');
                     }
                 });
-            }
-        });
-    });
-
-    // =====================================================
-    // SYNC PRODUCTS COUNT BUTTON HANDLER
-    // =====================================================
-    $('#syncProductsCountBtn').on('click', function() {
-        const $btn = $(this);
-        const $icon = $btn.find('i');
-
-        // Disable button and add spinning animation
-        $btn.prop('disabled', true).addClass('syncing');
-        $icon.removeClass('bi-arrow-repeat').addClass('bi-arrow-repeat');
-
-        Swal.fire({
-            title: 'Syncing...',
-            text: 'Please wait while we sync product counts',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-
-        $.ajax({
-            url: '{{ route("admin.vendors.sync-products-count") }}',
-            method: 'POST',
-            data: {
-                _token: '{{ csrf_token() }}'
-            },
-            success: function(response) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Success!',
-                    text: response.message,
-                    timer: 3000,
-                    showConfirmButton: false
-                });
-
-                // Reload table to show updated counts
-                table.ajax.reload();
-                loadStatistics();
-            },
-            error: function(xhr) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error!',
-                    text: xhr.responseJSON?.message || 'Failed to sync product counts',
-                });
-            },
-            complete: function() {
-                // Re-enable button and remove spinning animation
-                $btn.prop('disabled', false).removeClass('syncing');
             }
         });
     });

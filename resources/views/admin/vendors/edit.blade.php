@@ -1,435 +1,469 @@
+{{-- resources/views/admin/vendors/edit.blade.php --}}
+
 @extends('admin.layouts.app')
 
-@section('title', 'Edit Vendor - ' . $vendor->name)
-
-@push('styles')
-<style>
-    .form-section {
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        border: 1px solid #e0e0e0;
-    }
-
-    .section-title {
-        color: #5B914C;
-        font-weight: 600;
-        font-size: 1.1rem;
-        margin-bottom: 15px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #5B914C;
-    }
-
-    .btn-submit {
-        background-color: #5B914C;
-        border-color: #5B914C;
-        color: white;
-    }
-
-    .btn-submit:hover {
-        background-color: #4a7a3d;
-        border-color: #4a7a3d;
-        color: white;
-    }
-
-    .image-preview {
-        max-width: 200px;
-        max-height: 200px;
-        margin-top: 10px;
-        border-radius: 8px;
-    }
-
-    .current-image {
-        max-width: 200px;
-        max-height: 200px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-    }
-
-    .required-field::after {
-        content: " *";
-        color: red;
-    }
-</style>
-@endpush
+@section('title', 'Edit Vendor')
 
 @section('content')
 <div class="container-fluid">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1"><i class="bi bi-pencil"></i> Edit Vendor</h2>
+            <h1 class="h3 mb-0">Edit Vendor</h1>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">Dashboard</a></li>
                     <li class="breadcrumb-item"><a href="{{ route('admin.vendors.index') }}">Vendors</a></li>
-                    <li class="breadcrumb-item active">{{ $vendor->name }}</li>
+                    <li class="breadcrumb-item active">Edit: {{ $vendor->name }}</li>
                 </ol>
             </nav>
         </div>
-        <div>
+        <div class="d-flex gap-2">
             <a href="{{ route('admin.vendors.show', $vendor->id) }}" class="btn btn-info">
-                <i class="bi bi-eye"></i> View Details
+                <i class="bi bi-eye"></i> View
             </a>
-            <a href="{{ route('admin.vendors.index') }}" class="btn btn-outline-secondary">
+            <a href="{{ route('admin.vendors.index') }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Back to List
             </a>
         </div>
     </div>
 
-    <form id="vendorForm" enctype="multipart/form-data">
+    <!-- Edit Form -->
+    <form id="editVendorForm">
         @csrf
         @method('PUT')
 
-        <!-- Basic Information -->
-        <div class="form-section">
-            <h5 class="section-title"><i class="bi bi-info-circle"></i> Basic Information</h5>
+        <div class="row">
+            <!-- Main Information Card -->
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header" style="background-color: #5B914C; color: white;">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Name -->
+                            <div class="col-md-6 mb-3">
+                                <label for="name" class="form-label">Vendor Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" value="{{ old('name', $vendor->name) }}" required>
+                                <div class="invalid-feedback"></div>
+                            </div>
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label required-field">Contact Person Name</label>
-                    <input type="text" name="name" class="form-control" value="{{ $vendor->name }}" required>
-                </div>
+                            <!-- Company Name -->
+                            <div class="col-md-6 mb-3">
+                                <label for="company_name" class="form-label">Company Name</label>
+                                <input type="text" class="form-control" id="company_name" name="company_name" value="{{ old('company_name', $vendor->company_name) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
 
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Company Name</label>
-                    <input type="text" name="company_name" class="form-control" value="{{ $vendor->company_name }}">
-                </div>
+                            <!-- Email -->
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="email" name="email" value="{{ old('email', $vendor->email) }}" required>
+                                <div class="invalid-feedback"></div>
+                            </div>
 
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Slug</label>
-                    <input type="text" name="slug" class="form-control" value="{{ $vendor->slug }}">
-                    <small class="text-muted">Leave blank to auto-generate from name</small>
-                </div>
+                            <!-- Phone -->
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone</label>
+                                <input type="text" class="form-control" id="phone" name="phone" value="{{ old('phone', $vendor->phone) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
 
-                <div class="col-md-6 mb-3">
-                    <label class="form-label required-field">Email</label>
-                    <input type="email" name="email" class="form-control" value="{{ $vendor->email }}" required>
-                </div>
+                            <!-- Mobile -->
+                            <div class="col-md-6 mb-3">
+                                <label for="mobile" class="form-label">Mobile</label>
+                                <input type="text" class="form-control" id="mobile" name="mobile" value="{{ old('mobile', $vendor->mobile) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
 
-                <div class="col-md-4 mb-3">
-                    <label class="form-label">Phone</label>
-                    <input type="text" name="phone" class="form-control" value="{{ $vendor->phone }}">
-                </div>
+                            <!-- Website -->
+                            <div class="col-md-6 mb-3">
+                                <label for="website" class="form-label">Website</label>
+                                <input type="url" class="form-control" id="website" name="website" value="{{ old('website', $vendor->website) }}" placeholder="https://example.com">
+                                <div class="invalid-feedback"></div>
+                            </div>
 
-                <div class="col-md-4 mb-3">
-                    <label class="form-label">Mobile</label>
-                    <input type="text" name="mobile" class="form-control" value="{{ $vendor->mobile }}">
-                </div>
-
-                <div class="col-md-4 mb-3">
-                    <label class="form-label">Website</label>
-                    <input type="url" name="website" class="form-control" value="{{ $vendor->website }}" placeholder="https://example.com">
-                </div>
-
-                <div class="col-md-12 mb-3">
-                    <label class="form-label">Description</label>
-                    <textarea name="description" class="form-control" rows="4">{{ $vendor->description }}</textarea>
-                </div>
-            </div>
-        </div>
-
-        <!-- Address Information -->
-        <div class="form-section">
-            <h5 class="section-title"><i class="bi bi-geo-alt"></i> Address Information</h5>
-
-            <div class="row">
-                <div class="col-md-12 mb-3">
-                    <label class="form-label">Address</label>
-                    <input type="text" name="address" class="form-control" value="{{ $vendor->address }}">
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label class="form-label">City</label>
-                    <input type="text" name="city" class="form-control" value="{{ $vendor->city }}">
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label class="form-label">State/Province</label>
-                    <input type="text" name="state" class="form-control" value="{{ $vendor->state }}">
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label class="form-label">Country</label>
-                    <select name="country" class="form-select">
-                        <option value="">Select Country</option>
-                        @foreach($countries as $country)
-                            <option value="{{ $country }}" {{ $vendor->country === $country ? 'selected' : '' }}>
-                                {{ $country }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label class="form-label">Postal Code</label>
-                    <input type="text" name="postal_code" class="form-control" value="{{ $vendor->postal_code }}">
-                </div>
-            </div>
-        </div>
-
-        <!-- Business Information -->
-        <div class="form-section">
-            <h5 class="section-title"><i class="bi bi-briefcase"></i> Business Information</h5>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Tax Number</label>
-                    <input type="text" name="tax_number" class="form-control" value="{{ $vendor->tax_number }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Registration Number</label>
-                    <input type="text" name="registration_number" class="form-control" value="{{ $vendor->registration_number }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Payment Terms</label>
-                    <input type="text" name="payment_terms" class="form-control" value="{{ $vendor->payment_terms }}" placeholder="e.g., Net 30 days">
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label class="form-label">Credit Limit</label>
-                    <input type="number" name="credit_limit" class="form-control" value="{{ $vendor->credit_limit }}" min="0" step="0.01">
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label class="form-label">Currency</label>
-                    <select name="currency" class="form-select">
-                        <option value="">Select Currency</option>
-                        @foreach($currencies as $code => $currency)
-                            <option value="{{ $code }}" {{ $vendor->currency === $code ? 'selected' : '' }}>
-                                {{ $code }} - {{ $currency['name'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bank Information -->
-        <div class="form-section">
-            <h5 class="section-title"><i class="bi bi-bank"></i> Bank Information</h5>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Bank Name</label>
-                    <input type="text" name="bank_name" class="form-control" value="{{ $vendor->bank_name }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Account Name</label>
-                    <input type="text" name="bank_account_name" class="form-control" value="{{ $vendor->bank_account_name }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Account Number</label>
-                    <input type="text" name="bank_account_number" class="form-control" value="{{ $vendor->bank_account_number }}">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Routing Number</label>
-                    <input type="text" name="bank_routing_number" class="form-control" value="{{ $vendor->bank_routing_number }}">
-                </div>
-            </div>
-        </div>
-
-        <!-- Images -->
-        <div class="form-section">
-            <h5 class="section-title"><i class="bi bi-images"></i> Images</h5>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Logo</label>
-                    @if($vendor->logo)
-                        <div>
-                            <img src="{{ $vendor->getLogoUrl() }}" class="current-image" alt="Current Logo">
+                            <!-- Description -->
+                            <div class="col-12 mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="4">{{ old('description', $vendor->description) }}</textarea>
+                                <div class="invalid-feedback"></div>
+                            </div>
                         </div>
-                    @endif
-                    <input type="file" name="logo" class="form-control" accept="image/*" id="logoInput">
-                    <small class="text-muted">Recommended: 200x200px. Leave blank to keep current logo.</small>
-                    <img id="logoPreview" class="image-preview" style="display: none;">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Banner Image</label>
-                    @if($vendor->banner_image)
-                        <div>
-                            <img src="{{ $vendor->getBannerUrl() }}" class="current-image" alt="Current Banner">
-                        </div>
-                    @endif
-                    <input type="file" name="banner_image" class="form-control" accept="image/*" id="bannerInput">
-                    <small class="text-muted">Recommended: 1200x400px. Leave blank to keep current banner.</small>
-                    <img id="bannerPreview" class="image-preview" style="display: none;">
-                </div>
-            </div>
-        </div>
-
-        <!-- Social Media -->
-        <div class="form-section">
-            <h5 class="section-title"><i class="bi bi-share"></i> Social Media Links</h5>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><i class="bi bi-facebook"></i> Facebook</label>
-                    <input type="url" name="facebook" class="form-control" value="{{ $vendor->getSocialMediaLink('facebook') }}" placeholder="https://facebook.com/...">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><i class="bi bi-twitter"></i> Twitter</label>
-                    <input type="url" name="twitter" class="form-control" value="{{ $vendor->getSocialMediaLink('twitter') }}" placeholder="https://twitter.com/...">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><i class="bi bi-instagram"></i> Instagram</label>
-                    <input type="url" name="instagram" class="form-control" value="{{ $vendor->getSocialMediaLink('instagram') }}" placeholder="https://instagram.com/...">
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label"><i class="bi bi-linkedin"></i> LinkedIn</label>
-                    <input type="url" name="linkedin" class="form-control" value="{{ $vendor->getSocialMediaLink('linkedin') }}" placeholder="https://linkedin.com/...">
-                </div>
-            </div>
-        </div>
-
-        <!-- Status & Settings -->
-        <div class="form-section">
-            <h5 class="section-title"><i class="bi bi-gear"></i> Status & Settings</h5>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label required-field">Status</label>
-                    <select name="status_key_code" class="form-select" required>
-                        @foreach($statusList as $status)
-                            <option value="{{ $status->key_code }}" {{ $vendor->status_key_code === $status->key_code ? 'selected' : '' }}>
-                                {{ $status->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Sort Order</label>
-                    <input type="number" name="sort_order" class="form-control" value="{{ $vendor->sort_order }}" min="0">
-                </div>
-
-                <div class="col-md-12 mb-3">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" name="is_verified" id="isVerified" {{ $vendor->is_verified ? 'checked' : '' }}>
-                        <label class="form-check-label" for="isVerified">
-                            <i class="bi bi-check-circle"></i> Mark as Verified
-                        </label>
                     </div>
                 </div>
 
-                <div class="col-md-12 mb-3">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" name="is_featured" id="isFeatured" {{ $vendor->is_featured ? 'checked' : '' }}>
-                        <label class="form-check-label" for="isFeatured">
-                            <i class="bi bi-star"></i> Mark as Featured
-                        </label>
+                <!-- Address Information Card -->
+                <div class="card mb-4">
+                    <div class="card-header" style="background-color: #5B914C; color: white;">
+                        <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Address Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Address -->
+                            <div class="col-12 mb-3">
+                                <label for="address" class="form-label">Street Address</label>
+                                <textarea class="form-control" id="address" name="address" rows="2">{{ old('address', $vendor->address) }}</textarea>
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <!-- City -->
+                            <div class="col-md-6 mb-3">
+                                <label for="city" class="form-label">City</label>
+                                <input type="text" class="form-control" id="city" name="city" value="{{ old('city', $vendor->city) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <!-- State -->
+                            <div class="col-md-6 mb-3">
+                                <label for="state" class="form-label">State/Province</label>
+                                <input type="text" class="form-control" id="state" name="state" value="{{ old('state', $vendor->state) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <!-- Country -->
+                            <div class="col-md-6 mb-3">
+                                <label for="country" class="form-label">Country</label>
+                                <select class="form-select" id="country" name="country">
+                                    <option value="">Select Country</option>
+                                    @foreach($countries as $country)
+                                        <option value="{{ $country }}" {{ old('country', $vendor->country) == $country ? 'selected' : '' }}>
+                                            {{ $country }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <!-- Postal Code -->
+                            <div class="col-md-6 mb-3">
+                                <label for="postal_code" class="form-label">Postal Code</label>
+                                <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ old('postal_code', $vendor->postal_code) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Business Information Card -->
+                <div class="card mb-4">
+                    <div class="card-header" style="background-color: #5B914C; color: white;">
+                        <h5 class="mb-0"><i class="bi bi-building"></i> Business Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Tax Number -->
+                            <div class="col-md-6 mb-3">
+                                <label for="tax_number" class="form-label">Tax Number</label>
+                                <input type="text" class="form-control" id="tax_number" name="tax_number" value="{{ old('tax_number', $vendor->tax_number) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <!-- Registration Number -->
+                            <div class="col-md-6 mb-3">
+                                <label for="registration_number" class="form-label">Registration Number</label>
+                                <input type="text" class="form-control" id="registration_number" name="registration_number" value="{{ old('registration_number', $vendor->registration_number) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Banking Information Card -->
+                <div class="card mb-4">
+                    <div class="card-header" style="background-color: #5B914C; color: white;">
+                        <h5 class="mb-0"><i class="bi bi-bank"></i> Banking Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Bank Name -->
+                            <div class="col-md-6 mb-3">
+                                <label for="bank_name" class="form-label">Bank Name</label>
+                                <input type="text" class="form-control" id="bank_name" name="bank_name" value="{{ old('bank_name', $vendor->bank_name) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <!-- Bank Account Name -->
+                            <div class="col-md-6 mb-3">
+                                <label for="bank_account_name" class="form-label">Account Name</label>
+                                <input type="text" class="form-control" id="bank_account_name" name="bank_account_name" value="{{ old('bank_account_name', $vendor->bank_account_name) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <!-- Bank Account Number -->
+                            <div class="col-md-6 mb-3">
+                                <label for="bank_account_number" class="form-label">Account Number</label>
+                                <input type="text" class="form-control" id="bank_account_number" name="bank_account_number" value="{{ old('bank_account_number', $vendor->bank_account_number) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <!-- Bank Routing Number -->
+                            <div class="col-md-6 mb-3">
+                                <label for="bank_routing_number" class="form-label">Routing Number</label>
+                                <input type="text" class="form-control" id="bank_routing_number" name="bank_routing_number" value="{{ old('bank_routing_number', $vendor->bank_routing_number) }}">
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Form Actions -->
-        <div class="form-section">
-            <div class="d-flex justify-content-end gap-2">
-                <a href="{{ route('admin.vendors.index') }}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Cancel
-                </a>
-                <button type="submit" class="btn btn-submit">
-                    <i class="bi bi-check-circle"></i> Update Vendor
-                </button>
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Status Card -->
+                <div class="card mb-4">
+                    <div class="card-header" style="background-color: #5B914C; color: white;">
+                        <h5 class="mb-0"><i class="bi bi-gear"></i> Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Status -->
+                        <div class="mb-3">
+                            <label for="status_key_code" class="form-label">Status <span class="text-danger">*</span></label>
+                            <select class="form-select" id="status_key_code" name="status_key_code" required>
+                                @foreach($statusList as $status)
+                                    <option value="{{ $status->key_code }}"
+                                        {{ old('status_key_code', $vendor->status_key_code) == $status->key_code ? 'selected' : '' }}>
+                                        {{ $status->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="invalid-feedback"></div>
+                        </div>
+
+                        <!-- Currency -->
+                        <div class="mb-3">
+                            <label for="currency" class="form-label">Currency</label>
+                            <select class="form-select" id="currency" name="currency">
+                                @foreach (get_all_currencies() as $code => $label)
+                                    <option value="{{ $code }}" {{ old('currency', $vendor->currency) == $code ? 'selected' : '' }}>
+                                        {{ $code }} - {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="invalid-feedback"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics Card -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Statistics</h5>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="syncStatsBtn" title="Sync Statistics">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Products Count:</span>
+                            <span class="badge bg-primary" id="productsCount">{{ $vendor->products_count ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Total Purchases:</span>
+                            <span class="badge bg-success" id="totalPurchases">${{ number_format($vendor->total_purchases ?? 0, 2) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Orders Count:</span>
+                            <span class="badge bg-info" id="ordersCount">{{ $vendor->orders_count ?? 0 }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audit Information Card -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Audit Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Created At:</small>
+                            <strong>{{ $vendor->created_at->format('d M Y, h:i A') }}</strong>
+                        </div>
+                        @if($vendor->creator)
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Created By:</small>
+                            <strong>{{ $vendor->creator->name }}</strong>
+                        </div>
+                        @endif
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Last Updated:</small>
+                            <strong>{{ $vendor->updated_at->format('d M Y, h:i A') }}</strong>
+                        </div>
+                        @if($vendor->updater)
+                        <div>
+                            <small class="text-muted d-block">Updated By:</small>
+                            <strong>{{ $vendor->updater->name }}</strong>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="card">
+                    <div class="card-body">
+                        <button type="submit" class="btn w-100 mb-2" style="background-color: #5B914C; color: white;">
+                            <i class="bi bi-check-circle"></i> Update Vendor
+                        </button>
+                        <a href="{{ route('admin.vendors.show', $vendor->id) }}" class="btn btn-info w-100 mb-2">
+                            <i class="bi bi-eye"></i> View Vendor
+                        </a>
+                        <a href="{{ route('admin.vendors.index') }}" class="btn btn-light w-100">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </form>
 </div>
-@endsection
+
+@push('styles')
+<style>
+    .card-header {
+        font-weight: 600;
+    }
+    .form-label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+    .invalid-feedback {
+        display: block;
+    }
+    .card {
+        box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+    #syncStatsBtn.syncing i {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+@endpush
 
 @push('scripts')
 <script>
 $(document).ready(function() {
-    // Image preview for logo
-    $('#logoInput').on('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                $('#logoPreview').attr('src', e.target.result).show();
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-
-    // Image preview for banner
-    $('#bannerInput').on('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                $('#bannerPreview').attr('src', e.target.result).show();
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-
-    // Form submission
-    $('#vendorForm').on('submit', function(e) {
+    // Handle form submission
+    $('#editVendorForm').on('submit', function(e) {
         e.preventDefault();
 
-        let formData = new FormData(this);
+        // Clear previous errors
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').text('');
 
+        // Get form data
+        const formData = new FormData(this);
+
+        // Disable submit button
+        const $submitBtn = $('button[type="submit"]');
+        const originalText = $submitBtn.html();
+        $submitBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Updating...');
+
+        // Submit via AJAX
         $.ajax({
             url: '{{ route("admin.vendors.update", $vendor->id) }}',
-            type: 'POST',
+            method: 'POST',
             data: formData,
             processData: false,
             contentType: false,
-            beforeSend: function() {
-                Swal.fire({
-                    title: 'Updating Vendor...',
-                    text: 'Please wait',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
-            },
             success: function(response) {
                 if (response.success) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Success!',
                         text: response.message,
-                        confirmButtonColor: '#5B914C'
+                        showConfirmButton: false,
+                        timer: 2000
                     }).then(() => {
                         window.location.href = '{{ route("admin.vendors.show", $vendor->id) }}';
                     });
                 }
             },
             error: function(xhr) {
-                let errorMessage = 'Failed to update vendor';
+                // Re-enable submit button
+                $submitBtn.prop('disabled', false).html(originalText);
 
-                if (xhr.responseJSON) {
-                    if (xhr.responseJSON.message) {
-                        errorMessage = xhr.responseJSON.message;
-                    } else if (xhr.responseJSON.errors) {
-                        const errors = Object.values(xhr.responseJSON.errors).flat();
-                        errorMessage = errors.join('<br>');
-                    }
+                if (xhr.status === 422) {
+                    // Validation errors
+                    const errors = xhr.responseJSON.errors;
+
+                    $.each(errors, function(field, messages) {
+                        const $input = $(`[name="${field}"]`);
+                        $input.addClass('is-invalid');
+                        $input.next('.invalid-feedback').text(messages[0]);
+                    });
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Validation Error',
+                        text: 'Please check the form and correct the errors.',
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: xhr.responseJSON?.message || 'Failed to update vendor. Please try again.',
+                    });
                 }
+            }
+        });
+    });
 
+    // Clear error on input change
+    $('input, select, textarea').on('input change', function() {
+        $(this).removeClass('is-invalid');
+        $(this).next('.invalid-feedback').text('');
+    });
+
+    // Sync Statistics Button
+    $('#syncStatsBtn').on('click', function() {
+        const $btn = $(this);
+
+        $btn.prop('disabled', true).addClass('syncing');
+
+        $.ajax({
+            url: '{{ route("admin.vendors.sync-individual", $vendor->id) }}',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Update statistics display
+                    $('#productsCount').text(response.data.products_count);
+                    $('#totalPurchases').text('$' + response.data.total_purchases);
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Statistics Synced!',
+                        html: `
+                            <p>Products: <strong>${response.data.products_count}</strong></p>
+                            <p>Total Purchases: <strong>$${response.data.total_purchases}</strong></p>
+                        `,
+                        timer: 2500,
+                        showConfirmButton: false
+                    });
+                }
+            },
+            error: function(xhr) {
                 Swal.fire({
                     icon: 'error',
                     title: 'Error!',
-                    html: errorMessage
+                    text: xhr.responseJSON?.message || 'Failed to sync statistics.',
+                    timer: 2000
                 });
+            },
+            complete: function() {
+                $btn.prop('disabled', false).removeClass('syncing');
             }
         });
     });
 });
 </script>
 @endpush
+@endsection

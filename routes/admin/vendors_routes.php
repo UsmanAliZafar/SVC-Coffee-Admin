@@ -17,7 +17,6 @@ Route::prefix('vendors')->name('vendors.')->group(function () {
         Route::get('/', [VendorsController::class, 'index'])->name('index');
         Route::get('/data', [VendorsController::class, 'getData'])->name('data');
         Route::get('/statistics', [VendorsController::class, 'statistics'])->name('statistics');
-        Route::post('/sync-products-count', [VendorsController::class, 'syncProductsCount'])->name('sync-products-count');
     });
 
     // Create Routes (MUST be before /{id} routes)
@@ -30,8 +29,15 @@ Route::prefix('vendors')->name('vendors.')->group(function () {
     Route::middleware('admin.permission:vendors.update')->group(function () {
         Route::get('/{id}/edit', [VendorsController::class, 'edit'])->name('edit');
         Route::put('/{id}', [VendorsController::class, 'update'])->name('update');
-        Route::post('/{id}/toggle-verified', [VendorsController::class, 'toggleVerified'])->name('toggle-verified');
-        Route::post('/{id}/toggle-featured', [VendorsController::class, 'toggleFeatured'])->name('toggle-featured');
+        Route::patch('/{id}', [VendorsController::class, 'update'])->name('update.patch');
+
+        // Sync Individual Vendor (NEW ROUTE)
+        Route::post('/{id}/sync', [VendorsController::class, 'syncIndividual'])->name('sync-individual');
+    });
+
+    // Sync Routes (requires read permission)
+    Route::middleware('admin.permission:vendors.read')->group(function () {
+        Route::post('/sync-products-count', [VendorsController::class, 'syncProductsCount'])->name('sync-products-count');
     });
 
     // Delete Routes

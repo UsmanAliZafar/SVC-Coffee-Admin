@@ -804,6 +804,14 @@
                     <div class="info-label">Currency</div>
                     <div class="info-value">{{ $product->curency }}</div>
                 </div>
+                <div class="mb-3">
+                    <div class="info-label">Regular Price</div>
+                    <div class="info-value">{{ $product->curency }} {{ number_format($product->price, 2) }}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="info-label">Sale Price</div>
+                    <div class="info-value">{{ $product->curency }} {{ number_format($product->sale_price, 2) }}</div>
+                </div>
 
                 @if($product->cost_price)
                     <div class="mb-3">

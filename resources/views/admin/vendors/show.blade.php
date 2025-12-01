@@ -1,140 +1,15 @@
+{{-- resources/views/admin/vendors/show.blade.php --}}
+
 @extends('admin.layouts.app')
 
-@section('title', 'Vendor Details - ' . $vendor->name)
-
-@push('styles')
-<style>
-    .info-section {
-        background: #fff;
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 20px;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-
-    .section-title {
-        color: #5B914C;
-        font-weight: 600;
-        font-size: 1.1rem;
-        margin-bottom: 15px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #5B914C;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .info-label {
-        font-weight: 600;
-        color: #666;
-        font-size: 0.9rem;
-        margin-bottom: 5px;
-    }
-
-    .info-value {
-        font-size: 1rem;
-        color: #333;
-        margin-bottom: 15px;
-    }
-
-    .vendor-header {
-        background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
-        color: white;
-        padding: 30px;
-        border-radius: 10px;
-        margin-bottom: 30px;
-        box-shadow: 0 4px 12px rgba(91, 145, 76, 0.3);
-    }
-
-    .vendor-logo {
-        width: 120px;
-        height: 120px;
-        object-fit: cover;
-        border-radius: 10px;
-        border: 4px solid white;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-
-    .vendor-title {
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 10px;
-    }
-
-    .stat-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 15px;
-        border-radius: 8px;
-        text-align: center;
-        border: 1px solid #ddd;
-        transition: all 0.3s;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    .stat-label {
-        font-size: 0.85rem;
-        color: #666;
-        margin-bottom: 5px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .stat-value {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #5B914C;
-    }
-
-    .social-icon {
-        font-size: 1.5rem;
-        margin-right: 10px;
-        transition: color 0.2s;
-    }
-
-    .social-icon:hover {
-        color: #5B914C;
-    }
-
-    .banner-image {
-        width: 100%;
-        max-height: 300px;
-        object-fit: cover;
-        border-radius: 10px;
-        margin-bottom: 20px;
-    }
-
-    .timeline-item {
-        padding: 10px 0;
-        border-left: 2px solid #5B914C;
-        padding-left: 20px;
-        margin-left: 10px;
-        position: relative;
-    }
-
-    .timeline-item::before {
-        content: '';
-        width: 12px;
-        height: 12px;
-        background: #5B914C;
-        border-radius: 50%;
-        position: absolute;
-        left: -7px;
-        top: 15px;
-    }
-</style>
-@endpush
+@section('title', 'Vendor Details')
 
 @section('content')
 <div class="container-fluid">
-    <!-- Header Actions -->
+    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1"><i class="bi bi-eye"></i> Vendor Details</h2>
+            <h1 class="h3 mb-0">Vendor Details</h1>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">Dashboard</a></li>
@@ -143,485 +18,589 @@
                 </ol>
             </nav>
         </div>
-        <div>
+        <div class="d-flex gap-2">
             @if(auth('admin')->user()->hasPermission('vendors.update'))
-            <a href="{{ route('admin.vendors.edit', $vendor->id) }}" class="btn btn-primary">
-                <i class="bi bi-pencil"></i> Edit Vendor
-            </a>
-            @endif
-            @if(auth('admin')->user()->hasPermission('vendors.update'))
-            <button type="button" class="btn btn-outline-success" onclick="toggleVerified()">
-                <i class="bi bi-check-circle"></i> {{ $vendor->is_verified ? 'Unverify' : 'Verify' }}
-            </button>
-            <button type="button" class="btn btn-outline-warning" onclick="toggleFeatured()">
-                <i class="bi bi-star"></i> {{ $vendor->is_featured ? 'Unfeature' : 'Feature' }}
-            </button>
+                <button type="button" class="btn btn-outline-primary" id="syncVendorBtn" title="Sync Statistics">
+                    <i class="bi bi-arrow-repeat"></i> Sync Stats
+                </button>
+                <a href="{{ route('admin.vendors.edit', $vendor->id) }}" class="btn btn-warning">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
             @endif
             @if(auth('admin')->user()->hasPermission('vendors.delete'))
-            <button type="button" class="btn btn-outline-danger" onclick="deleteVendor()">
-                <i class="bi bi-trash"></i> Delete
-            </button>
+                <button type="button" class="btn btn-danger" id="deleteVendorBtn">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
             @endif
-            <a href="{{ route('admin.vendors.index') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back
+            <a href="{{ route('admin.vendors.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to List
             </a>
         </div>
     </div>
 
-    <!-- Vendor Header -->
-    <div class="vendor-header">
-        <div class="row align-items-center">
-            <div class="col-md-2 text-center">
-                <img src="{{ $vendor->getLogoUrl() }}" alt="{{ $vendor->name }}" class="vendor-logo">
-            </div>
-            <div class="col-md-7">
-                <h1 class="vendor-title">{{ $vendor->name }}</h1>
-                @if($vendor->company_name)
-                    <p class="mb-2"><strong>Company:</strong> {{ $vendor->company_name }}</p>
-                @endif
-                <div class="mt-3">
-                    {!! $vendor->getStatusBadge() !!}
-
-                    @if($vendor->is_verified)
-                        <span class="badge bg-success"><i class="bi bi-check-circle"></i> Verified</span>
-                    @endif
-
-                    @if($vendor->is_featured)
-                        <span class="badge bg-warning"><i class="bi bi-star"></i> Featured</span>
-                    @endif
-                </div>
-            </div>
-            <div class="col-md-3 text-end">
-                <div class="stat-card bg-white">
-                    <div class="stat-label">Rating</div>
-                    <div class="stat-value">
-                        {!! $vendor->getRatingStars() !!}
-                    </div>
-                    <small class="text-muted">{{ $vendor->reviews_count }} reviews</small>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Banner Image -->
-    @if($vendor->banner_image)
-    <div class="info-section">
-        <img src="{{ $vendor->getBannerUrl() }}" alt="Banner" class="banner-image">
-    </div>
-    @endif
-
     <div class="row">
-        <!-- Left Column -->
+        <!-- Main Information -->
         <div class="col-lg-8">
+            <!-- Status & Quick Info Bar -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h2 class="mb-2">{{ $vendor->name }}</h2>
+                            @if($vendor->company_name)
+                                <h5 class="text-muted mb-3">{{ $vendor->company_name }}</h5>
+                            @endif
+                            <div class="d-flex gap-2 flex-wrap">
+                                {!! $vendor->getStatusBadge() !!}
+                                @if($vendor->currency)
+                                    <span class="badge bg-info">{{ $vendor->currency }}</span>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="d-flex flex-column gap-2">
+                                @if($vendor->email)
+                                    <a href="mailto:{{ $vendor->email }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-envelope"></i> {{ $vendor->email }}
+                                    </a>
+                                @endif
+                                @if($vendor->phone)
+                                    <a href="tel:{{ $vendor->phone }}" class="btn btn-sm btn-outline-success">
+                                        <i class="bi bi-telephone"></i> {{ $vendor->phone }}
+                                    </a>
+                                @endif
+                                @if($vendor->website)
+                                    <a href="{{ $vendor->website }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                        <i class="bi bi-globe"></i> Visit Website
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            <!-- Contact Information -->
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-telephone"></i> Contact Information
-                </h5>
+            <!-- Statistics Cards -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card text-center" style="border-left: 4px solid #5B914C;">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-2">Products</h6>
+                            <h2 class="mb-0" style="color: #5B914C;">{{ $vendor->products_count ?? 0 }}</h2>
+                            @if(auth('admin')->user()->hasPermission('products.read'))
+                                <a href="{{ route('admin.products.index') }}?vendor={{ $vendor->id }}" class="btn btn-sm btn-link">
+                                    View Products
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center" style="border-left: 4px solid #28a745;">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-2">Total Purchases</h6>
+                            <h2 class="mb-0 text-success">{{ $vendor->getFormattedTotalPurchases() }}</h2>
+                            <small class="text-muted">Lifetime Value</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center" style="border-left: 4px solid #17a2b8;">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-2">Orders</h6>
+                            <h2 class="mb-0 text-info">{{ $vendor->orders_count ?? 0 }}</h2>
+                            <small class="text-muted">Total Orders</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="info-label">Email</div>
-                        <div class="info-value">
+            <!-- Basic Information Card -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #5B914C; color: white;">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Basic Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Vendor Name:</strong>
+                            <span>{{ $vendor->name }}</span>
+                        </div>
+                        @if($vendor->company_name)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Company Name:</strong>
+                            <span>{{ $vendor->company_name }}</span>
+                        </div>
+                        @endif
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Email:</strong>
                             <a href="mailto:{{ $vendor->email }}">{{ $vendor->email }}</a>
                         </div>
-                    </div>
-
-                    @if($vendor->phone)
-                    <div class="col-md-6">
-                        <div class="info-label">Phone</div>
-                        <div class="info-value">
+                        @if($vendor->phone)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Phone:</strong>
                             <a href="tel:{{ $vendor->phone }}">{{ $vendor->phone }}</a>
                         </div>
-                    </div>
-                    @endif
-
-                    @if($vendor->mobile)
-                    <div class="col-md-6">
-                        <div class="info-label">Mobile</div>
-                        <div class="info-value">
+                        @endif
+                        @if($vendor->mobile)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Mobile:</strong>
                             <a href="tel:{{ $vendor->mobile }}">{{ $vendor->mobile }}</a>
                         </div>
-                    </div>
-                    @endif
-
-                    @if($vendor->website)
-                    <div class="col-md-6">
-                        <div class="info-label">Website</div>
-                        <div class="info-value">
-                            <a href="{{ $vendor->website }}" target="_blank" rel="noopener">
-                                {{ $vendor->website }} <i class="bi bi-box-arrow-up-right"></i>
-                            </a>
+                        @endif
+                        @if($vendor->website)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Website:</strong>
+                            <a href="{{ $vendor->website }}" target="_blank">{{ $vendor->website }}</a>
                         </div>
-                    </div>
-                    @endif
-                </div>
-            </div>
-
-            <!-- Address Information -->
-            @if($vendor->hasCompleteAddress())
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-geo-alt"></i> Address Information
-                </h5>
-
-                <div class="info-value">
-                    {{ $vendor->getFullAddress() }}
-                </div>
-            </div>
-            @endif
-
-            <!-- Description -->
-            @if($vendor->description)
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-file-text"></i> About
-                </h5>
-
-                <div class="info-value">
-                    {{ $vendor->description }}
-                </div>
-            </div>
-            @endif
-
-            <!-- Business Information -->
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-briefcase"></i> Business Information
-                </h5>
-
-                <div class="row">
-                    @if($vendor->tax_number)
-                    <div class="col-md-6">
-                        <div class="info-label">Tax Number</div>
-                        <div class="info-value">{{ $vendor->tax_number }}</div>
-                    </div>
-                    @endif
-
-                    @if($vendor->registration_number)
-                    <div class="col-md-6">
-                        <div class="info-label">Registration Number</div>
-                        <div class="info-value">{{ $vendor->registration_number }}</div>
-                    </div>
-                    @endif
-
-                    @if($vendor->payment_terms)
-                    <div class="col-md-6">
-                        <div class="info-label">Payment Terms</div>
-                        <div class="info-value">{{ $vendor->payment_terms }}</div>
-                    </div>
-                    @endif
-
-                    @if($vendor->credit_limit)
-                    <div class="col-md-6">
-                        <div class="info-label">Credit Limit</div>
-                        <div class="info-value">{{ $vendor->currency }} {{ number_format($vendor->credit_limit, 2) }}</div>
-                    </div>
-                    @endif
-
-                    @if($vendor->currency)
-                    <div class="col-md-6">
-                        <div class="info-label">Currency</div>
-                        <div class="info-value">{{ $vendor->currency }}</div>
-                    </div>
-                    @endif
-                </div>
-            </div>
-
-            <!-- Bank Information -->
-            @if($vendor->hasBankDetails())
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-bank"></i> Bank Information
-                </h5>
-
-                <div class="row">
-                    @if($vendor->bank_name)
-                    <div class="col-md-6">
-                        <div class="info-label">Bank Name</div>
-                        <div class="info-value">{{ $vendor->bank_name }}</div>
-                    </div>
-                    @endif
-
-                    @if($vendor->bank_account_name)
-                    <div class="col-md-6">
-                        <div class="info-label">Account Name</div>
-                        <div class="info-value">{{ $vendor->bank_account_name }}</div>
-                    </div>
-                    @endif
-
-                    @if($vendor->bank_account_number)
-                    <div class="col-md-6">
-                        <div class="info-label">Account Number</div>
-                        <div class="info-value">{{ $vendor->bank_account_number }}</div>
-                    </div>
-                    @endif
-
-                    @if($vendor->bank_routing_number)
-                    <div class="col-md-6">
-                        <div class="info-label">Routing Number</div>
-                        <div class="info-value">{{ $vendor->bank_routing_number }}</div>
-                    </div>
-                    @endif
-                </div>
-            </div>
-            @endif
-
-            <!-- Social Media -->
-            @if(!empty($vendor->getSocialMedia()))
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-share"></i> Social Media
-                </h5>
-
-                <div>
-                    @if($vendor->getSocialMediaLink('facebook'))
-                        <a href="{{ $vendor->getSocialMediaLink('facebook') }}" target="_blank" class="social-icon text-primary" title="Facebook">
-                            <i class="bi bi-facebook"></i>
-                        </a>
-                    @endif
-
-                    @if($vendor->getSocialMediaLink('twitter'))
-                        <a href="{{ $vendor->getSocialMediaLink('twitter') }}" target="_blank" class="social-icon text-info" title="Twitter">
-                            <i class="bi bi-twitter"></i>
-                        </a>
-                    @endif
-
-                    @if($vendor->getSocialMediaLink('instagram'))
-                        <a href="{{ $vendor->getSocialMediaLink('instagram') }}" target="_blank" class="social-icon text-danger" title="Instagram">
-                            <i class="bi bi-instagram"></i>
-                        </a>
-                    @endif
-
-                    @if($vendor->getSocialMediaLink('linkedin'))
-                        <a href="{{ $vendor->getSocialMediaLink('linkedin') }}" target="_blank" class="social-icon text-primary" title="LinkedIn">
-                            <i class="bi bi-linkedin"></i>
-                        </a>
-                    @endif
-                </div>
-            </div>
-            @endif
-
-            <!-- Activity Timeline -->
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-clock-history"></i> Activity Timeline
-                </h5>
-
-                <div class="timeline-item">
-                    <strong>Vendor Created</strong><br>
-                    <small class="text-muted">
-                        {{ $vendor->created_at->format('M d, Y H:i') }}
-                        @if($vendor->creator)
-                            by {{ $vendor->creator->name }}
                         @endif
-                    </small>
-                </div>
-
-                @if($vendor->updated_at != $vendor->created_at)
-                <div class="timeline-item">
-                    <strong>Last Updated</strong><br>
-                    <small class="text-muted">
-                        {{ $vendor->updated_at->format('M d, Y H:i') }}
-                        @if($vendor->updater)
-                            by {{ $vendor->updater->name }}
+                        @if($vendor->description)
+                        <div class="col-12">
+                            <strong class="text-muted d-block mb-1">Description:</strong>
+                            <p class="mb-0">{{ $vendor->description }}</p>
+                        </div>
                         @endif
-                    </small>
+                    </div>
                 </div>
-                @endif
             </div>
 
+            <!-- Address Information Card -->
+            @if($vendor->address || $vendor->city || $vendor->country)
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #5B914C; color: white;">
+                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Address Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @if($vendor->address)
+                        <div class="col-12 mb-3">
+                            <strong class="text-muted d-block mb-1">Street Address:</strong>
+                            <span>{{ $vendor->address }}</span>
+                        </div>
+                        @endif
+                        @if($vendor->city)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">City:</strong>
+                            <span>{{ $vendor->city }}</span>
+                        </div>
+                        @endif
+                        @if($vendor->state)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">State/Province:</strong>
+                            <span>{{ $vendor->state }}</span>
+                        </div>
+                        @endif
+                        @if($vendor->country)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Country:</strong>
+                            <span>{{ $vendor->country }}</span>
+                        </div>
+                        @endif
+                        @if($vendor->postal_code)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Postal Code:</strong>
+                            <span>{{ $vendor->postal_code }}</span>
+                        </div>
+                        @endif
+                        {{-- @if($vendor->hasCompleteAddress()) --}}
+                        <div class="col-12">
+                            <hr>
+                            <strong class="text-muted d-block mb-1">Full Address:</strong>
+                            <span>{{ $vendor->getFullAddress() }}</span>
+                        </div>
+                        {{-- @endif --}}
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Business Information Card -->
+            @if($vendor->tax_number || $vendor->registration_number)
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #5B914C; color: white;">
+                    <h5 class="mb-0"><i class="bi bi-building"></i> Business Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @if($vendor->tax_number)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Tax Number:</strong>
+                            <span>{{ $vendor->tax_number }}</span>
+                        </div>
+                        @endif
+                        @if($vendor->registration_number)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Registration Number:</strong>
+                            <span>{{ $vendor->registration_number }}</span>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Banking Information Card -->
+            {{-- @if($vendor->hasBankDetails()) --}}
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #5B914C; color: white;">
+                    <h5 class="mb-0"><i class="bi bi-bank"></i> Banking Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @if($vendor->bank_name)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Bank Name:</strong>
+                            <span>{{ $vendor->bank_name }}</span>
+                        </div>
+                        @endif
+                        @if($vendor->bank_account_name)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Account Name:</strong>
+                            <span>{{ $vendor->bank_account_name }}</span>
+                        </div>
+                        @endif
+                        @if($vendor->bank_account_number)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Account Number:</strong>
+                            <span>{{ $vendor->bank_account_number }}</span>
+                        </div>
+                        @endif
+                        @if($vendor->bank_routing_number)
+                        <div class="col-md-6 mb-3">
+                            <strong class="text-muted d-block mb-1">Routing Number:</strong>
+                            <span>{{ $vendor->bank_routing_number }}</span>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            {{-- @endif --}}
+
+            <!-- Recent Products -->
+            @if($vendor->products->count() > 0)
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Recent Products</h5>
+                        @if(auth('admin')->user()->hasPermission('products.read'))
+                            <a href="{{ route('admin.products.index') }}?vendor={{ $vendor->id }}" class="btn btn-sm btn-primary">
+                                View All Products
+                            </a>
+                        @endif
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>SKU</th>
+                                    <th>Price</th>
+                                    <th>Stock</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($vendor->products->take(5) as $product)
+                                <tr>
+                                    <td>
+                                        <strong>{{ $product->name }}</strong>
+                                    </td>
+                                    <td>{{ $product->sku }}</td>
+                                    <td>{{ $product->currency }} {{ number_format($product->price, 2) }}</td>
+                                    <td>
+                                        @if($product->track_inventory)
+                                            <span class="badge {{ $product->stock_quantity > $product->low_stock_threshold ? 'bg-success' : 'bg-warning' }}">
+                                                {{ $product->stock_quantity }}
+                                            </span>
+                                        @else
+                                            <span class="badge bg-secondary">N/A</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($product->status_key_code == 'PRODUCT_ACTIVE')
+                                            <span class="badge bg-success">Active</span>
+                                        @else
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if(auth('admin')->user()->hasPermission('products.read'))
+                                            <a href="{{ route('admin.products.show', $product->id) }}" class="btn btn-sm btn-info">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
         </div>
 
-        <!-- Right Column -->
+        <!-- Sidebar -->
         <div class="col-lg-4">
-
-            <!-- Quick Stats -->
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-graph-up"></i> Quick Stats
-                </h5>
-
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="stat-card">
-                            <div class="stat-label">Products</div>
-                            <div class="stat-value">{{ $vendor->products_count }}</div>
-                        </div>
+            <!-- Status Card -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #5B914C; color: white;">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Status & Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong class="text-muted d-block mb-2">Status:</strong>
+                        {!! $vendor->getStatusBadge() !!}
                     </div>
-
-                    <div class="col-6">
-                        <div class="stat-card">
-                            <div class="stat-label">Orders</div>
-                            <div class="stat-value">{{ $vendor->orders_count }}</div>
-                        </div>
+                    @if($vendor->currency)
+                    <div class="mb-3">
+                        <strong class="text-muted d-block mb-2">Currency:</strong>
+                        <span class="badge bg-info">{{ $vendor->currency }}</span>
                     </div>
+                    @endif
+                    <div>
+                        <strong class="text-muted d-block mb-2">Active:</strong>
+                        @if($vendor->isActive())
+                            <span class="badge bg-success">Yes</span>
+                        @else
+                            <span class="badge bg-danger">No</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
 
-                    @if($vendor->total_purchases)
-                    <div class="col-12">
-                        <div class="stat-card">
-                            <div class="stat-label">Total Purchases</div>
-                            <div class="stat-value text-success">{{ $vendor->getFormattedTotalPurchases() }}</div>
-                        </div>
+            <!-- Quick Actions Card -->
+            @if(auth('admin')->user()->hasPermission('vendors.update'))
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <button type="button" class="btn btn-outline-primary w-100 mb-2" id="syncStatsBtn">
+                        <i class="bi bi-arrow-repeat"></i> Sync Statistics
+                    </button>
+                    @if($vendor->isActive())
+                        <button type="button" class="btn btn-outline-warning w-100 mb-2" onclick="changeStatus('VENDOR_INACTIVE')">
+                            <i class="bi bi-pause-circle"></i> Deactivate Vendor
+                        </button>
+                    @else
+                        <button type="button" class="btn btn-outline-success w-100 mb-2" onclick="changeStatus('VENDOR_ACTIVE')">
+                            <i class="bi bi-play-circle"></i> Activate Vendor
+                        </button>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+            <!-- Audit Information Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Audit Trail</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong class="text-muted d-block mb-1">Created At:</strong>
+                        <span>{{ $vendor->created_at->format('d M Y, h:i A') }}</span>
+                        <br>
+                        <small class="text-muted">{{ $vendor->created_at->diffForHumans() }}</small>
+                    </div>
+                    @if($vendor->creator)
+                    <div class="mb-3">
+                        <strong class="text-muted d-block mb-1">Created By:</strong>
+                        <span>{{ $vendor->creator->name }}</span>
+                    </div>
+                    @endif
+                    <div class="mb-3">
+                        <strong class="text-muted d-block mb-1">Last Updated:</strong>
+                        <span>{{ $vendor->updated_at->format('d M Y, h:i A') }}</span>
+                        <br>
+                        <small class="text-muted">{{ $vendor->updated_at->diffForHumans() }}</small>
+                    </div>
+                    @if($vendor->updater)
+                    <div>
+                        <strong class="text-muted d-block mb-1">Updated By:</strong>
+                        <span>{{ $vendor->updater->name }}</span>
                     </div>
                     @endif
                 </div>
             </div>
 
-            <!-- Vendor Information -->
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-info-circle"></i> Vendor Details
-                </h5>
-
-                <div class="mb-3">
-                    <div class="info-label">Vendor ID</div>
-                    <div class="info-value"><code>{{ $vendor->id }}</code></div>
+            <!-- Vendor ID Card -->
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-fingerprint"></i> Vendor ID</h5>
                 </div>
-
-                @if($vendor->slug)
-                <div class="mb-3">
-                    <div class="info-label">Slug</div>
-                    <div class="info-value"><code>{{ $vendor->slug }}</code></div>
-                </div>
-                @endif
-
-                <div class="mb-0">
-                    <div class="info-label">Sort Order</div>
-                    <div class="info-value">{{ $vendor->sort_order ?? 0 }}</div>
+                <div class="card-body">
+                    <code class="d-block p-2 bg-light rounded">{{ $vendor->id }}</code>
                 </div>
             </div>
-
-            <!-- Quick Actions -->
-            @if(auth('admin')->user()->hasPermission('vendors.update'))
-            <div class="info-section">
-                <h5 class="section-title">
-                    <i class="bi bi-lightning"></i> Quick Actions
-                </h5>
-
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-outline-success" onclick="toggleVerified()">
-                        <i class="bi bi-check-circle"></i> Toggle Verified
-                    </button>
-                    <button type="button" class="btn btn-outline-warning" onclick="toggleFeatured()">
-                        <i class="bi bi-star"></i> Toggle Featured
-                    </button>
-                </div>
-            </div>
-            @endif
-
         </div>
     </div>
 </div>
-@endsection
+
+@push('styles')
+<style>
+    .card {
+        box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
+    }
+    .card-header {
+        font-weight: 600;
+    }
+    #syncVendorBtn.syncing i, #syncStatsBtn.syncing i {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+@endpush
 
 @push('scripts')
 <script>
-const vendorId = '{{ $vendor->id }}';
+$(document).ready(function() {
+    // Sync Statistics (Header Button)
+    $('#syncVendorBtn').on('click', function() {
+        syncVendorStats($(this));
+    });
 
-// Delete vendor
-function deleteVendor() {
-    Swal.fire({
-        title: 'Delete this vendor?',
-        text: "This action cannot be undone!",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, delete it!'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $.ajax({
-                url: '{{ route("admin.vendors.destroy", $vendor->id) }}',
-                type: 'DELETE',
-                data: {
-                    _token: '{{ csrf_token() }}'
-                },
-                success: function(response) {
-                    if (response.success) {
+    // Sync Statistics (Sidebar Button)
+    $('#syncStatsBtn').on('click', function() {
+        syncVendorStats($(this));
+    });
+
+    function syncVendorStats($btn) {
+        $btn.prop('disabled', true).addClass('syncing');
+
+        $.ajax({
+            url: '{{ route("admin.vendors.sync-individual", $vendor->id) }}',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Statistics Synced!',
+                        html: `
+                            <p>Products: <strong>${response.data.products_count}</strong></p>
+                            <p>Total Purchases: <strong>$${response.data.total_purchases}</strong></p>
+                        `,
+                        timer: 2500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.reload();
+                    });
+                }
+            },
+            error: function(xhr) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: xhr.responseJSON?.message || 'Failed to sync statistics.',
+                });
+            },
+            complete: function() {
+                $btn.prop('disabled', false).removeClass('syncing');
+            }
+        });
+    }
+
+    // Delete Vendor
+    $('#deleteVendorBtn').on('click', function() {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '{{ route("admin.vendors.destroy", $vendor->id) }}',
+                    method: 'DELETE',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
                         Swal.fire({
                             icon: 'success',
                             title: 'Deleted!',
                             text: response.message,
-                            confirmButtonColor: '#5B914C'
+                            showConfirmButton: false,
+                            timer: 2000
                         }).then(() => {
                             window.location.href = '{{ route("admin.vendors.index") }}';
                         });
+                    },
+                    error: function(xhr) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error!',
+                            text: xhr.responseJSON?.message || 'Failed to delete vendor.',
+                        });
                     }
+                });
+            }
+        });
+    });
+});
+
+// Change Status Function
+function changeStatus(newStatus) {
+    const statusNames = {
+        'VENDOR_ACTIVE': 'Activate',
+        'VENDOR_INACTIVE': 'Deactivate'
+    };
+
+    Swal.fire({
+        title: `${statusNames[newStatus]} Vendor?`,
+        text: "Are you sure you want to change the status?",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#5B914C',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, change it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '{{ route("admin.vendors.update", $vendor->id) }}',
+                method: 'PUT',
+                data: {
+                    _token: '{{ csrf_token() }}',
+                    status_key_code: newStatus,
+                    name: '{{ $vendor->name }}',
+                    email: '{{ $vendor->email }}'
+                },
+                success: function(response) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: 'Status updated successfully',
+                        showConfirmButton: false,
+                        timer: 1500
+                    }).then(() => {
+                        location.reload();
+                    });
                 },
                 error: function(xhr) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error!',
-                        text: xhr.responseJSON?.message || 'Failed to delete vendor'
+                        text: xhr.responseJSON?.message || 'Failed to update status.',
                     });
                 }
             });
         }
     });
 }
-
-// Toggle verified
-function toggleVerified() {
-    $.ajax({
-        url: '{{ route("admin.vendors.toggle-verified", $vendor->id) }}',
-        type: 'POST',
-        data: {
-            _token: '{{ csrf_token() }}'
-        },
-        success: function(response) {
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Success!',
-                    text: response.message,
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    location.reload();
-                });
-            }
-        },
-        error: function(xhr) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error!',
-                text: xhr.responseJSON?.message || 'Failed to update verification'
-            });
-        }
-    });
-}
-
-// Toggle featured
-function toggleFeatured() {
-    $.ajax({
-        url: '{{ route("admin.vendors.toggle-featured", $vendor->id) }}',
-        type: 'POST',
-        data: {
-            _token: '{{ csrf_token() }}'
-        },
-        success: function(response) {
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Success!',
-                    text: response.message,
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    location.reload();
-                });
-            }
-        },
-        error: function(xhr) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error!',
-                text: xhr.responseJSON?.message || 'Failed to update featured status'
-            });
-        }
-    });
-}
 </script>
 @endpush
+@endsection

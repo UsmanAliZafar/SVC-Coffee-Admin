@@ -49,8 +49,6 @@ class StoreSettingSeeder extends Seeder
             'order_prefix' => 'ORD-',
             'order_number_start' => 1000,
             'order_number_length' => 6,
-            'order_auto_confirm' => false,
-            'order_notification_email' => true,
 
             // Tax Settings
             'tax_enabled' => false,
