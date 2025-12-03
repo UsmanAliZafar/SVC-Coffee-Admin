@@ -251,14 +251,14 @@ class ContactUsController extends Controller
 
                 // Quick Reply button
                 if (auth('admin')->user()->hasPermission('contact_us.update')) {
-                    $actions .= '<button type="button" class="btn btn-sm btn-success quick-reply-btn"
-                        data-id="' . $contact->id . '"
-                        data-email="' . htmlspecialchars($contact->email) . '"
-                        data-name="' . htmlspecialchars($contact->name) . '"
-                        data-subject="' . htmlspecialchars($contact->subject) . '"
-                        title="Quick Reply">
-                        <i class="bi bi-reply-fill"></i>
-                    </button>';
+                    // $actions .= '<button type="button" class="btn btn-sm btn-success quick-reply-btn"
+                    //     data-id="' . $contact->id . '"
+                    //     data-email="' . htmlspecialchars($contact->email) . '"
+                    //     data-name="' . htmlspecialchars($contact->name) . '"
+                    //     data-subject="' . htmlspecialchars($contact->subject) . '"
+                    //     title="Quick Reply">
+                    //     <i class="bi bi-reply-fill"></i>
+                    // </button>';
 
                     // Status Update button
                     $actions .= '<button type="button" class="btn btn-sm btn-warning update-status-btn"
@@ -398,7 +398,7 @@ class ContactUsController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'assigned_to' => 'required|exists:users,id',
+            'assigned_to' => 'required|exists:admin_users,id', // Changed from users to admin_users
         ]);
 
         if ($validator->fails()) {
@@ -543,7 +543,7 @@ class ContactUsController extends Controller
         $validator = Validator::make($request->all(), [
             'contact_ids' => 'required|array',
             'contact_ids.*' => 'exists:contact_us,id',
-            'assigned_to' => 'required|exists:users,id',
+            'assigned_to' => 'required|exists:admin_users,id', // Changed from users to admin_users
         ]);
 
         if ($validator->fails()) {

@@ -232,8 +232,6 @@ class CustomersController extends Controller
                 // Additional Info
                 'acquisition_source' => 'nullable|string|max:100',
                 'notes' => 'nullable|string',
-                'tags' => 'nullable|array',
-                'tags.*' => 'string|max:50',
             ]);
 
             DB::beginTransaction();
@@ -435,8 +433,6 @@ class CustomersController extends Controller
                 // Additional Info
                 'acquisition_source' => 'nullable|string|max:100',
                 'notes' => 'nullable|string',
-                'tags' => 'nullable|array',
-                'tags.*' => 'string|max:50',
             ]);
 
             // Remove password if not provided

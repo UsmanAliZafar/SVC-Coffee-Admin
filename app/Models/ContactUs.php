@@ -58,7 +58,7 @@ class ContactUs extends Model
      */
     public function assignedAdmin()
     {
-        return $this->belongsTo(User::class, 'assigned_to');
+        return $this->belongsTo(AdminUser::class, 'assigned_to');
     }
 
     /**

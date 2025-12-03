@@ -679,12 +679,7 @@
 
 <script>
 $(document).ready(function() {
-    let tagsArray = @json($customer->tags ?? []);
-
     // Initialize tags display
-    renderTags();
-    updateHiddenTags();
-
     // Password toggle visibility
     $('.password-toggle').on('click', function() {
         const targetId = $(this).data('target');
@@ -738,65 +733,6 @@ $(document).ready(function() {
     });
 
     // Tags functionality
-    function addTag(tag) {
-        tag = tag.trim();
-        if (tag && !tagsArray.includes(tag)) {
-            tagsArray.push(tag);
-            renderTags();
-            updateHiddenTags();
-        }
-    }
-
-    function removeTag(tag) {
-        tagsArray = tagsArray.filter(t => t !== tag);
-        renderTags();
-        updateHiddenTags();
-    }
-
-    function renderTags() {
-        const container = $('#tagsContainer');
-        container.empty();
-
-        tagsArray.forEach(tag => {
-            const badge = $(`
-                <span class="badge bg-primary me-2 mb-2" style="font-size: 0.9rem; padding: 0.5rem 0.75rem;">
-                    ${tag}
-                    <i class="bi bi-x-circle ms-1" style="cursor: pointer;" data-tag="${tag}"></i>
-                </span>
-            `);
-            container.append(badge);
-        });
-
-        // Remove tag on click
-        container.find('.bi-x-circle').on('click', function() {
-            removeTag($(this).data('tag'));
-        });
-    }
-
-    function updateHiddenTags() {
-        $('#tags_hidden').val(JSON.stringify(tagsArray));
-    }
-
-    // Add tag on Enter or comma
-    $('#tags_input').on('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            const value = $(this).val().replace(',', '').trim();
-            if (value) {
-                addTag(value);
-                $(this).val('');
-            }
-        }
-    });
-
-    // Add tag on blur
-    $('#tags_input').on('blur', function() {
-        const value = $(this).val().trim();
-        if (value) {
-            addTag(value);
-            $(this).val('');
-        }
-    });
 
     // Form submission
     $('#customerForm').on('submit', function(e) {

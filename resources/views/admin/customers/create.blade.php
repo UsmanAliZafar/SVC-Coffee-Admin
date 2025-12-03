@@ -430,14 +430,6 @@
                                 <i class="bi bi-lock-fill"></i> These notes are only visible to admins and will not be shown to the customer.
                             </small>
                         </div>
-
-                        <div class="mb-0">
-                            <label for="tags" class="form-label">Tags</label>
-                            <input type="text" class="form-control" id="tags_input" placeholder="Add tags separated by commas (e.g., VIP, Wholesale, Premium)">
-                            <small class="text-muted">Press Enter or comma to add tags</small>
-                            <div id="tagsContainer" class="mt-2"></div>
-                            <input type="hidden" name="tags" id="tags_hidden">
-                        </div>
                     </div>
                 </div>
 
@@ -615,66 +607,6 @@ $(document).ready(function() {
         });
     });
 
-    // Tags functionality
-    function addTag(tag) {
-        tag = tag.trim();
-        if (tag && !tagsArray.includes(tag)) {
-            tagsArray.push(tag);
-            renderTags();
-            updateHiddenTags();
-        }
-    }
-
-    function removeTag(tag) {
-        tagsArray = tagsArray.filter(t => t !== tag);
-        renderTags();
-        updateHiddenTags();
-    }
-
-    function renderTags() {
-        const container = $('#tagsContainer');
-        container.empty();
-
-        tagsArray.forEach(tag => {
-            const badge = $(`
-                <span class="badge bg-primary me-2 mb-2" style="font-size: 0.9rem; padding: 0.5rem 0.75rem;">
-                    ${tag}
-                    <i class="bi bi-x-circle ms-1" style="cursor: pointer;" data-tag="${tag}"></i>
-                </span>
-            `);
-            container.append(badge);
-        });
-
-        // Remove tag on click
-        container.find('.bi-x-circle').on('click', function() {
-            removeTag($(this).data('tag'));
-        });
-    }
-
-    function updateHiddenTags() {
-        $('#tags_hidden').val(JSON.stringify(tagsArray));
-    }
-
-    // Add tag on Enter or comma
-    $('#tags_input').on('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            const value = $(this).val().replace(',', '').trim();
-            if (value) {
-                addTag(value);
-                $(this).val('');
-            }
-        }
-    });
-
-    // Add tag on blur
-    $('#tags_input').on('blur', function() {
-        const value = $(this).val().trim();
-        if (value) {
-            addTag(value);
-            $(this).val('');
-        }
-    });
 
     // Form submission
     $('#customerForm').on('submit', function(e) {
@@ -692,14 +624,6 @@ $(document).ready(function() {
 
         // Get form data
         const formData = new FormData(this);
-
-        // Add tags
-        if (tagsArray.length > 0) {
-            formData.delete('tags');
-            tagsArray.forEach((tag, index) => {
-                formData.append(`tags[${index}]`, tag);
-            });
-        }
 
         // AJAX request
         $.ajax({
