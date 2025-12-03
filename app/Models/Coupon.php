@@ -169,7 +169,8 @@ class Coupon extends Model
                 ->count();
         }
 
-        if ($customerUsageCount >= $this->usage_limit_per_customer) {
+        // compares properly (>= means "used limit times or more")
+        if ($this->usage_limit_per_customer && $customerUsageCount >= $this->usage_limit_per_customer) {
             return [
                 'valid' => false,
                 'message' => 'You have already used this coupon the maximum number of times.'

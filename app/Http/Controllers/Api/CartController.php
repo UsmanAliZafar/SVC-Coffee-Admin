@@ -408,12 +408,20 @@ class CartController extends Controller
                     'message' => 'This coupon is no longer valid',
                 ], 400);
             }
-
+            // Check usage limits
+            if ($coupon->usage_limit_total && $coupon->total_used >= $coupon->usage_limit_total) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This coupon has reached its usage limit',
+                ], 400);
+            }
             // Check customer eligibility
             $customerCheck = $coupon->canBeUsedByCustomer(
                 $validated['customer_id'] ?? null,
                 $validated['customer_email'] ?? null
             );
+
+
 
             if (!$customerCheck['valid']) {
                 return response()->json([

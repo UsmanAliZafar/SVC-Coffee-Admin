@@ -14,6 +14,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Customer;
 use App\Models\Transaction;
+use App\Models\Coupon;
 
 
 class CheckoutController extends Controller
@@ -402,6 +403,30 @@ class CheckoutController extends Controller
                 ], 500);
             }
 
+            // ============================================================
+            // ✅ RECORD COUPON USAGE
+            // ============================================================
+            if (isset($cartMeta['coupon']) && $cartMeta['coupon']['id']) {
+                $coupon = Coupon::find($cartMeta['coupon']['id']);
+
+                if ($coupon) {
+                    $coupon->recordUsage(
+                        orderId: $order->id,
+                        customerId: $order->customer_id,
+                        customerEmail: $order->getCustomerEmail(),
+                        discountAmount: $discountAmount,
+                        orderSubtotal: $subtotal,
+                        orderTotal: $totalAmount,
+                        ipAddress: $request->ip()
+                    );
+
+                    \Log::info('✅ Coupon usage recorded', [
+                        'coupon_code' => $coupon->code,
+                        'order' => $order->order_number,
+                        'discount' => $discountAmount,
+                    ]);
+                }
+            }
             // Clear cart
             Cache::forget("cart:{$validated['cart_id']}");
             Cache::forget("cart_meta:{$validated['cart_id']}");
