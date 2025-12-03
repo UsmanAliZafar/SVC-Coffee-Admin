@@ -416,32 +416,66 @@
 </div>
 
 <!-- Quick Stock Management Modal -->
+<!-- Quick Stock Management Modal -->
 <div class="modal fade" id="quickStockModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header" style="background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%); color: white;">
                 <h5 class="modal-title">
                     <i class="bi bi-box-seam"></i> Quick Stock Management
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="quickStockForm">
                 @csrf
                 <input type="hidden" id="quickStockProductId" name="product_id">
                 <div class="modal-body">
+                    <!-- Product Info -->
                     <div class="mb-3">
-                        <h6 id="quickStockProductName" class="text-muted"></h6>
-                    </div>
+                        <h6 id="quickStockProductName" class="text-muted mb-3"></h6>
 
-                    <div class="mb-3">
-                        <label class="form-label">Current Stock</label>
-                        <div class="alert alert-info mb-2">
-                            <strong id="quickStockCurrent">0</strong> units
+                        <!-- Total Stock Summary -->
+                        <div class="alert alert-info mb-3">
+                            <div class="row text-center">
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Total Stock (All Warehouses)</div>
+                                    <h4 class="mb-0" id="quickStockTotalStock">0</h4>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Selected Warehouse</div>
+                                    <h4 class="mb-0" id="quickStockWarehouseCurrent">0</h4>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Available</div>
+                                    <h4 class="mb-0 text-success" id="quickStockWarehouseAvailable">0</h4>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Warehouse Selection -->
                     <div class="mb-3">
-                        <label class="form-label">Action Type</label>
+                        <label class="form-label">
+                            <i class="bi bi-building"></i> Select Warehouse <span class="text-danger">*</span>
+                        </label>
+                        <select id="quickStockWarehouse" name="warehouse_id" class="form-select" required>
+                            <option value="">-- Select Warehouse --</option>
+                        </select>
+                        <div id="warehouseStockInfo" class="mt-2 d-none">
+                            <div class="small text-muted">
+                                <i class="bi bi-info-circle"></i>
+                                Current: <strong class="text-primary" id="selectedWarehouseStock">0</strong> units |
+                                Reserved: <strong class="text-warning" id="selectedWarehouseReserved">0</strong> units |
+                                Available: <strong class="text-success" id="selectedWarehouseAvailable">0</strong> units
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Type -->
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-gear"></i> Action Type
+                        </label>
                         <select id="quickStockAction" class="form-select" name="action_type">
                             <option value="set">Set Stock (Replace)</option>
                             <option value="add">Add Stock (+)</option>
@@ -449,8 +483,11 @@
                         </select>
                     </div>
 
+                    <!-- Quantity Input -->
                     <div class="mb-3">
-                        <label class="form-label">Quantity</label>
+                        <label class="form-label">
+                            <i class="bi bi-123"></i> Quantity
+                        </label>
                         <div class="input-group">
                             <button type="button" class="btn btn-outline-secondary" onclick="quickAdjustStock(-10)">
                                 <i class="bi bi-dash-lg"></i> 10
@@ -458,7 +495,8 @@
                             <button type="button" class="btn btn-outline-secondary" onclick="quickAdjustStock(-1)">
                                 <i class="bi bi-dash"></i>
                             </button>
-                            <input type="number" id="quickStockQuantity" name="quantity" class="form-control text-center" min="0" value="0" required>
+                            <input type="number" id="quickStockQuantity" name="quantity"
+                                   class="form-control text-center" min="0" value="0" required>
                             <button type="button" class="btn btn-outline-secondary" onclick="quickAdjustStock(1)">
                                 <i class="bi bi-plus"></i>
                             </button>
@@ -468,18 +506,25 @@
                         </div>
                     </div>
 
+                    <!-- Low Stock Threshold -->
                     <div class="mb-3">
-                        <label class="form-label">Low Stock Threshold</label>
-                        <input type="number" id="quickStockThreshold" name="low_stock_threshold" class="form-control" min="0" value="10">
-                        <div class="form-text">Optional: Update threshold for low stock alerts</div>
+                        <label class="form-label">
+                            <i class="bi bi-exclamation-triangle"></i> Low Stock Threshold
+                        </label>
+                        <input type="number" id="quickStockThreshold" name="low_stock_threshold"
+                               class="form-control" min="0" value="10">
+                        <div class="form-text">Alert when stock falls below this level</div>
                     </div>
 
+                    <!-- Preview -->
                     <div id="quickStockPreview" class="alert alert-secondary">
-                        <strong>Preview:</strong> <span id="previewText">New stock will be: 0</span>
+                        <strong>Preview:</strong> <span id="previewText">Select a warehouse to see preview</span>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
                     <button type="submit" class="btn btn-filter">
                         <i class="bi bi-check-circle"></i> Update Stock
                     </button>
@@ -488,6 +533,7 @@
         </div>
     </div>
 </div>
+
 <!-- Variants Modal -->
 <div class="modal fade" id="variantsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -1139,24 +1185,88 @@ $(document).ready(function() {
     });
 
 // Quick Stock Management
-// Quick Stock Management
 $(document).on('click', '.quick-stock-btn', function() {
     const productId = $(this).data('id');
     const productName = $(this).data('name');
-    const currentStock = parseInt($(this).data('stock'));
-    const threshold = parseInt($(this).data('threshold'));
+    const threshold = parseInt($(this).data('threshold')) || 10;
 
     $('#quickStockProductId').val(productId);
     $('#quickStockProductName').text(productName);
-    $('#quickStockCurrent').text(currentStock);
     $('#quickStockQuantity').val(0);
     $('#quickStockThreshold').val(threshold);
     $('#quickStockAction').val('set');
+    $('#quickStockWarehouse').html('<option value="">Loading warehouses...</option>');
+    $('#warehouseStockInfo').addClass('d-none');
 
-    updateQuickStockPreview();
+    // Load warehouse stock data
+    $.ajax({
+        url: `/admin/products/${productId}/warehouse-stock`,
+        type: 'GET',
+        success: function(response) {
+            if (response.success) {
+                warehousesData = response.warehouses;
+
+                // Update total stock
+                $('#quickStockTotalStock').text(response.total_stock);
+
+                // Populate warehouse dropdown
+                let options = '<option value="">-- Select Warehouse --</option>';
+                response.warehouses.forEach(function(warehouse) {
+                    const defaultBadge = warehouse.is_default ? ' (Default)' : '';
+                    const stockInfo = ` - Stock: ${warehouse.current_stock}`;
+                    options += `<option value="${warehouse.id}"
+                                       data-stock="${warehouse.current_stock}"
+                                       data-reserved="${warehouse.reserved}"
+                                       data-available="${warehouse.available}">
+                                    ${warehouse.name} [${warehouse.code}]${defaultBadge}${stockInfo}
+                                </option>`;
+                });
+
+                $('#quickStockWarehouse').html(options);
+
+                // Auto-select default warehouse if exists
+                const defaultWarehouse = response.warehouses.find(w => w.is_default);
+                if (defaultWarehouse) {
+                    $('#quickStockWarehouse').val(defaultWarehouse.id).trigger('change');
+                }
+            }
+        },
+        error: function(xhr) {
+            $('#quickStockWarehouse').html('<option value="">Failed to load warehouses</option>');
+            Swal.fire('Error', 'Failed to load warehouse data', 'error');
+        }
+    });
+
     $('#quickStockModal').modal('show');
 });
+// Warehouse selection change
+$('#quickStockWarehouse').on('change', function() {
+    const selectedOption = $(this).find('option:selected');
+    const warehouseId = $(this).val();
 
+    if (warehouseId) {
+        const stock = parseInt(selectedOption.data('stock')) || 0;
+        const reserved = parseInt(selectedOption.data('reserved')) || 0;
+        const available = parseInt(selectedOption.data('available')) || 0;
+
+        $('#quickStockWarehouseCurrent').text(stock);
+        $('#quickStockWarehouseAvailable').text(available);
+
+        $('#selectedWarehouseStock').text(stock);
+        $('#selectedWarehouseReserved').text(reserved);
+        $('#selectedWarehouseAvailable').text(available);
+
+        $('#warehouseStockInfo').removeClass('d-none');
+
+        // Update preview
+        updateQuickStockPreview();
+    } else {
+        $('#warehouseStockInfo').addClass('d-none');
+        $('#quickStockWarehouseCurrent').text('0');
+        $('#quickStockWarehouseAvailable').text('0');
+        $('#previewText').html('Select a warehouse to see preview');
+    }
+});
 // Adjust quick stock quantity
 window.quickAdjustStock = function(amount) {
     const input = $('#quickStockQuantity');
@@ -1168,36 +1278,52 @@ window.quickAdjustStock = function(amount) {
 
 // Update stock preview
 function updateQuickStockPreview() {
+    const warehouseId = $('#quickStockWarehouse').val();
+
+    if (!warehouseId) {
+        $('#previewText').html('Select a warehouse to see preview');
+        $('#quickStockPreview').removeClass('alert-success alert-warning alert-danger').addClass('alert-secondary');
+        return;
+    }
+
     const action = $('#quickStockAction').val();
     const quantity = parseInt($('#quickStockQuantity').val()) || 0;
-    const currentStock = parseInt($('#quickStockCurrent').text());
+    const selectedOption = $('#quickStockWarehouse').find('option:selected');
+    const currentStock = parseInt(selectedOption.data('stock')) || 0;
+    const reserved = parseInt(selectedOption.data('reserved')) || 0;
+
     let newStock = 0;
     let actionText = '';
 
     switch(action) {
         case 'set':
             newStock = quantity;
-            actionText = `Stock will be set to: <strong>${newStock}</strong> units`;
+            actionText = `Stock in selected warehouse will be set to: <strong>${newStock}</strong> units`;
             break;
         case 'add':
             newStock = currentStock + quantity;
-            actionText = `Stock will be increased to: <strong>${newStock}</strong> units (${currentStock} + ${quantity})`;
+            actionText = `Stock will increase to: <strong>${newStock}</strong> units (${currentStock} + ${quantity})`;
             break;
         case 'reduce':
             newStock = Math.max(0, currentStock - quantity);
-            actionText = `Stock will be reduced to: <strong>${newStock}</strong> units (${currentStock} - ${quantity})`;
+            actionText = `Stock will reduce to: <strong>${newStock}</strong> units (${currentStock} - ${quantity})`;
             break;
     }
 
+    const newAvailable = Math.max(0, newStock - reserved);
+    actionText += `<br><small class="text-muted">Available after update: ${newAvailable} units (${reserved} reserved)</small>`;
+
     $('#previewText').html(actionText);
 
-    // Change preview color based on result
+    // Change preview color
     const previewDiv = $('#quickStockPreview');
     previewDiv.removeClass('alert-secondary alert-success alert-warning alert-danger');
 
+    const threshold = parseInt($('#quickStockThreshold').val()) || 10;
+
     if (newStock <= 0) {
         previewDiv.addClass('alert-danger');
-    } else if (newStock <= parseInt($('#quickStockThreshold').val())) {
+    } else if (newStock <= threshold) {
         previewDiv.addClass('alert-warning');
     } else {
         previewDiv.addClass('alert-success');
@@ -1213,9 +1339,17 @@ $('#quickStockAction, #quickStockQuantity, #quickStockThreshold').on('change key
 $('#quickStockForm').on('submit', function(e) {
     e.preventDefault();
 
+    const warehouseId = $('#quickStockWarehouse').val();
+
+    if (!warehouseId) {
+        Swal.fire('Error', 'Please select a warehouse', 'error');
+        return;
+    }
+
     const productId = $('#quickStockProductId').val();
     const formData = {
         _token: '{{ csrf_token() }}',
+        warehouse_id: warehouseId,
         action_type: $('#quickStockAction').val(),
         quantity: parseInt($('#quickStockQuantity').val()),
         low_stock_threshold: parseInt($('#quickStockThreshold').val())
@@ -1241,11 +1375,13 @@ $('#quickStockForm').on('submit', function(e) {
                 Swal.fire({
                     icon: 'success',
                     title: 'Success!',
-                    text: response.message,
-                    timer: 1500,
-                    showConfirmButton: false
+                    html: `<p>${response.message}</p>
+                           <p class="mb-0"><strong>New Stock:</strong> ${response.new_stock} units</p>
+                           <p class="mb-0 text-muted"><small>Total across all warehouses: ${response.total_stock} units</small></p>`,
+                    timer: 3000,
+                    showConfirmButton: true
                 });
-                table.draw(false); // Reload table without resetting pagination
+                table.draw(false);
             } else {
                 Swal.fire('Error!', response.message, 'error');
             }
@@ -1255,6 +1391,7 @@ $('#quickStockForm').on('submit', function(e) {
         }
     });
 });
+
 // View product image in modal
 function viewProductImage(imageUrl, productName) {
     Swal.fire({

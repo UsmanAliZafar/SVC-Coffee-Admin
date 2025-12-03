@@ -22,7 +22,7 @@ use App\Models\Vendor;
 use App\Models\ProductWarehouseStock;
 use App\Models\Warehouse;
 use App\Models\InventoryMovement;
-
+use App\Models\StockAlert;
 class ProductsController extends Controller
 {
     /**
@@ -2851,7 +2851,7 @@ class ProductsController extends Controller
     }
 
     /**
-     * Quick stock update from index page
+     * Quick stock update from index page with warehouse support
      */
     public function quickStockUpdate(Request $request, $id)
     {
@@ -2861,50 +2861,186 @@ class ProductsController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'warehouse_id' => 'required|exists:warehouses,id',
             'action_type' => 'required|in:set,add,reduce',
             'quantity' => 'required|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
+        ], [
+            'warehouse_id.required' => 'Please select a warehouse',
+            'warehouse_id.exists' => 'Selected warehouse does not exist',
+            'action_type.required' => 'Action type is required',
+            'action_type.in' => 'Invalid action type',
+            'quantity.required' => 'Quantity is required',
+            'quantity.integer' => 'Quantity must be a number',
+            'quantity.min' => 'Quantity cannot be negative',
+            'low_stock_threshold.integer' => 'Threshold must be a number',
+            'low_stock_threshold.min' => 'Threshold cannot be negative',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
+                'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
         }
 
+        DB::beginTransaction();
+
         try {
             $product = Product::findOrFail($id);
-            $quantity = $request->quantity;
 
-            // Update stock based on action type
-            switch ($request->action_type) {
+            // Check if product has variants
+            if ($product->has_variants) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot update stock for products with variants. Please manage stock at variant level.'
+                ], 422);
+            }
+
+            $warehouseId = $request->warehouse_id;
+            $actionType = $request->action_type;
+            $quantity = (int) $request->quantity;
+
+            // Get warehouse info
+            $warehouse = Warehouse::findOrFail($warehouseId);
+
+            // Get or create warehouse stock record
+            $warehouseStock = ProductWarehouseStock::firstOrCreate(
+                [
+                    'product_id' => $product->id,
+                    'warehouse_id' => $warehouseId,
+                    'variant_id' => null,
+                ],
+                [
+                    'quantity' => 0,
+                    'reserved_quantity' => 0,
+                    'available_quantity' => 0,
+                ]
+            );
+
+            $previousQuantity = $warehouseStock->quantity;
+            $newQuantity = 0;
+            $reason = '';
+            $message = '';
+
+            // Calculate new quantity based on action type
+            switch ($actionType) {
                 case 'set':
-                    $product->setStock($quantity);
-                    $message = 'Stock set to ' . $quantity . ' units';
+                    $newQuantity = $quantity;
+                    $reason = "Stock set to {$quantity} units via quick stock management";
+                    $message = "Stock in {$warehouse->name} set to {$quantity} units";
                     break;
+
                 case 'add':
-                    $product->addStock($quantity);
-                    $message = 'Added ' . $quantity . ' units to stock';
+                    $newQuantity = $previousQuantity + $quantity;
+                    $reason = "Added {$quantity} units via quick stock management";
+                    $message = "Added {$quantity} units to {$warehouse->name}";
                     break;
+
                 case 'reduce':
-                    $product->reduceStock($quantity);
-                    $message = 'Reduced stock by ' . $quantity . ' units';
+                    if ($quantity > $warehouseStock->available_quantity) {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Cannot reduce by {$quantity} units. Only {$warehouseStock->available_quantity} units available (excluding reserved stock)."
+                        ], 422);
+                    }
+                    $newQuantity = max(0, $previousQuantity - $quantity);
+                    $reason = "Reduced {$quantity} units via quick stock management";
+                    $message = "Reduced {$quantity} units from {$warehouse->name}";
                     break;
             }
 
-            // Update threshold if provided
+            // Update warehouse stock
+            $warehouseStock->update([
+                'quantity' => $newQuantity,
+                'available_quantity' => $newQuantity - $warehouseStock->reserved_quantity,
+            ]);
+
+            // Create inventory movement record
+            InventoryMovement::create([
+                'product_id' => $product->id,
+                'warehouse_id' => $warehouseId,
+                'type' => 'adjustment',
+                'quantity' => $newQuantity - $previousQuantity,
+                'previous_quantity' => $previousQuantity,
+                'new_quantity' => $newQuantity,
+                'reason' => $reason,
+                'created_by' => auth('admin')->id(),
+            ]);
+
+            // Update product total stock (syncs from all warehouses)
+            $product->updateTotalStock();
+
+            // Update low stock threshold if provided
             if ($request->filled('low_stock_threshold')) {
                 $product->update(['low_stock_threshold' => $request->low_stock_threshold]);
             }
 
+            // Refresh product to get updated stock
+            $product = $product->fresh();
+            $totalStock = $product->getTotalWarehouseStock();
+
+            // Check and create stock alerts if needed
+            if ($newQuantity <= 0) {
+                StockAlert::updateOrCreate(
+                    [
+                        'product_id' => $product->id,
+                        'warehouse_id' => $warehouseId,
+                        'alert_type' => 'out_of_stock',
+                        'is_resolved' => false,
+                    ],
+                    [
+                        'current_quantity' => $newQuantity,
+                        'threshold_quantity' => 0,
+                    ]
+                );
+            } elseif ($newQuantity <= $product->low_stock_threshold) {
+                StockAlert::updateOrCreate(
+                    [
+                        'product_id' => $product->id,
+                        'warehouse_id' => $warehouseId,
+                        'alert_type' => 'low_stock',
+                        'is_resolved' => false,
+                    ],
+                    [
+                        'current_quantity' => $newQuantity,
+                        'threshold_quantity' => $product->low_stock_threshold,
+                    ]
+                );
+            } else {
+                // Resolve alerts if stock is now sufficient
+                StockAlert::where('product_id', $product->id)
+                    ->where('warehouse_id', $warehouseId)
+                    ->where('is_resolved', false)
+                    ->update(['is_resolved' => true, 'resolved_at' => now()]);
+            }
+
+            DB::commit();
+
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'new_stock' => $product->fresh()->stock_quantity
+                'new_stock' => $newQuantity,
+                'warehouse_stock' => $newQuantity,
+                'total_stock' => $totalStock,
+                'available_stock' => $warehouseStock->fresh()->available_quantity,
+                'reserved_stock' => $warehouseStock->fresh()->reserved_quantity,
+                'warehouse_name' => $warehouse->name,
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Quick stock update failed: ' . $e->getMessage(), [
+                'product_id' => $id,
+                'warehouse_id' => $request->warehouse_id ?? null,
+                'action_type' => $request->action_type ?? null,
+                'quantity' => $request->quantity ?? null,
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update stock: ' . $e->getMessage()
@@ -2912,6 +3048,99 @@ class ProductsController extends Controller
         }
     }
 
+    /**
+     * Get warehouse stock for quick stock modal
+     */
+    public function getWarehouseStock($productId)
+    {
+        // Check permission
+        if (!auth('admin')->user()->hasPermission('products.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        try {
+            $product = Product::with(['warehouseStock.warehouse'])->findOrFail($productId);
+
+            // Check if product has variants
+            if ($product->has_variants) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This product has variants. Please manage stock at variant level.',
+                    'has_variants' => true,
+                ], 422);
+            }
+
+            // Get warehouses that have stock records for this product
+            $productWarehouses = $product->warehouseStock()
+                ->whereNull('variant_id')
+                ->with('warehouse')
+                ->get()
+                ->map(function($stock) {
+                    return [
+                        'id' => $stock->warehouse_id,
+                        'name' => $stock->warehouse->name,
+                        'code' => $stock->warehouse->code,
+                        'current_stock' => $stock->quantity,
+                        'reserved' => $stock->reserved_quantity,
+                        'available' => $stock->available_quantity,
+                        'is_default' => $stock->warehouse->is_default,
+                        'is_active' => $stock->warehouse->is_active,
+                        'location' => $stock->location,
+                        'has_stock' => true,
+                        'priority' => $stock->warehouse->priority ?? 0,
+                    ];
+                })
+                ->sortByDesc('priority')
+                ->values();
+
+            // If no warehouses found, optionally include all active warehouses
+            // Remove this section if you want ONLY warehouses with existing stock
+            if ($productWarehouses->isEmpty()) {
+                $productWarehouses = Warehouse::active()
+                    ->byPriority()
+                    ->get()
+                    ->map(function($warehouse) {
+                        return [
+                            'id' => $warehouse->id,
+                            'name' => $warehouse->name,
+                            'code' => $warehouse->code,
+                            'current_stock' => 0,
+                            'reserved' => 0,
+                            'available' => 0,
+                            'is_default' => $warehouse->is_default,
+                            'is_active' => $warehouse->is_active,
+                            'location' => null,
+                            'has_stock' => false,
+                            'priority' => $warehouse->priority ?? 0,
+                        ];
+                    });
+            }
+
+            // Get total stock across all warehouses
+            $totalStock = $product->getTotalWarehouseStock();
+
+            return response()->json([
+                'success' => true,
+                'warehouses' => $productWarehouses,
+                'total_stock' => $totalStock,
+                'track_inventory' => $product->track_inventory,
+                'low_stock_threshold' => $product->low_stock_threshold,
+                'product_name' => $product->name,
+                'sku' => $product->sku,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get warehouse stock: ' . $e->getMessage(), [
+                'product_id' => $productId,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load warehouse stock: ' . $e->getMessage()
+            ], 500);
+        }
+    }
     /**
      * Update product URL/slug with optional redirect
      */

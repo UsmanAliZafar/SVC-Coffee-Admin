@@ -487,7 +487,7 @@
         <div class="col-lg-4">
 
             {{-- Quick Actions --}}
-            <div class="card section-card shadow-sm mb-4">
+            <div class="card section-card shadow-sm mb-4 d-none">
                 <div class="section-header">
                     <h5 class="mb-0 fw-bold">
                         <i class="bi bi-lightning-fill text-warning"></i> Quick Actions

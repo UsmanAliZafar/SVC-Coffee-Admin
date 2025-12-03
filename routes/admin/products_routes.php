@@ -56,7 +56,7 @@ Route::prefix('products')->name('products.')->group(function () {
         Route::get('/export', [ProductsController::class, 'export'])->name('export');
 
         Route::get('/get-by-sku', [ProductsController::class, 'getBySku'])->name('get-by-sku');
-
+        Route::get('/{product}/warehouse-stock', [ProductsController::class, 'getWarehouseStock'])->name('warehouse-stock');
         // AJAX Lists and Details
 
         Route::get('/ajax-list', [ProductsController::class, 'getProductsList'])->name('ajax-list');
