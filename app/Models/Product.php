@@ -1138,6 +1138,25 @@ class Product extends Model
     // ==================== WAREHOUSE & INVENTORY RELATIONSHIPS ====================
 
     /**
+     * Get available stock for a specific warehouse
+     */
+    public function getAvailableStockForWarehouse($warehouseId): int
+    {
+        if (!$this->track_inventory) {
+            return PHP_INT_MAX;
+        }
+
+        // If product has variants, we need to handle variant selection separately
+        if ($this->needsVariants()) {
+            return 0; // Will be handled in variant selection
+        }
+
+        return ProductWarehouseStock::where('product_id', $this->id)
+            ->where('warehouse_id', $warehouseId)
+            ->whereNull('variant_id')
+            ->value('available_quantity') ?? 0;
+    }
+    /**
      * Get all warehouse stock for this product
      */
     public function warehouseStock(): HasMany
@@ -1202,8 +1221,19 @@ class Product extends Model
             return PHP_INT_MAX;
         }
 
-        return $this->warehouseStock()->sum('available_quantity');
+        // If product has variants, sum available stock from all variants
+        if ($this->needsVariants()) {
+            return ProductWarehouseStock::where('product_id', $this->id)
+                ->whereNotNull('variant_id')
+                ->sum('available_quantity');
+        }
+
+        // For simple products, sum available stock from all warehouses
+        return ProductWarehouseStock::where('product_id', $this->id)
+            ->whereNull('variant_id')
+            ->sum('available_quantity');
     }
+
 
     /**
      * Get total reserved stock across all warehouses

@@ -559,14 +559,14 @@
                                 data-name="{{ $product->name }}"
                                 data-sku="{{ $product->sku }}"
                                 data-price="{{ $product->getFinalPrice() }}"
-                                data-stock="{{ $product->stock_quantity }}"
+                                data-stock="{{ $product->getTotalAvailableStock() ?? 0 }}"
                                 data-image="{{ $product->getMainImageUrl() }}"
                                 data-has-variants="{{ $product->has_variants ? 'true' : 'false' }}">
                             {{ $product->name }} - {{ $product->sku }}
                             @if($product->has_variants)
                                 <span class="badge bg-info">Has Variants</span>
                             @else
-                                (Stock: {{ $product->stock_quantity }})
+                                (Stock: {{ $product->getTotalAvailableStock() ?? 0 }})
                             @endif
                             - {{ store_currency_symbol() }} {{ number_format($product->getFinalPrice(), 2) }}
                         </option>

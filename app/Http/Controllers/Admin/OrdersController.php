@@ -186,7 +186,7 @@ class OrdersController extends Controller
     public function create()
     {
         $customers = Customer::active()->orderBy('first_name')->get();
-        $products = Product::active()->inStock()->with('category')->get();
+        $products = Product::active()->inStock()->with('category','warehouseStock')->get();
         $statusList = SystemStatus::where('module', 'orders')->active()->ordered()->get();
         $paymentStatusList = SystemStatus::where('module', 'payments')->active()->ordered()->get();
         $currencies = get_currencies();
@@ -615,131 +615,180 @@ class OrdersController extends Controller
 
                 $quantity = $itemData['quantity'];
                 $variant = !empty($itemData['variant_id']) ? ProductVariant::find($itemData['variant_id']) : null;
-
-                // Get or create warehouse stock record
-                $warehouseStock = ProductWarehouseStock::firstOrCreate(
-                    [
-                        'product_id' => $product->id,
-                        'variant_id' => $variant ? $variant->id : null,
-                    ],
-                    [
-                        'quantity' => 0,
-                        'reserved_quantity' => 0,
-                        'available_quantity' => 0,
-                    ]
-                );
-
                 $itemName = $variant ? "{$product->name} ({$variant->getFullName()})" : $product->name;
 
-                // ============================================================
-                // SCENARIO 1: PENDING → RESERVE STOCK
-                // ============================================================
-                if ($shouldReserve) {
-                    // Check available stock
-                    if ($warehouseStock->available_quantity < $quantity) {
-                        DB::rollBack();
+                // ✅ CHECK TOTAL AVAILABLE STOCK ACROSS ALL WAREHOUSES
+                $totalAvailableStock = ProductWarehouseStock::where('product_id', $product->id)
+                    ->where('variant_id', $variant ? $variant->id : null)
+                    ->sum('available_quantity');
 
-                        \Log::error('❌ Insufficient stock for reservation', [
-                            'product' => $product->name,
-                            'variant' => $variant ? $variant->getFullName() : null,
-                            'requested' => $quantity,
-                            'available' => $warehouseStock->available_quantity,
-                        ]);
+                if ($totalAvailableStock < $quantity) {
+                    DB::rollBack();
 
-                        return response()->json([
-                            'success' => false,
-                            'message' => "Insufficient stock for0- {$itemName}.\nAvailable: {$warehouseStock->available_quantity}\nRequested: {$quantity}"
-                        ], 400);
+                    \Log::error('❌ Insufficient total stock across all warehouses', [
+                        'product' => $product->name,
+                        'variant' => $variant ? $variant->getFullName() : null,
+                        'requested' => $quantity,
+                        'total_available' => $totalAvailableStock,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Insufficient stock for {$itemName}.\nTotal available: {$totalAvailableStock}\nRequested: {$quantity}"
+                    ], 400);
+                }
+
+                // ✅ GET ALL WAREHOUSES WITH STOCK (ORDERED BY QUANTITY DESC)
+                $warehouseStocks = ProductWarehouseStock::where('product_id', $product->id)
+                    ->where('variant_id', $variant ? $variant->id : null)
+                    ->where('available_quantity', '>', 0)
+                    ->orderBy('available_quantity', 'desc')
+                    ->get();
+
+                if ($warehouseStocks->isEmpty()) {
+                    DB::rollBack();
+
+                    \Log::error('❌ No warehouse stock records found', [
+                        'product' => $product->name,
+                        'variant' => $variant ? $variant->getFullName() : null,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "No warehouse stock found for {$itemName}."
+                    ], 400);
+                }
+
+                // ✅ SPLIT QUANTITY ACROSS MULTIPLE WAREHOUSES IF NEEDED
+                $remainingQuantity = $quantity;
+                $fulfillmentDetails = [];
+
+                foreach ($warehouseStocks as $warehouseStock) {
+                    if ($remainingQuantity <= 0) {
+                        break;
                     }
 
-                    // RESERVE STOCK
-                    if ($warehouseStock->reserveStock($quantity)) {
-                        OrderItem::where('order_id', $order->id)
-                            ->where('product_id', $product->id)
-                            ->where('product_variant_id', $variant ? $variant->id : null)
-                            ->update([
-                                'warehouse_id' => $defaultWarehouse->id,
-                                'stock_reserved' => true,
-                                'stock_reserved_at' => now(),
-                                'stock_deducted' => false,
+                    // Calculate how much we can take from this warehouse
+                    $quantityFromWarehouse = min($remainingQuantity, $warehouseStock->available_quantity);
+
+                    // ============================================================
+                    // SCENARIO 1: PENDING → RESERVE STOCK
+                    // ============================================================
+                    if ($shouldReserve) {
+                        if ($warehouseStock->reserveStock($quantityFromWarehouse)) {
+                            $fulfillmentDetails[] = [
+                                'warehouse_id' => $warehouseStock->warehouse_id,
+                                'warehouse_name' => $warehouseStock->warehouse->name ?? 'Unknown',
+                                'quantity' => $quantityFromWarehouse,
+                                'action' => 'RESERVED',
+                            ];
+
+                            \Log::info('🔒 RESERVED from warehouse', [
+                                'order' => $order->order_number,
+                                'product' => $itemName,
+                                'warehouse' => $warehouseStock->warehouse->name ?? 'Unknown',
+                                'quantity' => $quantityFromWarehouse,
+                                'remaining' => $remainingQuantity - $quantityFromWarehouse,
                             ]);
 
-                        \Log::info('🔒 RESERVED (Stage 1 - PENDING)', [
+                            $remainingQuantity -= $quantityFromWarehouse;
+                        } else {
+                            DB::rollBack();
+                            return response()->json([
+                                'success' => false,
+                                'message' => "Failed to reserve stock from warehouse: {$warehouseStock->warehouse->name}"
+                            ], 500);
+                        }
+                    }
+
+                    // ============================================================
+                    // SCENARIO 2: CONFIRMED/PROCESSING → DEDUCT STOCK
+                    // ============================================================
+                    elseif ($shouldDeduct) {
+                        if ($warehouseStock->quantity < $quantityFromWarehouse) {
+                            DB::rollBack();
+
+                            \Log::error('❌ Insufficient stock in warehouse', [
+                                'warehouse' => $warehouseStock->warehouse->name,
+                                'available' => $warehouseStock->quantity,
+                                'needed' => $quantityFromWarehouse,
+                            ]);
+
+                            return response()->json([
+                                'success' => false,
+                                'message' => "Insufficient stock in warehouse: {$warehouseStock->warehouse->name}"
+                            ], 400);
+                        }
+
+                        $warehouseStock->reduceStock($quantityFromWarehouse);
+
+                        $fulfillmentDetails[] = [
+                            'warehouse_id' => $warehouseStock->warehouse_id,
+                            'warehouse_name' => $warehouseStock->warehouse->name ?? 'Unknown',
+                            'quantity' => $quantityFromWarehouse,
+                            'action' => 'DEDUCTED',
+                        ];
+
+                        \Log::info('⚡ DEDUCTED from warehouse', [
                             'order' => $order->order_number,
                             'product' => $itemName,
-                            'quantity' => $quantity,
-                            'warehouse' => $defaultWarehouse->name,
-                            'warehouse_qty' => $warehouseStock->fresh()->quantity,
-                            'warehouse_reserved' => $warehouseStock->fresh()->reserved_quantity,
-                            'warehouse_available' => $warehouseStock->fresh()->available_quantity,
+                            'warehouse' => $warehouseStock->warehouse->name ?? 'Unknown',
+                            'quantity' => $quantityFromWarehouse,
+                            'remaining' => $remainingQuantity - $quantityFromWarehouse,
                         ]);
-                    } else {
-                        DB::rollBack();
-                        return response()->json([
-                            'success' => false,
-                            'message' => "Failed to reserve stock for {$itemName}"
-                        ], 500);
+
+                        $remainingQuantity -= $quantityFromWarehouse;
                     }
                 }
 
-                // ============================================================
-                // SCENARIO 2: CONFIRMED/PROCESSING/SHIPPED → DEDUCT STOCK
-                // ============================================================
-                elseif ($shouldDeduct) {
-                    // Check if enough stock (use total quantity, not available)
-                    if ($warehouseStock->quantity < $quantity) {
-                        DB::rollBack();
+                // ✅ VERIFY ALL QUANTITY WAS FULFILLED
+                if ($remainingQuantity > 0) {
+                    DB::rollBack();
 
-                        \Log::error('❌ Insufficient stock for deduction', [
-                            'product' => $product->name,
-                            'variant' => $variant ? $variant->getFullName() : null,
-                            'requested' => $quantity,
-                            'available' => $warehouseStock->quantity,
-                        ]);
-
-                        return response()->json([
-                            'success' => false,
-                            'message' => "Insufficient warehouse stock for {$itemName}.\nAvailable: {$warehouseStock->quantity}\nRequested: {$quantity}"
-                        ], 400);
-                    }
-
-                    // DEDUCT STOCK DIRECTLY (Stage 2)
-                    $warehouseStock->reduceStock($quantity);
-
-                    OrderItem::where('order_id', $order->id)
-                        ->where('product_id', $product->id)
-                        ->where('product_variant_id', $variant ? $variant->id : null)
-                        ->update([
-                            'warehouse_id' => $defaultWarehouse->id,
-                            'stock_reserved' => false,
-                            'stock_reserved_at' => null,
-                            'stock_deducted' => true,
-                            'stock_deducted_at' => now(),
-                        ]);
-
-                    \Log::info('⚡ DEDUCTED (Stage 2 - CONFIRMED/PROCESSING)', [
-                        'order' => $order->order_number,
-                        'status' => $orderStatus,
+                    \Log::error('❌ Could not fulfill complete order quantity', [
                         'product' => $itemName,
-                        'quantity' => $quantity,
-                        'warehouse' => $defaultWarehouse->name,
-                        'warehouse_qty_before' => $warehouseStock->quantity + $quantity,
-                        'warehouse_qty_after' => $warehouseStock->fresh()->quantity,
+                        'requested' => $quantity,
+                        'fulfilled' => $quantity - $remainingQuantity,
+                        'remaining' => $remainingQuantity,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Could not fulfill complete quantity for {$itemName}"
+                    ], 500);
+                }
+
+                // ✅ UPDATE ORDER ITEM WITH FULFILLMENT DETAILS
+                $orderItem = OrderItem::where('order_id', $order->id)
+                    ->where('product_id', $product->id)
+                    ->where('product_variant_id', $variant ? $variant->id : null)
+                    ->first();
+
+                if ($orderItem) {
+                    $orderItem->update([
+                        'warehouse_id' => $fulfillmentDetails[0]['warehouse_id'], // Primary warehouse
+                        'stock_reserved' => $shouldReserve,
+                        'stock_reserved_at' => $shouldReserve ? now() : null,
+                        'stock_deducted' => $shouldDeduct,
+                        'stock_deducted_at' => $shouldDeduct ? now() : null,
+                        'fulfillment_details' => json_encode($fulfillmentDetails), // ✅ Store multi-warehouse info
                     ]);
                 }
+
+                \Log::info('✅ Item fulfilled from warehouses', [
+                    'product' => $itemName,
+                    'total_quantity' => $quantity,
+                    'warehouses_used' => count($fulfillmentDetails),
+                    'details' => $fulfillmentDetails,
+                ]);
             }
 
-            \Log::info('✅ Stock operations completed', [
+            \Log::info('✅ All stock operations completed', [
                 'order' => $order->order_number,
                 'status' => $orderStatus,
-                'action' => $shouldReserve ? 'RESERVED' : ($shouldDeduct ? 'DEDUCTED' : 'NONE'),
             ]);
 
-            // Stock operations ends here................
-
             DB::commit();
-
-            \Log::info('Order saved successfully', ['order_id' => $order->id]);
 
             return response()->json([
                 'success' => true,
