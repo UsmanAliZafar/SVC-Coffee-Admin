@@ -67,7 +67,7 @@
                 <i class="bi bi-plus-circle"></i> Create Coupon
             </a>
             @endif
-            <button type="button" class="btn btn-outline-secondary" id="generateCodeBtn">
+            <button type="button" class="btn btn-outline-secondary d-none" id="generateCodeBtn">
                 <i class="bi bi-magic"></i> Generate Code
             </button>
         </div>

@@ -457,10 +457,86 @@ class OrdersController extends Controller
             $discountAmount = $validated['discount_amount'] ?? 0;
             $shippingAmount = $validated['shipping_amount'] ?? 0;
 
-            // ✅ GRAND TOTAL = Subtotal (includes inclusive tax) + Exclusive tax + Additional tax + Shipping - Discount
-            $totalAmount = $subtotal + $exclusiveTaxTotal + $additionalTax + $shippingAmount - $discountAmount;
+            // ============================================================
+            // STEP 2.5: VALIDATE AND APPLY COUPON (IF PROVIDED) ✅
+            // ============================================================
+            $couponId = null;
+            $appliedCoupon = null;
+            $freeShipping = false;
 
-            // Ensure total is never negative
+            if (!empty($validated['discount_code'])) {
+                $coupon = Coupon::byCode($validated['discount_code'])
+                    ->active()
+                    ->valid()
+                    ->first();
+
+                if ($coupon && $coupon->isValid()) {
+                    // Check customer eligibility
+                    $customerCheck = $coupon->canBeUsedByCustomer(
+                        $validated['customer_id'] ?? null,
+                        $validated['guest_email'] ?? null
+                    );
+
+                    if ($customerCheck['valid']) {
+                        // Prepare cart items for validation
+                        $cartItems = [];
+                        foreach ($validated['items'] as $item) {
+                            $cartItems[] = [
+                                'product_id' => $item['product_id'],
+                                'variant_id' => $item['variant_id'] ?? null,
+                                'price' => (float) $item['unit_price'],
+                                'quantity' => (int) $item['quantity'],
+                            ];
+                        }
+
+                        $itemCount = array_sum(array_column($cartItems, 'quantity'));
+
+                        // Check cart applicability
+                        $cartCheck = $coupon->isApplicableToCart($cartItems, $subtotal, $itemCount);
+
+                        if ($cartCheck['valid']) {
+                            // Calculate discount
+                            $discountDetails = $coupon->calculateDiscount($cartItems, $subtotal);
+                            $discountAmount = (float) ($discountDetails['discount_amount'] ?? 0);
+                            $freeShipping = $discountDetails['free_shipping'] ?? false;
+
+                            // ✅ Apply free shipping
+                            if ($freeShipping) {
+                                $shippingAmount = 0;
+                            }
+
+                            $appliedCoupon = $coupon;
+                            $couponId = $coupon->id;
+
+                            \Log::info('✅ Coupon applied during order creation', [
+                                'code' => $coupon->code,
+                                'discount_type' => $coupon->discount_type,
+                                'discount_amount' => $discountAmount,
+                                'free_shipping' => $freeShipping,
+                                'original_shipping' => $validated['shipping_amount'] ?? 0,
+                                'final_shipping' => $shippingAmount,
+                            ]);
+                        } else {
+                            \Log::warning('⚠️ Coupon not applicable to cart', [
+                                'code' => $coupon->code,
+                                'reason' => $cartCheck['message'] ?? 'Unknown',
+                            ]);
+                        }
+                    } else {
+                        \Log::warning('⚠️ Customer not eligible for coupon', [
+                            'code' => $coupon->code,
+                            'reason' => $customerCheck['message'] ?? 'Unknown',
+                        ]);
+                    }
+                } else {
+                    \Log::warning('⚠️ Invalid or expired coupon', [
+                        'code' => $validated['discount_code'],
+                    ]);
+                }
+            }
+
+            // ✅ Recalculate total with coupon applied
+            $totalAmount = $subtotal + $exclusiveTaxTotal + $additionalTax + $shippingAmount - $discountAmount;
             $totalAmount = max(0, $totalAmount);
             // ============================================================
             // STEP 3: CREATE ORDER (same as before)
@@ -473,6 +549,7 @@ class OrdersController extends Controller
                 'shipping_amount' => $shippingAmount,
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
+                'coupon_id' => $couponId ?? null,
             ], $validated, [ // Then validated, then override system fields
                 'order_source' => 'admin',
                 'ip_address' => $request->ip(),
@@ -481,6 +558,27 @@ class OrdersController extends Controller
 
             unset($orderData['items']);
             $order = Order::create($orderData);
+            // ============================================================
+            // RECORD COUPON USAGE (After order creation) ✅
+            // ============================================================
+            if ($appliedCoupon && $couponId) {
+                $appliedCoupon->recordUsage(
+                    $order->id,
+                    $validated['customer_id'] ?? null,
+                    $validated['guest_email'] ?? null,
+                    $discountAmount,
+                    $subtotal,
+                    $totalAmount,
+                    $request->ip()
+                );
+
+                \Log::info('✅ Coupon usage recorded', [
+                    'order_number' => $order->order_number,
+                    'coupon_code' => $appliedCoupon->code,
+                    'discount_amount' => $discountAmount,
+                    'total_used' => $appliedCoupon->fresh()->total_used,
+                ]);
+            }
             // Trigger notifications (same as before)
             $this->notificationService->notify('order_created', [
                 'order_id' => $order->id,
