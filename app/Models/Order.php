@@ -820,7 +820,7 @@ class Order extends Model
     /**
      * Mark as shipped
      */
-    public function markAsShipped(string $trackingNumber = null, string $carrier = null): bool
+    public function markAsShipped(?string $trackingNumber = null, ?string $carrier = null): bool
     {
         return $this->update([
             'status_key_code' => 'ORDER_SHIPPED',
@@ -829,6 +829,7 @@ class Order extends Model
             'shipping_carrier' => $carrier ?? $this->shipping_carrier,
         ]);
     }
+
 
     /**
      * Mark as delivered
@@ -844,7 +845,7 @@ class Order extends Model
     /**
      * Cancel order
      */
-    public function cancel(string $reason = null): bool
+    public function cancel(?string $reason = null): bool
     {
         if (!$this->canBeCancelled()) {
             return false;
