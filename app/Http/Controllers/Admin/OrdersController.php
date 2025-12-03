@@ -204,7 +204,7 @@ class OrdersController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        // ✅ Clean guest fields if customer is selected
+        // Clean guest fields if customer is selected
         if ($request->filled('customer_id')) {
             $request->merge([
                 'guest_email' => null,
@@ -213,7 +213,7 @@ class OrdersController extends Controller
             ]);
         }
 
-        // ✅ Build validation rules dynamically
+        // Build validation rules dynamically
         $rules = [
             // Customer Information
             'customer_id' => 'nullable|uuid|exists:customers,id',
@@ -266,14 +266,14 @@ class OrdersController extends Controller
             'admin_notes' => 'nullable|string|max:5000',
         ];
 
-        // ✅ Only require guest fields if no customer selected
+        // Only require guest fields if no customer selected
         if (!$request->filled('customer_id')) {
             $rules['guest_email'] = 'required|email|max:255';
             $rules['guest_name'] = 'required|string|max:255';
             $rules['guest_phone'] = 'required|string|max:20';
         }
 
-        // ✅ Custom validation messages (same as before, add variant message)
+        // Custom validation messages (same as before, add variant message)
         $messages = [
             // Guest Customer Messages
             'guest_name.required' => 'Guest name is required when no customer is selected.',
@@ -421,8 +421,8 @@ class OrdersController extends Controller
             // STEP 2: CALCULATE TOTALS (WITH PRODUCT-LEVEL TAX)
             // ============================================================
             $subtotal = 0;
-            $totalItemTax = 0;
-            $exclusiveTax = 0;
+            $inclusiveTaxTotal = 0;
+            $exclusiveTaxTotal = 0;
 
             // Calculate subtotal and item-level taxes
             foreach ($validated['items'] as $item) {
@@ -432,47 +432,55 @@ class OrdersController extends Controller
 
                 // Calculate item tax
                 if ($product && $product->is_taxable && $product->tax_percentage > 0) {
-                    $itemTax = ($itemSubtotal * $product->tax_percentage) / 100;
-                    $totalItemTax += $itemTax;
+                    $taxRate = $product->tax_percentage / 100;
 
-                    // Track exclusive tax separately (will be added to total)
-                    if ($product->tax_type === 'exclusive') {
-                        $exclusiveTax += $itemTax;
+                    if ($product->tax_type === 'inclusive') {
+                        // Tax already in price - extract it
+                        $basePrice = $itemSubtotal / (1 + $taxRate);
+                        $itemTax = $itemSubtotal - $basePrice;
+                        $inclusiveTaxTotal += $itemTax;
+                    } else {
+                        // Tax to be added
+                        $itemTax = $itemSubtotal * $taxRate;
+                        $exclusiveTaxTotal += $itemTax;
                     }
                 }
             }
 
-            // Calculate additional tax (order-level)
-            $additionalTax = $subtotal * (($validated['tax_rate'] ?? 0) / 100);
+            // Calculate additional tax (order-level admin override)
+            $additionalTaxRate = $validated['tax_rate'] ?? 0;
+            $additionalTax = $subtotal * ($additionalTaxRate / 100);
 
-            // Total tax = all item taxes + additional tax
-            $taxAmount = $totalItemTax + $additionalTax;
+            // ✅ TOTAL TAX = All product taxes (inclusive + exclusive) + additional tax
+            $taxAmount = $inclusiveTaxTotal + $exclusiveTaxTotal + $additionalTax;
 
             $discountAmount = $validated['discount_amount'] ?? 0;
             $shippingAmount = $validated['shipping_amount'] ?? 0;
 
-            // Grand total = subtotal + exclusive tax + additional tax + shipping - discount
-            // (inclusive tax is already in subtotal, so we don't add it again)
-            $totalAmount = $subtotal + $exclusiveTax + $additionalTax + $shippingAmount - $discountAmount;
+            // ✅ GRAND TOTAL = Subtotal (includes inclusive tax) + Exclusive tax + Additional tax + Shipping - Discount
+            $totalAmount = $subtotal + $exclusiveTaxTotal + $additionalTax + $shippingAmount - $discountAmount;
 
+            // Ensure total is never negative
+            $totalAmount = max(0, $totalAmount);
             // ============================================================
             // STEP 3: CREATE ORDER (same as before)
             // ============================================================
-            $orderData = array_merge($validated, [
-                'order_source' => 'admin',
+            $orderData = array_merge([
+                // Calculated values FIRST
                 'subtotal' => $subtotal,
                 'tax_amount' => $taxAmount,
-                'discount_amount' => $discountAmount,
+                'tax_rate' => $additionalTaxRate,
                 'shipping_amount' => $shippingAmount,
+                'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
-                'currency' => $validated['currency'] ?? 'USD',
+            ], $validated, [ // Then validated, then override system fields
+                'order_source' => 'admin',
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
 
             unset($orderData['items']);
             $order = Order::create($orderData);
-
             // Trigger notifications (same as before)
             $this->notificationService->notify('order_created', [
                 'order_id' => $order->id,
@@ -502,15 +510,27 @@ class OrdersController extends Controller
 
                 // ✅ Calculate tax based on product tax settings
                 $itemTaxAmount = 0;
-                if ($product->is_taxable && $product->tax_percentage > 0) {
-                    $itemTaxAmount = ($itemSubtotal * $product->tax_percentage) / 100;
+                $itemTaxRate = $product->tax_percentage ?? 0;
+
+                if ($product->is_taxable && $itemTaxRate > 0) {
+                    $taxRate = $itemTaxRate / 100;
+
+                    if ($product->tax_type === 'inclusive') {
+                        // Tax already in price - extract it
+                        $basePrice = $itemSubtotal / (1 + $taxRate);
+                        $itemTaxAmount = $itemSubtotal - $basePrice;
+                    } else {
+                        // Tax to be added
+                        $itemTaxAmount = $itemSubtotal * $taxRate;
+                    }
                 }
 
-                // ✅ Calculate item total based on tax type
+                // ✅ Calculate item total (subtotal + exclusive tax only)
+                // Inclusive tax is already in subtotal, so we only add exclusive tax
                 if ($product->tax_type === 'exclusive') {
-                    $itemTotal = $itemSubtotal + $itemTaxAmount; // Add tax for exclusive
+                    $itemTotal = $itemSubtotal + $itemTaxAmount;
                 } else {
-                    $itemTotal = $itemSubtotal; // Tax already included for inclusive
+                    $itemTotal = $itemSubtotal; // Inclusive tax already in price
                 }
 
                 $orderItem = OrderItem::create([

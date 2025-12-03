@@ -330,7 +330,7 @@
                                 value="{{ $order->shipping_amount }}" min="0" step="0.01">
                         </div>
 
-                        <div class="mb-0">
+                        <div class="mb-0 d-none">
                             <label for="tax_rate" class="form-label">Tax Rate (%)</label>
                             <input type="number" class="form-control" id="tax_rate" name="tax_rate"
                                 value="{{ $order->tax_rate ?? 0 }}" min="0" max="100" step="0.01">

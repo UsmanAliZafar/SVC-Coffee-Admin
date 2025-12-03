@@ -397,7 +397,7 @@
                             <label for="shipping_amount" class="form-label">Shipping Amount ({{ store_currency_symbol() }})</label>
                             <input type="number" class="form-control" id="shipping_amount" name="shipping_amount" value="0" min="0" step="0.01">
                         </div>
-                        <div class="mb-0">
+                        <div class="mb-0 d-none">
                             <label for="tax_rate" class="form-label">Tax Rate (%)</label>
                             <input type="number" class="form-control" id="tax_rate" name="tax_rate" value="0" min="0" max="100" step="0.01">
                         </div>
