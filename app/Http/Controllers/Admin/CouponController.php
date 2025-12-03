@@ -104,25 +104,34 @@ class CouponController extends Controller
                     '</span>';
             })
             ->addColumn('usage_stats', function ($coupon) {
-                $used = $coupon->total_used;
+                $used = $coupon->total_used ?? 0;
                 $limit = $coupon->usage_limit_total;
 
-                if ($limit) {
-                    $percentage = ($used / $limit) * 100;
-                    $color = $percentage >= 90 ? 'danger' : ($percentage >= 70 ? 'warning' : 'success');
+                if ($limit && $limit > 0) {
+                    $percentage = $limit > 0 ? min(($used / $limit) * 100, 100) : 0;
+
+                    // Custom color logic using your brand color
+                    if ($percentage >= 90) {
+                        $color = '#dc3545'; // Red for critical (90-100%)
+                    } elseif ($percentage >= 70) {
+                        $color = '#ffc107'; // Yellow/Warning (70-89%)
+                    } else {
+                        $color = '#5B914C'; // Your brand green (0-69%)
+                    }
+
                     return '<div class="text-center">
-                        <div class="progress" style="height: 20px;">
-                            <div class="progress-bar bg-' . $color . '" role="progressbar"
-                                style="width: ' . $percentage . '%"
+                        <div class="progress" style="height: 20px; background-color: rgba(91, 145, 76, 0.1);">
+                            <div class="progress-bar" role="progressbar"
+                                style="width: ' . $percentage . '%; background-color: ' . $color . ';"
                                 aria-valuenow="' . $used . '"
                                 aria-valuemin="0"
                                 aria-valuemax="' . $limit . '">
-                                ' . $used . '/' . $limit . '
+                                <span style="color: white; font-weight: 600;">' . $used . ' / ' . $limit . '</span>
                             </div>
                         </div>
                     </div>';
                 } else {
-                    return '<span class="badge bg-secondary">' . $used . ' / Unlimited</span>';
+                    return '<span class="badge" style="background-color: #5B914C; color: white;">' . $used . ' / Unlimited</span>';
                 }
             })
             ->addColumn('validity', function ($coupon) {
@@ -385,6 +394,20 @@ class CouponController extends Controller
 
         DB::beginTransaction();
         try {
+            // ✅ SET DEFAULTS FOR NULLABLE FIELDS
+            $validated['min_purchase_amount'] = $validated['min_purchase_amount'] ?? 0;
+            $validated['min_items_count'] = $validated['min_items_count'] ?? 0;
+            $validated['max_discount_amount'] = $validated['max_discount_amount'] ?? null;
+            $validated['usage_limit_total'] = $validated['usage_limit_total'] ?? null;
+            $validated['applies_to_sale_items'] = $request->has('applies_to_sale_items') ? 1 : 0;
+            $validated['first_order_only'] = $request->has('first_order_only') ? 1 : 0;
+            $validated['is_active'] = $request->has('is_active') ? 1 : 0;
+            $validated['is_featured'] = $request->has('is_featured') ? 1 : 0;
+
+            // ✅ HANDLE FREE SHIPPING (no discount_value needed)
+            if ($validated['discount_type'] === 'free_shipping') {
+                $validated['discount_value'] = 0;
+            }
             $validated['updated_by'] = auth('admin')->id();
             $coupon->update($validated);
 
