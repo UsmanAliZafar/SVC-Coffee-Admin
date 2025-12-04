@@ -1652,4 +1652,26 @@ class SwagerApiController extends Controller
      * )
      */
     public function ContactUs() {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/pages",
+     *     operationId="getAllPages",
+     *     tags={"Pages"},
+     *     summary="Get all published pages",
+     *     description="Retrieve a paginated list of all published and public pages",
+     *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer", default=15)),
+     *     @OA\Response(response=200, description="Success")
+     * )
+     *
+     * @OA\Get(
+     *     path="/api/pages/{slug}",
+     *     operationId="getPageBySlug",
+     *     tags={"Pages"},
+     *     summary="Get page by slug",
+     *     @OA\Parameter(name="slug", in="path", required=true, @OA\Schema(type="string")),
+     *     @OA\Response(response=200, description="Success")
+     * )
+     */
+    public function sitePages() {}
 }

@@ -85,6 +85,7 @@ namespace App\Http\Controllers\Api;
  *     description="Contact form submissions - Submit inquiries and messages to the store"
  * )
  *
+ *
  * @OA\Response(
  *     response="Success",
  *     description="Successful operation",

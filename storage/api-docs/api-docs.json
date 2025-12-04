@@ -19,7 +19,7 @@
             "description": "Local Development Server"
         },
         {
-            "url": "https://staging.workforcecommerce.com",
+            "url": "https://staging-dashboard.svcarabia.com",
             "description": "Staging Server"
         },
         {
@@ -3799,6 +3799,55 @@
                     }
                 }
             }
+        },
+        "/api/pages": {
+            "get": {
+                "tags": [
+                    "Pages"
+                ],
+                "summary": "Get all published pages",
+                "description": "Retrieve a paginated list of all published and public pages",
+                "operationId": "getAllPages",
+                "parameters": [
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/pages/{slug}": {
+            "get": {
+                "tags": [
+                    "Pages"
+                ],
+                "summary": "Get page by slug",
+                "operationId": "getPageBySlug",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -6459,6 +6508,10 @@
         {
             "name": "Contact Us",
             "description": "Contact form submissions - Submit inquiries and messages to the store"
+        },
+        {
+            "name": "Pages",
+            "description": "Pages"
         }
     ],
     "security": [
