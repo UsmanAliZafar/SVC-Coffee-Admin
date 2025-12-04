@@ -187,7 +187,11 @@ class OrdersController extends Controller
     {
         $customers = Customer::active()->orderBy('first_name')->get();
         $products = Product::active()->inStock()->with('category','warehouseStock')->get();
-        $statusList = SystemStatus::where('module', 'orders')->active()->ordered()->get();
+        $statusList = SystemStatus::where('module', 'orders')
+                    ->whereNotIn('key_code', ['ORDER_CANCELLED', 'ORDER_RETURNED','ORDER_PROCESSING','ORDER_SHIPPED','ORDER_DELIVERED'])
+                    ->active()
+                    ->ordered()
+                    ->get();
         $paymentStatusList = SystemStatus::where('module', 'payments')->active()->ordered()->get();
         $currencies = get_currencies();
 
@@ -1064,9 +1068,13 @@ class OrdersController extends Controller
             ], 500);
         }
     }
+
     /**
-     * Handle status change with 2-stage stock management
-     * NO PAYMENT CHECKS - Pure status-based
+     * Handle status change with simplified stock management
+     * Stock Deduction Rules:
+     * - PENDING → CONFIRMED/PROCESSING/SHIPPED/DELIVERED: Deduct stock
+     * - Direct creation with CONFIRMED/PROCESSING/SHIPPED/DELIVERED: Deduct stock
+     * - ANY → CANCELLED/RETURNED: Restore stock
      */
     private function handleStatusChange($order, $oldStatus, $newStatus)
     {
@@ -1076,17 +1084,17 @@ class OrdersController extends Controller
 
         // ✅ Define valid transitions
         $validTransitions = [
-            'ORDER_PENDING' => ['ORDER_CONFIRMED', 'ORDER_CANCELLED'],
+            'ORDER_PENDING' => ['ORDER_CONFIRMED', 'ORDER_PROCESSING', 'ORDER_SHIPPED', 'ORDER_DELIVERED', 'ORDER_CANCELLED'],
             'ORDER_CONFIRMED' => ['ORDER_PROCESSING', 'ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_CANCELLED'],
             'ORDER_PROCESSING' => ['ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_CANCELLED'],
             'ORDER_PACKED' => ['ORDER_SHIPPED', 'ORDER_CANCELLED'],
-            'ORDER_SHIPPED' => ['ORDER_DELIVERED', 'ORDER_RETURNED'],
+            'ORDER_SHIPPED' => ['ORDER_DELIVERED', 'ORDER_RETURNED', 'ORDER_CANCELLED'],
             'ORDER_DELIVERED' => ['ORDER_RETURNED'],
-            'ORDER_CANCELLED' => ['ORDER_PENDING', 'ORDER_CONFIRMED', 'ORDER_PROCESSING'], // Allow reactivation
+            'ORDER_CANCELLED' => ['ORDER_PENDING', 'ORDER_CONFIRMED', 'ORDER_PROCESSING'],
+            'ORDER_RETURNED' => [], // Final state
         ];
 
-        // ✅ ONLY validate if NOT coming from auto-confirmation logic
-        // Check if this is a direct invalid jump (without going through quickUpdateStatus)
+        // Validate transition (with logging only, don't block)
         if (isset($validTransitions[$oldStatus]) &&
             !in_array($newStatus, $validTransitions[$oldStatus])) {
 
@@ -1094,9 +1102,6 @@ class OrdersController extends Controller
                 'from' => $oldStatus,
                 'to' => $newStatus,
             ]);
-
-            // ✅ DON'T throw exception - just log and return
-            // The calling method (quickUpdateStatus) already handles the auto-confirmation
             return;
         }
 
@@ -1106,7 +1111,18 @@ class OrdersController extends Controller
             'to' => $newStatus,
         ]);
 
+        // ============================================================
+        // DEFINE STOCK ACTION STATUSES
+        // ============================================================
+        $deductStatuses = ['ORDER_CONFIRMED', 'ORDER_PROCESSING', 'ORDER_SHIPPED', 'ORDER_DELIVERED'];
+        $restoreStatuses = ['ORDER_CANCELLED', 'ORDER_RETURNED'];
 
+        $shouldDeduct = in_array($newStatus, $deductStatuses);
+        $shouldRestore = in_array($newStatus, $restoreStatuses);
+
+        // ============================================================
+        // PROCESS EACH ORDER ITEM
+        // ============================================================
         foreach ($order->items as $item) {
             if (!$item->product || !$item->product->track_inventory) {
                 continue;
@@ -1145,61 +1161,36 @@ class OrdersController extends Controller
             $itemName = $variant ? "{$product->name} ({$variant->getFullName()})" : $product->name;
 
             // ============================================================
-            // TRANSITION 1: ANY → PENDING (Reserve stock)
+            // SCENARIO 1: PENDING → Reserve Stock (Optional - Keep if needed)
             // ============================================================
-            if ($newStatus === 'ORDER_PENDING') {
-                if (!$item->stock_reserved && !$item->stock_deducted) {
-                    if ($warehouseStock->reserveStock($quantity)) {
-                        $item->update([
-                            'stock_reserved' => true,
-                            'stock_reserved_at' => now(),
-                        ]);
-
-                        \Log::info('🔒 Reserved (→ PENDING)', [
-                            'order' => $order->order_number,
-                            'product' => $itemName,
-                        ]);
-                    }
-                }
-            }
-
-            // ============================================================
-            // TRANSITION 2: PENDING → CONFIRMED (Deduct stock) ⚡
-            // ============================================================
-            elseif ($newStatus === 'ORDER_CONFIRMED' && $oldStatus === 'ORDER_PENDING') {
-                if ($item->stock_reserved && !$item->stock_deducted) {
-                    // Release reservation
-                    $warehouseStock->releaseStock($quantity);
-
-                    // Deduct actual stock
-                    $warehouseStock->reduceStock($quantity);
-
+            if ($newStatus === 'ORDER_PENDING' && !$item->stock_reserved && !$item->stock_deducted) {
+                if ($warehouseStock->reserveStock($quantity)) {
                     $item->update([
-                        'stock_reserved' => false,
-                        'stock_reserved_at' => null,
-                        'stock_deducted' => true,
-                        'stock_deducted_at' => now(),
+                        'stock_reserved' => true,
+                        'stock_reserved_at' => now(),
                     ]);
 
-                    \Log::info('⚡ DEDUCTED (PENDING → CONFIRMED)', [
+                    \Log::info('🔒 Reserved (→ PENDING)', [
                         'order' => $order->order_number,
                         'product' => $itemName,
-                        'quantity' => $quantity,
-                        'warehouse_qty' => $warehouseStock->fresh()->quantity,
                     ]);
                 }
             }
 
             // ============================================================
-            // TRANSITION 3: ANY → CONFIRMED/PROCESSING (Direct deduct)
+            // SCENARIO 2: ANY → CONFIRMED/PROCESSING/SHIPPED/DELIVERED (Deduct Stock)
             // ============================================================
-            elseif (in_array($newStatus, ['ORDER_CONFIRMED', 'ORDER_PROCESSING']) && !$item->stock_deducted) {
-                // If coming from PENDING with reservation
+            elseif ($shouldDeduct && !$item->stock_deducted) {
+                // If stock was reserved (from PENDING), release reservation first
                 if ($item->stock_reserved) {
                     $warehouseStock->releaseStock($quantity);
+                    \Log::info('🔓 Released reservation before deducting', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                    ]);
                 }
 
-                // Deduct stock
+                // Deduct actual stock
                 $warehouseStock->reduceStock($quantity);
 
                 $item->update([
@@ -1209,17 +1200,20 @@ class OrdersController extends Controller
                     'stock_deducted_at' => now(),
                 ]);
 
-                \Log::info('⚡ DEDUCTED (→ CONFIRMED/PROCESSING)', [
+                \Log::info('⚡ DEDUCTED', [
                     'order' => $order->order_number,
                     'product' => $itemName,
-                    'from' => $oldStatus,
+                    'from_status' => $oldStatus,
+                    'to_status' => $newStatus,
+                    'quantity' => $quantity,
+                    'remaining_stock' => $warehouseStock->fresh()->quantity,
                 ]);
             }
 
             // ============================================================
-            // TRANSITION 4: ANY → CANCELLED (Restore stock) 🔄
+            // SCENARIO 3: ANY → CANCELLED/RETURNED (Restore Stock)
             // ============================================================
-            elseif ($newStatus === 'ORDER_CANCELLED') {
+            elseif ($shouldRestore) {
                 // If stock was deducted, add it back
                 if ($item->stock_deducted) {
                     $warehouseStock->addStock($quantity);
@@ -1227,14 +1221,15 @@ class OrdersController extends Controller
                     $item->update([
                         'stock_deducted' => false,
                         'stock_deducted_at' => null,
-                        'status_key_code' => 'ITEM_CANCELLED',
+                        'status_key_code' => $newStatus === 'ORDER_CANCELLED' ? 'ITEM_CANCELLED' : 'ITEM_RETURNED',
                     ]);
 
                     \Log::info('✅ RESTORED (was deducted)', [
                         'order' => $order->order_number,
                         'product' => $itemName,
                         'quantity' => $quantity,
-                        'new_qty' => $warehouseStock->fresh()->quantity,
+                        'new_stock' => $warehouseStock->fresh()->quantity,
+                        'reason' => $newStatus,
                     ]);
                 }
                 // If stock was only reserved, release it
@@ -1244,31 +1239,37 @@ class OrdersController extends Controller
                     $item->update([
                         'stock_reserved' => false,
                         'stock_reserved_at' => null,
-                        'status_key_code' => 'ITEM_CANCELLED',
+                        'status_key_code' => $newStatus === 'ORDER_CANCELLED' ? 'ITEM_CANCELLED' : 'ITEM_RETURNED',
                     ]);
 
                     \Log::info('✅ RELEASED (was reserved)', [
                         'order' => $order->order_number,
                         'product' => $itemName,
+                        'reason' => $newStatus,
                     ]);
                 }
             }
 
             // ============================================================
-            // TRANSITION 5: CANCELLED → ANY (Re-apply stock logic)
+            // SCENARIO 4: CANCELLED/RETURNED → Reactivation (Re-deduct if needed)
             // ============================================================
-            elseif ($oldStatus === 'ORDER_CANCELLED') {
+            elseif (in_array($oldStatus, ['ORDER_CANCELLED', 'ORDER_RETURNED'])) {
                 if ($newStatus === 'ORDER_PENDING') {
-                    // Re-reserve
+                    // Re-reserve stock
                     if ($warehouseStock->reserveStock($quantity)) {
                         $item->update([
                             'stock_reserved' => true,
                             'stock_reserved_at' => now(),
                             'status_key_code' => 'ITEM_PENDING',
                         ]);
+
+                        \Log::info('🔒 Re-reserved (reactivation)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                        ]);
                     }
-                } else {
-                    // Re-deduct
+                } elseif ($shouldDeduct) {
+                    // Re-deduct stock
                     if ($warehouseStock->quantity >= $quantity) {
                         $warehouseStock->reduceStock($quantity);
 
@@ -1277,18 +1278,22 @@ class OrdersController extends Controller
                             'stock_deducted_at' => now(),
                             'status_key_code' => 'ITEM_PROCESSING',
                         ]);
+
+                        \Log::info('⚡ Re-deducted (reactivation)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                        ]);
                     }
                 }
             }
 
             // ============================================================
-            // TRANSITIONS 6-8: CONFIRMED → PROCESSING → PACKED → SHIPPED
-            // NO STOCK CHANGES (already deducted at CONFIRMED)
+            // SCENARIO 5: PACKED → No Stock Change (Already deducted)
             // ============================================================
-            elseif (in_array($newStatus, ['ORDER_PROCESSING', 'ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_DELIVERED'])) {
-                \Log::info('→ No stock change (already deducted)', [
+            elseif ($newStatus === 'ORDER_PACKED') {
+                \Log::info('📦 Packed (no stock change)', [
                     'order' => $order->order_number,
-                    'new_status' => $newStatus,
+                    'product' => $itemName,
                 ]);
             }
         }

@@ -466,7 +466,7 @@
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Unit Price ({{ store_currency_symbol() }}) <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="itemPrice" step="0.01" min="0">
+                        <input type="number" class="form-control" id="itemPrice" step="0.01" min="0" readonly>
                     </div>
                 </div>
             </div>
@@ -819,7 +819,7 @@ $(document).ready(function() {
                             <div class="col-auto text-center">
                                 <small class="text-muted d-block">Unit Price</small>
                                 <input type="number" class="form-control form-control-sm item-price"
-                                       data-index="${index}" value="${item.unit_price}" min="0" step="0.01" style="width: 100px;">
+                                       data-index="${index}" value="${item.unit_price}" min="0" step="0.01" style="width: 100px;" readonly>
                             </div>
                             <div class="col-auto text-end">
                                 <small class="text-muted d-block">Subtotal</small>
