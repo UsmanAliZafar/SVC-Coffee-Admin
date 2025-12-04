@@ -226,7 +226,7 @@
                         <div class="url-handle-container">
                             <div class="input-group" id="urlHandleDisplay">
                                 <span class="input-group-text bg-light">
-                                    <i class="bi bi-link-45deg"></i> {{ url('/') }}/categories/
+                                    <i class="bi bi-link-45deg"></i> {{ url('/') }}/category/
                                 </span>
                                 <input type="text" class="form-control bg-light" value="{{ $category->slug }}" readonly>
                                 <button type="button" class="btn btn-outline-secondary" id="editUrlBtn" title="Edit URL">
@@ -245,7 +245,7 @@
                                     <label class="form-label">New URL Slug</label>
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            {{ url('/') }}/categories/
+                                            {{ url('/') }}/category/
                                         </span>
                                         <input type="text" id="newSlugInput" class="form-control" value="{{ $category->slug }}" placeholder="new-category-url">
                                     </div>
@@ -633,8 +633,8 @@ $(document).ready(function() {
             title: 'Change Category URL?',
             html: `
                 <div class="text-start">
-                    <p><strong>Old URL:</strong><br><code>{{ url('/') }}/categories/${oldSlug}</code></p>
-                    <p><strong>New URL:</strong><br><code>{{ url('/') }}/categories/${newSlug}</code></p>
+                    <p><strong>Old URL:</strong><br><code>{{ url('/') }}/category/${oldSlug}</code></p>
+                    <p><strong>New URL:</strong><br><code>{{ url('/') }}/category/${newSlug}</code></p>
                     ${createRedirect ? '<p class="text-success"><i class="bi bi-check-circle"></i> A 301 redirect will be created</p>' : '<p class="text-warning"><i class="bi bi-exclamation-triangle"></i> No redirect will be created</p>'}
                 </div>
             `,

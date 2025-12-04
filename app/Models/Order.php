@@ -261,7 +261,7 @@ class Order extends Model
         //     $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(Str::random(6));
         // } while (static::where('order_number', $orderNumber)->exists());
 
-        return generate_order_number();;
+        return generate_order_number();
     }
 
     /**

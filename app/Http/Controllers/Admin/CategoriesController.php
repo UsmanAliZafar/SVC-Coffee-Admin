@@ -198,6 +198,15 @@ class CategoriesController extends Controller
                 $validated['thumbnail'] = $request->file('thumbnail')->store('categories/thumbnails', 'public');
             }
 
+            $validated['order'] = $validated['order'] ?? 0;
+            $validated['is_featured'] = $request->has('is_featured') ? true : false;
+            $validated['show_in_menu'] = $request->has('show_in_menu') ? true : false;
+            $validated['show_on_home'] = $request->has('show_on_home') ? true : false;
+
+            // Ensure parent_id is null if empty string
+            if (empty($validated['parent_id'])) {
+                $validated['parent_id'] = null;
+            }
             $category = ProductsCategories::create($validated);
 
             DB::commit();
@@ -313,7 +322,16 @@ class CategoriesController extends Controller
                     $validated[$field] = $request->file($field)->store('categories/' . str_replace('_', 's/', $field), 'public');
                 }
             }
+            // Handle default values for fields that might be null
+            $validated['order'] = $validated['order'] ?? $category->order ?? 0;
+            $validated['is_featured'] = $request->has('is_featured') ? true : false;
+            $validated['show_in_menu'] = $request->has('show_in_menu') ? true : false;
+            $validated['show_on_home'] = $request->has('show_on_home') ? true : false;
 
+            // Ensure parent_id is null if empty string
+            if (empty($validated['parent_id'])) {
+                $validated['parent_id'] = null;
+            }
             $category->update($validated);
 
             DB::commit();
@@ -333,16 +351,13 @@ class CategoriesController extends Controller
         }
     }
 
-    /**
-     * Update category URL and create redirect if needed
-     */
     public function updateUrl(Request $request, $id)
     {
         try {
             $category = ProductsCategories::findOrFail($id);
 
             $validator = Validator::make($request->all(), [
-                'slug' => 'required|string|max:255|unique:products_categories,slug,' . $id,
+                'slug' => 'required|string|max:255|unique:products_categories,slug,' . $id . ',id',
                 'create_redirect' => 'nullable|boolean',
             ]);
 
@@ -373,15 +388,42 @@ class CategoriesController extends Controller
 
                 // Create redirect if requested
                 if ($request->create_redirect) {
-                    UrlRedirect::create([
-                        'old_url' => '/category/' . $oldSlug,
-                        'new_url' => '/category/' . $newSlug,
-                        'redirect_type' => '301',
-                        'entity_type' => 'category',
-                        'entity_id' => $category->id,
-                        'is_active' => true,
-                        'notes' => 'Auto-generated redirect due to category slug change',
-                    ]);
+                    $oldUrl = '/category/' . $oldSlug;
+                    $newUrl = '/category/' . $newSlug;
+
+                    // Check if redirect already exists
+                    $existingRedirect = UrlRedirect::where('old_url', $oldUrl)->first();
+
+                    if ($existingRedirect) {
+                        // Update existing redirect
+                        $existingRedirect->update([
+                            'new_url' => $newUrl,
+                            'redirect_type' => '301',
+                            'is_active' => true,
+                            'notes' => 'Updated redirect due to category slug change on ' . now()->format('Y-m-d H:i:s'),
+                            'updated_by' => auth('admin')->id(),
+                        ]);
+                    } else {
+                        // Create new redirect
+                        UrlRedirect::create([
+                            'old_url' => $oldUrl,
+                            'new_url' => $newUrl,
+                            'redirect_type' => '301',
+                            'entity_type' => 'category',
+                            'entity_id' => $category->id,
+                            'is_active' => true,
+                            'notes' => 'Auto-generated redirect due to category slug change',
+                            'created_by' => auth('admin')->id(),
+                        ]);
+                    }
+
+                    // Update any existing redirects that point to the old URL
+                    UrlRedirect::where('new_url', $oldUrl)
+                        ->where('is_active', true)
+                        ->update([
+                            'new_url' => $newUrl,
+                            'updated_by' => auth('admin')->id(),
+                        ]);
                 }
 
                 DB::commit();
@@ -393,13 +435,22 @@ class CategoriesController extends Controller
 
             } catch (\Exception $e) {
                 DB::rollBack();
+
+                // Check for specific duplicate entry error
+                if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'A redirect for this URL already exists. Please contact administrator or try a different URL.'
+                    ], 422);
+                }
+
                 throw $e;
             }
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update URL: ' . $e->getMessage()
+                'message' => 'Failed to update URL. Please try again or contact support.'
             ], 500);
         }
     }
