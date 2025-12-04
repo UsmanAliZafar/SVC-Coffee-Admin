@@ -102,6 +102,15 @@ class VendorsController extends Controller
                 $count = $vendor->products_count ?? 0;
                 return '<span class="badge bg-primary">' . $count . '</span>';
             })
+            ->addColumn('orders_count', function($vendor) {
+                $count = $vendor->orders_count ?? 0;
+
+                if ($count > 0) {
+                    return '<span class="badge bg-info">' . $count . '</span>';
+                } else {
+                    return '<span class="badge bg-secondary">0</span>';
+                }
+            })
             ->addColumn('total_purchases', function($vendor) {
                 return '<span class="badge bg-success">' . $vendor->getFormattedTotalPurchases() . '</span>';
             })
@@ -115,7 +124,7 @@ class VendorsController extends Controller
                 if (auth('admin')->user()->hasPermission('vendors.update')) {
                     $actions .= '<button type="button" class="btn btn-sm btn-outline-info sync-vendor-btn"
                         data-id="' . $vendor->id . '"
-                        title="Sync Product Count & Purchases">
+                        title="Sync Statistics">
                         <i class="bi bi-arrow-repeat"></i>
                     </button>';
                 }
@@ -142,12 +151,12 @@ class VendorsController extends Controller
 
                 return $actions;
             })
-            ->rawColumns(['checkbox', 'vendor_info', 'location', 'products_count', 'total_purchases', 'status_badge', 'actions'])
+            ->rawColumns(['checkbox', 'vendor_info', 'location', 'products_count', 'orders_count', 'total_purchases', 'status_badge', 'actions'])
             ->make(true);
     }
 
     /**
-     * Sync ALL vendors' products count
+     * Sync ALL vendors' statistics (products count, orders count, and total value)
      */
     public function syncProductsCount(Request $request)
     {
@@ -156,44 +165,85 @@ class VendorsController extends Controller
         }
 
         try {
-            // Reset all vendor product counts to 0
-            DB::table('vendors')->update(['products_count' => 0]);
+            DB::beginTransaction();
 
-            // Get actual product counts per vendor
-            $vendorCounts = DB::table('products')
+            // Reset all vendor counts
+            DB::table('vendors')->update([
+                'products_count' => 0,
+                'orders_count' => 0,
+                'total_purchases' => 0
+            ]);
+
+            // Sync products count
+            $productCounts = DB::table('products')
                 ->whereNull('deleted_at')
                 ->whereNotNull('vendor_id')
                 ->select('vendor_id', DB::raw('COUNT(*) as total'))
                 ->groupBy('vendor_id')
                 ->get();
 
-            // Update each vendor's product count
-            $updated = 0;
-            foreach ($vendorCounts as $item) {
+            foreach ($productCounts as $item) {
                 DB::table('vendors')
                     ->where('id', $item->vendor_id)
                     ->update(['products_count' => $item->total]);
-                $updated++;
             }
+
+            // Calculate total value from products (cost_price * stock_quantity)
+            $productValues = DB::table('products')
+                ->whereNull('deleted_at')
+                ->whereNotNull('vendor_id')
+                ->select(
+                    'vendor_id',
+                    DB::raw('SUM(COALESCE(cost_price, price) * COALESCE(stock_quantity, 0)) as total_value')
+                )
+                ->groupBy('vendor_id')
+                ->get();
+
+            foreach ($productValues as $item) {
+                DB::table('vendors')
+                    ->where('id', $item->vendor_id)
+                    ->update(['total_purchases' => $item->total_value ?? 0]);
+            }
+
+            // Sync orders count (distinct orders containing vendor's products)
+            $orderCounts = DB::table('order_items')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->whereNull('order_items.deleted_at')
+                ->whereNull('products.deleted_at')
+                ->whereNotNull('products.vendor_id')
+                ->select(
+                    'products.vendor_id',
+                    DB::raw('COUNT(DISTINCT order_items.order_id) as total_orders')
+                )
+                ->groupBy('products.vendor_id')
+                ->get();
+
+            foreach ($orderCounts as $item) {
+                DB::table('vendors')
+                    ->where('id', $item->vendor_id)
+                    ->update(['orders_count' => $item->total_orders ?? 0]);
+            }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => "Successfully synced product counts for {$updated} vendors!",
-                'vendors_updated' => $updated
+                'message' => "Successfully synced all vendor statistics!",
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error syncing vendor product counts: ' . $e->getMessage());
+            DB::rollBack();
+            \Log::error('Error syncing vendor statistics: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to sync product counts. Please try again.'
+                'message' => 'Failed to sync statistics. Please try again.'
             ], 500);
         }
     }
 
     /**
-     * Sync INDIVIDUAL vendor's products count and total purchases
+     * Sync INDIVIDUAL vendor's statistics (products, orders, and inventory value)
      */
     public function syncIndividual($id)
     {
@@ -204,27 +254,19 @@ class VendorsController extends Controller
         try {
             $vendor = Vendor::findOrFail($id);
 
-            // Sync products count
-            $productsCount = $vendor->products()->count();
+            // Use the model's syncAllStatistics method
+            $vendor->syncAllStatistics();
 
-            // Sync total purchases (if you have purchase_orders table)
-            $totalPurchases = DB::table('purchase_orders')
-                ->where('vendor_id', $id)
-                ->where('status_key_code', 'completed')
-                ->sum('total_amount') ?? 0;
-
-            // Update vendor
-            $vendor->update([
-                'products_count' => $productsCount,
-                'total_purchases' => $totalPurchases
-            ]);
+            // Refresh to get updated values
+            $vendor->refresh();
 
             return response()->json([
                 'success' => true,
                 'message' => "Synced successfully!",
                 'data' => [
-                    'products_count' => $productsCount,
-                    'total_purchases' => number_format($totalPurchases, 2)
+                    'products_count' => $vendor->products_count,
+                    'orders_count' => $vendor->orders_count,
+                    'total_purchases' => $vendor->currency . ' ' . number_format($vendor->total_purchases, 2)
                 ]
             ]);
 
@@ -485,6 +527,9 @@ class VendorsController extends Controller
             'inactive' => Vendor::where('status_key_code', 'VENDOR_INACTIVE')->count(),
             'total_products' => Vendor::sum('products_count'),
             'total_purchases' => Vendor::sum('total_purchases'),
+            'total_orders' => Vendor::sum('orders_count'),
+            'pending_orders' => 0,  // Can be calculated if needed
+            'completed_orders' => 0, // Can be calculated if needed
         ];
 
         return response()->json($stats);
@@ -515,21 +560,32 @@ class VendorsController extends Controller
 
         try {
             $vendors = Vendor::whereIn('id', $request->vendor_ids)->get();
+            $deleted = 0;
+            $skipped = 0;
 
             foreach ($vendors as $vendor) {
                 // Check for products
                 if ($vendor->products()->count() > 0) {
-                    continue; // Skip vendors with products
+                    $skipped++;
+                    continue;
                 }
 
                 $vendor->delete();
+                $deleted++;
             }
 
             DB::commit();
 
+            $message = "{$deleted} vendor(s) deleted successfully";
+            if ($skipped > 0) {
+                $message .= " ({$skipped} skipped due to associations)";
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => count($request->vendor_ids) . ' vendor(s) deleted successfully'
+                'message' => $message,
+                'deleted' => $deleted,
+                'skipped' => $skipped
             ]);
 
         } catch (\Exception $e) {

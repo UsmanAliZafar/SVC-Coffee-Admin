@@ -489,7 +489,7 @@ $(document).ready(function() {
                         title: 'Statistics Synced!',
                         html: `
                             <p>Products: <strong>${response.data.products_count}</strong></p>
-                            <p>Total Purchases: <strong>$${response.data.total_purchases}</strong></p>
+                            <p>Total Purchases: <strong>${response.data.total_purchases}</strong></p>
                         `,
                         timer: 2500,
                         showConfirmButton: false
