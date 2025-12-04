@@ -544,12 +544,13 @@ class ProductsController extends Controller
             ],
             'tax' => $product->getTaxInfo(),
             'stock' => [
-                'is_available' => $product->isAvailableForPurchase(),
+                'is_available' =>  $product->isAvailableForPurchase(),
                 'is_in_stock' => $product->isInStock(),
                 'is_low_stock' => $product->isLowStock(),
                 'quantity' => $product->track_inventory ? $product->stock_quantity : null,
                 'low_stock_threshold' => $product->low_stock_threshold,
                 'track_inventory' => $product->track_inventory,
+                'available_stock' => $product->getTotalAvailableStock(),
             ],
             'availability' => [
                 'is_available' => $product->is_available,

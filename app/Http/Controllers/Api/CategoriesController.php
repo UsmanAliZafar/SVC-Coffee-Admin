@@ -977,6 +977,7 @@ class CategoriesController extends Controller
                 'quantity' => $product->track_inventory ? $product->stock_quantity : null,
                 'low_stock_threshold' => $product->low_stock_threshold,
                 'track_inventory' => $product->track_inventory,
+                'available_stock' => $product->getTotalAvailableStock(),
             ],
             'availability' => [
                 'is_available' => $product->is_available,
