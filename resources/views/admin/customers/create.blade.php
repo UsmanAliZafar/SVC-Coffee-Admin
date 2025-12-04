@@ -522,7 +522,6 @@
                             <li class="mb-2">✓ Business customers need company name</li>
                             <li class="mb-2">✓ Copy billing to shipping for same address</li>
                             <li class="mb-2">✓ Active status allows immediate login</li>
-                            <li class="mb-0">✓ Tags help organize customers</li>
                         </ul>
                     </div>
                 </div>

@@ -518,14 +518,6 @@
                                 <i class="bi bi-lock-fill"></i> These notes are only visible to admins and will not be shown to the customer.
                             </small>
                         </div>
-
-                        <div class="mb-0">
-                            <label for="tags" class="form-label">Tags</label>
-                            <input type="text" class="form-control" id="tags_input" placeholder="Add tags separated by commas (e.g., VIP, Wholesale, Premium)">
-                            <small class="text-muted">Press Enter or comma to add tags</small>
-                            <div id="tagsContainer" class="mt-2"></div>
-                            <input type="hidden" name="tags" id="tags_hidden">
-                        </div>
                     </div>
                 </div>
 
@@ -679,7 +671,6 @@
 
 <script>
 $(document).ready(function() {
-    // Initialize tags display
     // Password toggle visibility
     $('.password-toggle').on('click', function() {
         const targetId = $(this).data('target');
@@ -732,8 +723,6 @@ $(document).ready(function() {
         });
     });
 
-    // Tags functionality
-
     // Form submission
     $('#customerForm').on('submit', function(e) {
         e.preventDefault();
@@ -750,14 +739,6 @@ $(document).ready(function() {
 
         // Get form data
         const formData = new FormData(this);
-
-        // Add tags
-        if (tagsArray.length > 0) {
-            formData.delete('tags');
-            tagsArray.forEach((tag, index) => {
-                formData.append(`tags[${index}]`, tag);
-            });
-        }
 
         // AJAX request
         $.ajax({
