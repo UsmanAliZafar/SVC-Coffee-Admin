@@ -368,7 +368,6 @@
                             <div class="col-md-6 mb-3">
                                 <label for="preferred_language" class="form-label">Preferred Language</label>
                                 <select class="form-select" id="preferred_language" name="preferred_language">
-                                    <option value="">Select Language</option>
                                     <option value="en" selected>English</option>
                                     <option value="es">Spanish</option>
                                     <option value="fr">French</option>
@@ -382,7 +381,6 @@
                             <div class="col-md-6 mb-3">
                                 <label for="preferred_currency" class="form-label">Preferred Currency</label>
                                 <select class="form-select" id="preferred_currency" name="preferred_currency">
-                                    <option value="">Use Store Default</option>
                                     <option value="USD" selected>USD - US Dollar</option>
                                     <option value="EUR">EUR - Euro</option>
                                     <option value="GBP">GBP - British Pound</option>
