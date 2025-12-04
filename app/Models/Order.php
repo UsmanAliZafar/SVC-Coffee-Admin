@@ -645,15 +645,13 @@ class Order extends Model
     public function getStatusBadge(): string
     {
         return match($this->status_key_code) {
-            'ORDER_PENDING' => '<span class="badge bg-warning">Pending</span>',
-            'ORDER_CONFIRMED' => '<span class="badge bg-info">Confirmed</span>',
-            'ORDER_PROCESSING' => '<span class="badge bg-primary">Processing</span>',
-            'ORDER_PACKED' => '<span class="badge bg-secondary">Packed</span>',
-            'ORDER_SHIPPED' => '<span class="badge bg-purple">Shipped</span>',
-            'ORDER_DELIVERED' => '<span class="badge bg-success">Delivered</span>',
-            'ORDER_CANCELLED' => '<span class="badge bg-danger">Cancelled</span>',
-            'ORDER_REFUNDED' => '<span class="badge bg-dark">Refunded</span>',
-            'ORDER_FAILED' => '<span class="badge bg-danger">Failed</span>',
+            'ORDER_PENDING' => '<span class="badge text-dark" style="background-color: #fff3cd; color: #856404 !important;">Pending</span>',
+            'ORDER_CONFIRMED' => '<span class="badge text-dark" style="background-color: #cce5ff; color: #004085 !important;">Confirmed</span>',
+            'ORDER_PROCESSING' => '<span class="badge text-dark" style="background-color: #d1ecf1; color: #0c5460 !important;">Processing</span>',
+            'ORDER_SHIPPED' => '<span class="badge text-dark" style="background-color: #d6d8db; color: #383d41 !important;">Shipped</span>',
+            'ORDER_DELIVERED' => '<span class="badge" style="background-color: #28a745; color: #ffffff !important;">Delivered</span>',
+            'ORDER_CANCELLED' => '<span class="badge" style="background-color: #dc3545; color: #ffffff !important;">Cancelled</span>',
+            'ORDER_RETURNED' => '<span class="badge text-dark" style="background-color: #f8d7da; color: #721c24 !important;">Returned</span>',
             default => '<span class="badge bg-light text-dark">Unknown</span>',
         };
     }
@@ -664,12 +662,12 @@ class Order extends Model
     public function getPaymentStatusBadge(): string
     {
         return match($this->payment_status_key_code) {
-            'PAYMENT_PENDING' => '<span class="badge bg-warning">Pending</span>',
-            'PAYMENT_PAID' => '<span class="badge bg-success">Paid</span>',
-            'PAYMENT_PROCESSING' => '<span class="badge bg-info">Processing</span>',
+            'PAYMENT_PENDING' => '<span class="badge text-dark" style="background-color: #fff3cd; color: #856404 !important;">Pending</span>',
+            'PAYMENT_PROCESSING' => '<span class="badge text-dark" style="background-color: #cce5ff; color: #004085 !important;">Processing</span>',
+            'PAYMENT_PAID' => '<span class="badge" style="background-color: #28a745; color: #ffffff !important;">Paid</span>',
+            'PAYMENT_FAILED' => '<span class="badge" style="background-color: #dc3545; color: #ffffff !important;">Failed</span>',
+            'PAYMENT_REFUNDED' => '<span class="badge text-dark" style="background-color: #f8d7da; color: #721c24 !important;">Refunded</span>',
             'PAYMENT_PARTIALLY_PAID' => '<span class="badge bg-info">Partially Paid</span>',
-            'PAYMENT_FAILED' => '<span class="badge bg-danger">Failed</span>',
-            'PAYMENT_REFUNDED' => '<span class="badge bg-dark">Refunded</span>',
             'PAYMENT_PARTIALLY_REFUNDED' => '<span class="badge bg-secondary">Partially Refunded</span>',
             default => '<span class="badge bg-light text-dark">Unknown</span>',
         };

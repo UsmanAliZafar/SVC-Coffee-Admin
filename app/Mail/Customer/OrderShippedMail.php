@@ -44,7 +44,9 @@ class OrderShippedMail extends Mailable
                 'orderNumber' => $this->order->order_number,
                 'trackingNumber' => $this->order->shipping_tracking_number,
                 'carrier' => $this->order->shipping_carrier,
-                'shippedDate' => $this->order->shipped_at->format('F d, Y'),
+                'shippedDate' => $this->order->shipped_at
+                    ? $this->order->shipped_at->format('F d, Y')
+                    : now()->format('F d, Y'),
                 'estimatedDelivery' => $this->order->expected_delivery_date
                     ? $this->order->expected_delivery_date->format('F d, Y')
                     : 'Within 3-5 business days',

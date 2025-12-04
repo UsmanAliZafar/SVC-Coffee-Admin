@@ -2404,6 +2404,7 @@ class OrdersController extends Controller
             ], 500);
         }
     }
+
     /**
      * ✅ NEW HELPER METHOD: Trigger notifications based on status
      */
