@@ -149,11 +149,26 @@ class CartController extends Controller
                     }
                 }
 
-                // ✅ Use variant data if available, otherwise use product data
+                // Use variant data if available, otherwise use product data
+                $regularPrice = $variant ? (float) $variant->price : (float) $product->price;
                 $itemPrice = $variant ? $variant->getFinalPrice() : $product->getFinalPrice();
+
+                // ✅ Fallback to regular price if final price is 0
+                if ($itemPrice <= 0) {
+                    $itemPrice = $regularPrice;
+                }
+
                 $taxRate = $product->tax_percentage ?? 0;
-                $taxAmount = $product->is_taxable ? round(($itemPrice * $taxRate) / 100, 2) : 0;
-                $priceAfterTax = $product->is_taxable ? round($itemPrice + $taxAmount, 2) : $itemPrice;
+
+                // ✅ CALCULATE TAX FOR TOTAL QUANTITY
+                $itemSubtotal = $itemPrice * $validated['quantity'];
+                $taxAmount = $product->is_taxable ? round(($itemSubtotal * $taxRate) / 100, 2) : 0;
+                $priceAfterTax = $product->is_taxable ? round($itemPrice + (($itemPrice * $taxRate) / 100), 2) : $itemPrice;
+                $subtotalAfterTax = $priceAfterTax * $validated['quantity'];
+
+                // Get currency details
+                $currencyCode = $product->curency ?? 'SAR';
+                $currencySymbol = get_currency_symbol($currencyCode);
 
                 $cart[$itemKey] = [
                     'product_id' => $product->id,
@@ -163,18 +178,26 @@ class CartController extends Controller
                     'sku' => $variant ? $variant->sku : $product->sku,
                     'image' => $variant ? $variant->getImageUrl() : $product->getMainImageUrl(),
                     'price' => $itemPrice,
-                    'regular_price' => $variant ? (float) $variant->price : (float) $product->price,
-                    'product_currency' => $product->curency ?? 'USD',
+                    'regular_price' => $regularPrice,
+                    'product_currency' => $currencyCode,
                     'quantity' => $validated['quantity'],
                     'is_taxable' => $product->is_taxable,
                     'tax_rate' => $taxRate,
-                    'tax_amount' => $taxAmount,
-                    'price_after_tax' => $priceAfterTax,
+                    'tax_amount' => $taxAmount,  // ✅ NOW SHOWS TOTAL TAX (10 × 4 = 40)
+                    'price_after_tax' => $priceAfterTax,  // ✅ PER UNIT PRICE WITH TAX (110)
                     'max_quantity' => $variant
                         ? ($product->track_inventory ? $variant->stock_quantity : 999)
                         : ($product->track_inventory ? $product->stock_quantity : 999),
                     'variant_name' => $variant ? $variant->getFullName() : null,
                     'added_at' => now()->toIso8601String(),
+                    'formatted' => [
+                        'price' => format_price($itemPrice, $currencyCode, $currencySymbol),
+                        'regular_price' => format_price($regularPrice, $currencyCode, $currencySymbol),
+                        'tax_amount' => format_price($taxAmount, $currencyCode, $currencySymbol),
+                        'price_after_tax' => format_price($priceAfterTax, $currencyCode, $currencySymbol),
+                        'subtotal' => format_price($itemSubtotal, $currencyCode, $currencySymbol),
+                        'subtotal_after_tax' => format_price($subtotalAfterTax, $currencyCode, $currencySymbol),
+                    ],
                 ];
             }
 
@@ -742,22 +765,50 @@ class CartController extends Controller
             }
 
             // ✅ Update with variant data if available
+            $regularPrice = $variant ? (float) $variant->price : (float) $product->price;
             $itemPrice = $variant ? $variant->getFinalPrice() : $product->getFinalPrice();
+
+            // ✅ Fallback to regular price if final price is 0
+            if ($itemPrice <= 0) {
+                $itemPrice = $regularPrice;
+            }
+
             $taxRate = $product->tax_percentage ?? 0;
+            $quantity = is_numeric($item['quantity']) ? (int) $item['quantity'] : 1;
+
+            // ✅ CALCULATE TAX FOR TOTAL QUANTITY
+            $itemSubtotal = $itemPrice * $quantity;
+            $taxAmount = $product->is_taxable ? round(($itemSubtotal * $taxRate) / 100, 2) : 0;
+            $priceAfterTax = $product->is_taxable ? round($itemPrice + (($itemPrice * $taxRate) / 100), 2) : $itemPrice;
+            $subtotalAfterTax = $priceAfterTax * $quantity;
+
+            // Get currency details
+            $currencyCode = $product->curency ?? 'SAR';
+            $currencySymbol = get_currency_symbol($currencyCode);
 
             $item['name'] = $variant ? "{$product->name} - {$variant->getFullName()}" : $product->name;
             $item['sku'] = $variant ? $variant->sku : $product->sku;
             $item['image'] = $variant ? $variant->getImageUrl() : $product->getMainImageUrl();
             $item['price'] = $itemPrice;
-            $item['regular_price'] = $variant ? (float) $variant->price : (float) $product->price;
-            $item['tax_rate'] = $taxRate.'%';
-            $item['tax_amount'] = $product->is_taxable ? round(($itemPrice * $taxRate) / 100, 2) : 0;
-            $item['price_after_tax'] = $product->is_taxable ? round($itemPrice + $item['tax_amount'], 2) : $itemPrice;
+            $item['regular_price'] = $regularPrice;
+            $item['product_currency'] = $currencyCode;
+            $item['tax_rate'] = $taxRate;
+            $item['tax_amount'] = $taxAmount;  // ✅ NOW SHOWS TOTAL TAX
+            $item['price_after_tax'] = $priceAfterTax;
             $item['max_quantity'] = $variant
                 ? ($product->track_inventory ? $variant->stock_quantity : 999)
                 : ($product->track_inventory ? $product->stock_quantity : 999);
             $item['is_in_stock'] = $variant ? $variant->isInStock() : $product->isInStock();
             $item['variant_name'] = $variant ? $variant->getFullName() : null;
+
+            $item['formatted'] = [
+                'price' => format_price($itemPrice, $currencyCode, $currencySymbol),
+                'regular_price' => format_price($regularPrice, $currencyCode, $currencySymbol),
+                'tax_amount' => format_price($taxAmount, $currencyCode, $currencySymbol),
+                'price_after_tax' => format_price($priceAfterTax, $currencyCode, $currencySymbol),
+                'subtotal' => format_price($itemSubtotal, $currencyCode, $currencySymbol),
+                'subtotal_after_tax' => format_price($subtotalAfterTax, $currencyCode, $currencySymbol),
+            ];
         }
 
         return $cart;
