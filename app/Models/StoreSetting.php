@@ -89,6 +89,13 @@ class StoreSetting extends Model
         'instagram_url',
         'linkedin_url',
         'youtube_url',
+        'tiktok_url',
+        'pinterest_url',
+        'whatsapp_url',
+        'telegram_url',
+        'snapchat_url',
+        'github_url',
+        'discord_url',
 
         // Business Hours
         'business_hours',

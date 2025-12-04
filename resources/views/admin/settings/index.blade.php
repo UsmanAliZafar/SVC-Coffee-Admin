@@ -1495,62 +1495,158 @@
                         <h5 class="mb-3"><i class="bi bi-link-45deg me-2"></i>Social Media Links</h5>
 
                         <div class="row">
+                            {{-- Facebook --}}
                             <div class="col-md-6 mb-3">
                                 <label for="facebook_url" class="form-label">
                                     <i class="bi bi-facebook text-primary me-2"></i>Facebook URL
                                 </label>
                                 <input type="url" class="form-control @error('facebook_url') is-invalid @enderror"
-                                       id="facebook_url" name="facebook_url" value="{{ old('facebook_url', $settings->facebook_url) }}"
-                                       placeholder="https://facebook.com/yourpage">
+                                    id="facebook_url" name="facebook_url" value="{{ old('facebook_url', $settings->facebook_url) }}"
+                                    placeholder="https://facebook.com/yourpage">
                                 @error('facebook_url')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
+                            {{-- Twitter/X --}}
                             <div class="col-md-6 mb-3">
                                 <label for="twitter_url" class="form-label">
-                                    <i class="bi bi-twitter text-info me-2"></i>Twitter URL
+                                    <i class="bi bi-twitter text-info me-2"></i>Twitter/X URL
                                 </label>
                                 <input type="url" class="form-control @error('twitter_url') is-invalid @enderror"
-                                       id="twitter_url" name="twitter_url" value="{{ old('twitter_url', $settings->twitter_url) }}"
-                                       placeholder="https://twitter.com/yourprofile">
+                                    id="twitter_url" name="twitter_url" value="{{ old('twitter_url', $settings->twitter_url) }}"
+                                    placeholder="https://x.com/yourprofile">
                                 @error('twitter_url')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
+                            {{-- Instagram --}}
                             <div class="col-md-6 mb-3">
                                 <label for="instagram_url" class="form-label">
                                     <i class="bi bi-instagram text-danger me-2"></i>Instagram URL
                                 </label>
                                 <input type="url" class="form-control @error('instagram_url') is-invalid @enderror"
-                                       id="instagram_url" name="instagram_url" value="{{ old('instagram_url', $settings->instagram_url) }}"
-                                       placeholder="https://instagram.com/yourprofile">
+                                    id="instagram_url" name="instagram_url" value="{{ old('instagram_url', $settings->instagram_url) }}"
+                                    placeholder="https://instagram.com/yourprofile">
                                 @error('instagram_url')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
+                            {{-- LinkedIn --}}
                             <div class="col-md-6 mb-3">
                                 <label for="linkedin_url" class="form-label">
                                     <i class="bi bi-linkedin text-primary me-2"></i>LinkedIn URL
                                 </label>
                                 <input type="url" class="form-control @error('linkedin_url') is-invalid @enderror"
-                                       id="linkedin_url" name="linkedin_url" value="{{ old('linkedin_url', $settings->linkedin_url) }}"
-                                       placeholder="https://linkedin.com/company/yourcompany">
+                                    id="linkedin_url" name="linkedin_url" value="{{ old('linkedin_url', $settings->linkedin_url) }}"
+                                    placeholder="https://linkedin.com/company/yourcompany">
                                 @error('linkedin_url')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
+                            {{-- YouTube --}}
                             <div class="col-md-6 mb-3">
                                 <label for="youtube_url" class="form-label">
                                     <i class="bi bi-youtube text-danger me-2"></i>YouTube URL
                                 </label>
                                 <input type="url" class="form-control @error('youtube_url') is-invalid @enderror"
-                                       id="youtube_url" name="youtube_url" value="{{ old('youtube_url', $settings->youtube_url) }}"
-                                       placeholder="https://youtube.com/yourchannel">
+                                    id="youtube_url" name="youtube_url" value="{{ old('youtube_url', $settings->youtube_url) }}"
+                                    placeholder="https://youtube.com/yourchannel">
                                 @error('youtube_url')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- TikTok --}}
+                            <div class="col-md-6 mb-3">
+                                <label for="tiktok_url" class="form-label">
+                                    <i class="bi bi-tiktok text-dark me-2"></i>TikTok URL
+                                </label>
+                                <input type="url" class="form-control @error('tiktok_url') is-invalid @enderror"
+                                    id="tiktok_url" name="tiktok_url" value="{{ old('tiktok_url', $settings->tiktok_url ?? '') }}"
+                                    placeholder="https://tiktok.com/@yourprofile">
+                                @error('tiktok_url')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- Pinterest --}}
+                            <div class="col-md-6 mb-3">
+                                <label for="pinterest_url" class="form-label">
+                                    <i class="bi bi-pinterest text-danger me-2"></i>Pinterest URL
+                                </label>
+                                <input type="url" class="form-control @error('pinterest_url') is-invalid @enderror"
+                                    id="pinterest_url" name="pinterest_url" value="{{ old('pinterest_url', $settings->pinterest_url ?? '') }}"
+                                    placeholder="https://pinterest.com/yourprofile">
+                                @error('pinterest_url')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- WhatsApp --}}
+                            <div class="col-md-6 mb-3">
+                                <label for="whatsapp_url" class="form-label">
+                                    <i class="bi bi-whatsapp text-success me-2"></i>WhatsApp URL
+                                </label>
+                                <input type="url" class="form-control @error('whatsapp_url') is-invalid @enderror"
+                                    id="whatsapp_url" name="whatsapp_url" value="{{ old('whatsapp_url', $settings->whatsapp_url ?? '') }}"
+                                    placeholder="https://wa.me/yournumber">
+                                @error('whatsapp_url')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- Telegram --}}
+                            <div class="col-md-6 mb-3">
+                                <label for="telegram_url" class="form-label">
+                                    <i class="bi bi-telegram text-primary me-2"></i>Telegram URL
+                                </label>
+                                <input type="url" class="form-control @error('telegram_url') is-invalid @enderror"
+                                    id="telegram_url" name="telegram_url" value="{{ old('telegram_url', $settings->telegram_url ?? '') }}"
+                                    placeholder="https://t.me/yourchannel">
+                                @error('telegram_url')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- Snapchat --}}
+                            <div class="col-md-6 mb-3">
+                                <label for="snapchat_url" class="form-label">
+                                    <i class="bi bi-snapchat text-warning me-2"></i>Snapchat URL
+                                </label>
+                                <input type="url" class="form-control @error('snapchat_url') is-invalid @enderror"
+                                    id="snapchat_url" name="snapchat_url" value="{{ old('snapchat_url', $settings->snapchat_url ?? '') }}"
+                                    placeholder="https://snapchat.com/add/yourusername">
+                                @error('snapchat_url')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- GitHub --}}
+                            <div class="col-md-6 mb-3">
+                                <label for="github_url" class="form-label">
+                                    <i class="bi bi-github text-dark me-2"></i>GitHub URL
+                                </label>
+                                <input type="url" class="form-control @error('github_url') is-invalid @enderror"
+                                    id="github_url" name="github_url" value="{{ old('github_url', $settings->github_url ?? '') }}"
+                                    placeholder="https://github.com/yourusername">
+                                @error('github_url')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- Discord --}}
+                            <div class="col-md-6 mb-3">
+                                <label for="discord_url" class="form-label">
+                                    <i class="bi bi-discord text-primary me-2"></i>Discord URL
+                                </label>
+                                <input type="url" class="form-control @error('discord_url') is-invalid @enderror"
+                                    id="discord_url" name="discord_url" value="{{ old('discord_url', $settings->discord_url ?? '') }}"
+                                    placeholder="https://discord.gg/invitecode">
+                                @error('discord_url')
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>

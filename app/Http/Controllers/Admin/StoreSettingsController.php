@@ -498,13 +498,20 @@ class StoreSettingsController extends Controller
             'instagram_url' => 'nullable|url',
             'linkedin_url' => 'nullable|url',
             'youtube_url' => 'nullable|url',
+            'tiktok_url' => 'nullable|url',
+            'pinterest_url' => 'nullable|url',
+            'whatsapp_url' => 'nullable|url',
+            'telegram_url' => 'nullable|url',
+            'snapchat_url' => 'nullable|url',
+            'github_url' => 'nullable|url',
+            'discord_url' => 'nullable|url',
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()
-                           ->withErrors($validator)
-                           ->withInput()
-                           ->with('section', 'social');
+                        ->withErrors($validator)
+                        ->withInput()
+                        ->with('section', 'social');
         }
 
         $settings = StoreSetting::getSettings();
@@ -514,6 +521,13 @@ class StoreSettingsController extends Controller
             'instagram_url',
             'linkedin_url',
             'youtube_url',
+            'tiktok_url',
+            'pinterest_url',
+            'whatsapp_url',
+            'telegram_url',
+            'snapchat_url',
+            'github_url',
+            'discord_url',
         ]));
 
         $settings->updated_by = auth('admin')->id();

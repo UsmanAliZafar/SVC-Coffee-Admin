@@ -542,14 +542,33 @@ class StoreSettingsApiController extends Controller
      */
     private function getSocialMedia($settings): array
     {
-        return [
-            'facebook' => $settings->facebook_url,
-            'twitter' => $settings->twitter_url,
-            'instagram' => $settings->instagram_url,
-            'linkedin' => $settings->linkedin_url,
-            'youtube' => $settings->youtube_url,
-            'social_links' => $settings->social_links,
+        // Define all social media field mappings
+        $socialFields = [
+            'facebook' => 'facebook_url',
+            'twitter' => 'twitter_url',
+            'instagram' => 'instagram_url',
+            'linkedin' => 'linkedin_url',
+            'youtube' => 'youtube_url',
+            'tiktok' => 'tiktok_url',
+            'pinterest' => 'pinterest_url',
+            'whatsapp' => 'whatsapp_url',
+            'telegram' => 'telegram_url',
+            'snapchat' => 'snapchat_url',
+            'github' => 'github_url',
+            'discord' => 'discord_url',
         ];
+
+        $result = [];
+        foreach ($socialFields as $key => $field) {
+            $result[$key] = $settings->$field ?? null;
+        }
+
+        // Add social_links if it exists
+        if (isset($settings->social_links)) {
+            $result['social_links'] = $settings->social_links;
+        }
+
+        return $result;
     }
 
     /**
