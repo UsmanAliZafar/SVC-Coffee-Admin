@@ -523,7 +523,13 @@ class Product extends Model
      */
     public function getFinalPrice(): float
     {
-        return $this->sale_price ?? $this->price;
+        // If sale price exists and is greater than 0, use it
+        if (!is_null($this->sale_price) && $this->sale_price > 0) {
+            return (float) $this->sale_price;
+        }
+
+        // Otherwise return regular price
+        return (float) ($this->price ?? 0);
     }
 
     /**

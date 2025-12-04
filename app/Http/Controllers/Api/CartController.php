@@ -150,6 +150,11 @@ class CartController extends Controller
                 }
 
                 // ✅ Use variant data if available, otherwise use product data
+                $itemPrice = $variant ? $variant->getFinalPrice() : $product->getFinalPrice();
+                $taxRate = $product->tax_percentage ?? 0;
+                $taxAmount = $product->is_taxable ? round(($itemPrice * $taxRate) / 100, 2) : 0;
+                $priceAfterTax = $product->is_taxable ? round($itemPrice + $taxAmount, 2) : $itemPrice;
+
                 $cart[$itemKey] = [
                     'product_id' => $product->id,
                     'variant_id' => $variant ? $variant->id : null,
@@ -157,16 +162,18 @@ class CartController extends Controller
                     'slug' => $product->slug,
                     'sku' => $variant ? $variant->sku : $product->sku,
                     'image' => $variant ? $variant->getImageUrl() : $product->getMainImageUrl(),
-                    'price' => $variant ? $variant->getFinalPrice() : $product->getFinalPrice(),
+                    'price' => $itemPrice,
                     'regular_price' => $variant ? (float) $variant->price : (float) $product->price,
                     'product_currency' => $product->curency ?? 'USD',
                     'quantity' => $validated['quantity'],
                     'is_taxable' => $product->is_taxable,
-                    'tax_rate' => $product->tax_percentage ?? 0,
+                    'tax_rate' => $taxRate,
+                    'tax_amount' => $taxAmount,
+                    'price_after_tax' => $priceAfterTax,
                     'max_quantity' => $variant
                         ? ($product->track_inventory ? $variant->stock_quantity : 999)
                         : ($product->track_inventory ? $product->stock_quantity : 999),
-                    'variant_name' => $variant ? $variant->getFullName() : null, // ← NEW
+                    'variant_name' => $variant ? $variant->getFullName() : null,
                     'added_at' => now()->toIso8601String(),
                 ];
             }
@@ -735,11 +742,17 @@ class CartController extends Controller
             }
 
             // ✅ Update with variant data if available
+            $itemPrice = $variant ? $variant->getFinalPrice() : $product->getFinalPrice();
+            $taxRate = $product->tax_percentage ?? 0;
+
             $item['name'] = $variant ? "{$product->name} - {$variant->getFullName()}" : $product->name;
             $item['sku'] = $variant ? $variant->sku : $product->sku;
             $item['image'] = $variant ? $variant->getImageUrl() : $product->getMainImageUrl();
-            $item['price'] = $variant ? $variant->getFinalPrice() : $product->getFinalPrice();
+            $item['price'] = $itemPrice;
             $item['regular_price'] = $variant ? (float) $variant->price : (float) $product->price;
+            $item['tax_rate'] = $taxRate.'%';
+            $item['tax_amount'] = $product->is_taxable ? round(($itemPrice * $taxRate) / 100, 2) : 0;
+            $item['price_after_tax'] = $product->is_taxable ? round($itemPrice + $item['tax_amount'], 2) : $itemPrice;
             $item['max_quantity'] = $variant
                 ? ($product->track_inventory ? $variant->stock_quantity : 999)
                 : ($product->track_inventory ? $product->stock_quantity : 999);
