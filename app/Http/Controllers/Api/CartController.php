@@ -116,21 +116,35 @@ class CartController extends Controller
 
                 // ✅ Check stock (variant takes priority)
                 if ($variant) {
-                    // Check variant stock
-                    if ($product->track_inventory && $variant->stock_quantity < $validated['quantity']) {
+                    // Check variant available stock (considering reservations)
+                    $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                        ->where('variant_id', $variant->id)
+                        ->where('warehouse_id', \App\Models\Warehouse::where('is_default', true)->value('id'))
+                        ->first();
+
+                    $availableQty = $warehouseStock ? $warehouseStock->available_quantity : 0;
+
+                    if ($product->track_inventory && $availableQty < $validated['quantity']) {
                         return response()->json([
                             'success' => false,
                             'message' => 'Insufficient stock available for this variant',
-                            'available_quantity' => $variant->stock_quantity,
+                            'available_quantity' => $availableQty,
                         ], 400);
                     }
                 } else {
-                    // Check main product stock (existing code)
-                    if ($product->track_inventory && $product->stock_quantity < $validated['quantity']) {
+                    // Check main product available stock (considering reservations)
+                    $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                        ->whereNull('variant_id')
+                        ->where('warehouse_id', \App\Models\Warehouse::where('is_default', true)->value('id'))
+                        ->first();
+
+                    $availableQty = $warehouseStock ? $warehouseStock->available_quantity : 0;
+
+                    if ($product->track_inventory && $availableQty < $validated['quantity']) {
                         return response()->json([
                             'success' => false,
                             'message' => 'Insufficient stock available',
-                            'available_quantity' => $product->stock_quantity,
+                            'available_quantity' => $availableQty,
                         ], 400);
                     }
                 }
@@ -221,21 +235,35 @@ class CartController extends Controller
                 $variant = !empty($validated['variant_id']) ? ProductVariant::find($validated['variant_id']) : null;
 
                 if ($variant) {
-                    // Check variant stock
-                    if ($product->track_inventory && $variant->stock_quantity < $validated['quantity']) {
+                    // Check variant available stock
+                    $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                        ->where('variant_id', $variant->id)
+                        ->where('warehouse_id', \App\Models\Warehouse::where('is_default', true)->value('id'))
+                        ->first();
+
+                    $availableQty = $warehouseStock ? $warehouseStock->available_quantity : 0;
+
+                    if ($product->track_inventory && $availableQty < $validated['quantity']) {
                         return response()->json([
                             'success' => false,
                             'message' => 'Insufficient stock available for this variant',
-                            'available_quantity' => $variant->stock_quantity,
+                            'available_quantity' => $availableQty,
                         ], 400);
                     }
                 } else {
-                    // Check main product stock
-                    if ($product->track_inventory && $product->stock_quantity < $validated['quantity']) {
+                    // Check main product available stock
+                    $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                        ->whereNull('variant_id')
+                        ->where('warehouse_id', \App\Models\Warehouse::where('is_default', true)->value('id'))
+                        ->first();
+
+                    $availableQty = $warehouseStock ? $warehouseStock->available_quantity : 0;
+
+                    if ($product->track_inventory && $availableQty < $validated['quantity']) {
                         return response()->json([
                             'success' => false,
                             'message' => 'Insufficient stock available',
-                            'available_quantity' => $product->stock_quantity,
+                            'available_quantity' => $availableQty,
                         ], 400);
                     }
                 }
