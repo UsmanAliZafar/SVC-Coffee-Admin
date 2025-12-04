@@ -1074,11 +1074,38 @@ class OrdersController extends Controller
             return;
         }
 
+        // ✅ Define valid transitions
+        $validTransitions = [
+            'ORDER_PENDING' => ['ORDER_CONFIRMED', 'ORDER_CANCELLED'],
+            'ORDER_CONFIRMED' => ['ORDER_PROCESSING', 'ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_CANCELLED'],
+            'ORDER_PROCESSING' => ['ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_CANCELLED'],
+            'ORDER_PACKED' => ['ORDER_SHIPPED', 'ORDER_CANCELLED'],
+            'ORDER_SHIPPED' => ['ORDER_DELIVERED', 'ORDER_RETURNED'],
+            'ORDER_DELIVERED' => ['ORDER_RETURNED'],
+            'ORDER_CANCELLED' => ['ORDER_PENDING', 'ORDER_CONFIRMED', 'ORDER_PROCESSING'], // Allow reactivation
+        ];
+
+        // ✅ ONLY validate if NOT coming from auto-confirmation logic
+        // Check if this is a direct invalid jump (without going through quickUpdateStatus)
+        if (isset($validTransitions[$oldStatus]) &&
+            !in_array($newStatus, $validTransitions[$oldStatus])) {
+
+            \Log::warning('⚠️ Invalid status transition attempted', [
+                'from' => $oldStatus,
+                'to' => $newStatus,
+            ]);
+
+            // ✅ DON'T throw exception - just log and return
+            // The calling method (quickUpdateStatus) already handles the auto-confirmation
+            return;
+        }
+
         \Log::info('🔄 Status transition', [
             'order' => $order->order_number,
             'from' => $oldStatus,
             'to' => $newStatus,
         ]);
+
 
         foreach ($order->items as $item) {
             if (!$item->product || !$item->product->track_inventory) {
@@ -1449,7 +1476,29 @@ class OrdersController extends Controller
         try {
             $oldStatus = $order->status_key_code;
             $newStatus = $validated['status_key_code'];
+            // Auto-confirm if moving from PENDING to further statuses
+            if ($oldStatus === 'ORDER_PENDING' &&
+                in_array($newStatus, ['ORDER_PROCESSING', 'ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_DELIVERED'])) {
 
+                \Log::warning('⚠️ Forcing ORDER_CONFIRMED before advancing to ' . $newStatus);
+
+                // First confirm the order
+                $this->handleStatusChange($order, $oldStatus, 'ORDER_CONFIRMED');
+                $order->update([
+                    'status_key_code' => 'ORDER_CONFIRMED',
+                    'confirmed_at' => now(),
+                ]);
+
+                $this->notificationService->notify('order_confirmed', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                ]);
+                $this->notificationService->notifyCustomer('order_confirmed', $order);
+
+                // Update oldStatus for next transition
+                $oldStatus = 'ORDER_CONFIRMED';
+                $order->refresh(); // Refresh to get updated status
+            }
             // Check if already in target status
             if ($oldStatus === $newStatus) {
                 DB::rollBack();

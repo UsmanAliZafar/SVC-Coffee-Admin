@@ -1,7 +1,36 @@
 @extends('admin.layouts.app')
 
 @section('title', 'Orders Management')
+@section('styles')
+<style>
+.btn-primary,
+.bg-primary,
+.badge.bg-primary {
+    background-color: #5B914C !important;
+    border-color: #5B914C !important;
+}
 
+.text-primary {
+    color: #5B914C !important;
+}
+
+.btn-primary:hover {
+    background-color: #4a7a3d !important;
+    border-color: #4a7a3d !important;
+}
+
+.btn-outline-primary {
+    color: #5B914C !important;
+    border-color: #5B914C !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: #5B914C !important;
+    border-color: #5B914C !important;
+    color: white !important;
+}
+</style>
+@endsection
 @section('content')
 <div class="container-fluid">
 
@@ -710,20 +739,48 @@ $(document).ready(function() {
     });
 
     $('#confirmQuickUpdate').on('click', function() {
-        const orderId = $('#quickUpdateOrderId').val();
-        const statusCode = $('#quickStatusSelect').val();
-        const paymentCode = $('#quickPaymentSelect').val();
+    const orderId = $('#quickUpdateOrderId').val();
+    const statusCode = $('#quickStatusSelect').val();
+    const paymentCode = $('#quickPaymentSelect').val();
 
-        if (!statusCode && !paymentCode) {
+    if (!statusCode && !paymentCode) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'No Changes',
+            text: 'Please select at least one status to update'
+        });
+        return;
+    }
+
+    // ✅ NEW: Warn if skipping confirmation
+    const currentStatus = $('.quick-update-btn[data-id="' + orderId + '"]').data('status');
+        if (currentStatus === 'ORDER_PENDING' &&
+            statusCode &&
+            ['ORDER_PROCESSING', 'ORDER_PACKED', 'ORDER_SHIPPED', 'ORDER_DELIVERED'].includes(statusCode)) {
+
             Swal.fire({
-                icon: 'warning',
-                title: 'No Changes',
-                text: 'Please select at least one status to update'
+                icon: 'info',
+                title: 'Confirmation Required',
+                html: 'This order will be automatically <strong>CONFIRMED</strong> first, then updated to <strong>' +
+                    statusCode.replace('ORDER_', '') + '</strong>.<br><br>' +
+                    'Inventory will be deducted from reserved stock.',
+                showCancelButton: true,
+                confirmButtonText: 'Continue',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    performQuickUpdate(orderId, statusCode, paymentCode);
+                }
             });
             return;
         }
 
-        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
+        performQuickUpdate(orderId, statusCode, paymentCode);
+    });
+
+    function performQuickUpdate(orderId, statusCode, paymentCode) {
+        const $btn = $('#confirmQuickUpdate');
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
 
         const data = {
             _token: '{{ csrf_token() }}'
@@ -738,7 +795,7 @@ $(document).ready(function() {
             data: data,
             success: function(response) {
                 $('#quickStatusModal').modal('hide');
-                $('#confirmQuickUpdate').prop('disabled', false).html('Update');
+                $btn.prop('disabled', false).html('Update');
 
                 if (response.success) {
                     Swal.fire({
@@ -749,7 +806,6 @@ $(document).ready(function() {
                         showConfirmButton: false
                     });
 
-                    // Reload table without resetting pagination
                     ordersTable.ajax.reload(null, false);
                 } else {
                     Swal.fire({
@@ -761,7 +817,7 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 $('#quickStatusModal').modal('hide');
-                $('#confirmQuickUpdate').prop('disabled', false).html('Update');
+                $btn.prop('disabled', false).html('Update');
 
                 Swal.fire({
                     icon: 'error',
@@ -770,7 +826,7 @@ $(document).ready(function() {
                 });
             }
         });
-    });
+    }
 
     // ====================================
     // DELETE ORDER (SINGLE)
