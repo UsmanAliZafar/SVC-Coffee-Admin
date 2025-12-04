@@ -14,6 +14,7 @@ class EnableCors
         $allowedOrigins = [
             'https://staging-front.svcarabia.com',
             'http://localhost:3000',
+            'http://localhost:8000',
         ];
 
         // Get the origin from the request

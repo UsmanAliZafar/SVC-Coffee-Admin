@@ -224,7 +224,7 @@ class Page extends Model
      */
     public function getUrlAttribute(): string
     {
-        return route('page.show', $this->slug);
+        return $this->slug;
     }
 
     /**
