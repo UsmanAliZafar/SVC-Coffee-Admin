@@ -667,22 +667,6 @@
             </div>
             @endif
 
-            {{-- Tags --}}
-            @if($customer->tags && count($customer->tags) > 0)
-            <div class="card section-card shadow-sm mb-4">
-                <div class="section-header">
-                    <h5 class="mb-0 fw-bold">
-                        <i class="bi bi-tags-fill text-primary"></i> Tags
-                    </h5>
-                </div>
-                <div class="card-body">
-                    @foreach($customer->tags as $tag)
-                        <span class="tag-badge bg-primary text-white">{{ $tag }}</span>
-                    @endforeach
-                </div>
-            </div>
-            @endif
-
             {{-- Referral Info --}}
             @if($customer->referrer || $customer->referrals->count() > 0)
             <div class="card section-card shadow-sm mb-4">

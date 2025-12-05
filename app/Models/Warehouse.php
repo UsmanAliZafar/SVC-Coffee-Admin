@@ -99,7 +99,7 @@ class Warehouse extends Model
 
     public function movements(): HasMany
     {
-        return $this->hasMany(InventoryMovement::class);
+        return $this->hasMany(InventoryMovement::class)->orderBy('created_at', 'desc');
     }
 
     public function alerts(): HasMany

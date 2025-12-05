@@ -64,7 +64,7 @@
                 <i class="bi bi-plus-circle"></i> Add Category
             </a>
             @endif
-            <a href="{{ route('admin.categories.tree') }}" class="btn btn-outline-secondary">
+            <a href="{{ route('admin.categories.tree') }}" class="btn btn-outline-secondary d-none">
                 <i class="bi bi-diagram-3"></i> Tree View
             </a>
         </div>

@@ -640,7 +640,11 @@ let stockTable;
 $(document).ready(function() {
     // Initialize stock DataTable - but only when the tab is shown for the first time
     let stockTableInitialized = false;
+    movementsTable = $('#movementsTable').DataTable({
+        order: [[0, 'desc']],
+        pageLength: 25,
 
+    });
     // Load stock table when tab is shown
     $('button[data-bs-target="#stock"]').on('shown.bs.tab', function() {
         if (!stockTableInitialized) {

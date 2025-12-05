@@ -30,35 +30,82 @@ class WarehouseController extends Controller
      * Get warehouses data for DataTable (AJAX)
      */
     public function getData(Request $request)
-{
-    if (!auth('admin')->user()->hasPermission('inventory.read')) {
-        return response()->json(['error' => 'Unauthorized'], 403);
-    }
+    {
+        if (!auth('admin')->user()->hasPermission('inventory.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
-    // Handle statistics request
-    if ($request->has('get_stats')) {
-        $warehouses = Warehouse::all();
+        // Handle statistics request
+        if ($request->has('get_stats')) {
+            $warehouses = Warehouse::all();
 
-        $stats = [
-            'total' => $warehouses->count(),
-            'active' => $warehouses->where('is_active', true)->count(),
-            'total_stock' => $warehouses->sum(function($w) {
-                return $w->getTotalStock();
-            }),
-            'total_value' => $warehouses->sum(function($w) {
-                return $w->getTotalStockValue();
-            })
-        ];
+            $stats = [
+                'total' => $warehouses->count(),
+                'active' => $warehouses->where('is_active', true)->count(),
+                'total_stock' => $warehouses->sum(function($w) {
+                    return $w->getTotalStock();
+                }),
+                'total_value' => $warehouses->sum(function($w) {
+                    return $w->getTotalStockValue();
+                })
+            ];
 
-        return response()->json(['stats' => $stats]);
-    }
+            return response()->json(['stats' => $stats]);
+        }
 
-    // Handle card view request
-    if ($request->input('view') === 'card') {
+        // Handle card view request
+        if ($request->input('view') === 'card') {
+            $query = Warehouse::withCount(['stock', 'movements', 'alerts'])
+                            ->with(['stock' => function($q) {
+                                $q->where('quantity', '>', 0);
+                            }]);
+
+            // Apply filters
+            if ($request->filled('status')) {
+                $query->where('is_active', $request->status === 'active');
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('city', 'like', "%{$search}%");
+                });
+            }
+
+            $warehouses = $query->orderBy('priority', 'desc')
+                            ->orderBy('is_default', 'desc')
+                            ->get();
+
+            $data = $warehouses->map(function($warehouse) {
+                return [
+                    'id' => $warehouse->id,
+                    'name' => $warehouse->name,
+                    'code' => $warehouse->code,
+                    'is_active' => $warehouse->is_active,
+                    'is_default' => $warehouse->is_default,
+                    'priority' => $warehouse->priority,
+                    'full_address' => $warehouse->getFullAddress(),
+                    'stock_count' => $warehouse->stock_count ?? 0,
+                    'total_stock' => $warehouse->getTotalStock(),
+                    'total_value' => $warehouse->getTotalStockValue(),
+                    'low_stock_count' => $warehouse->getLowStockCount(),
+                    'out_of_stock_count' => $warehouse->getOutOfStockCount(),
+                    'has_stock' => $warehouse->hasStock(),
+                    'can_update' => auth('admin')->user()->hasPermission('inventory.update'),
+                    'can_delete' => auth('admin')->user()->hasPermission('inventory.delete'),
+                ];
+            });
+
+            return response()->json(['data' => $data]);
+        }
+
+        // Handle DataTable request (table view)
         $query = Warehouse::withCount(['stock', 'movements', 'alerts'])
-                          ->with(['stock' => function($q) {
-                              $q->where('quantity', '>', 0);
-                          }]);
+                        ->with(['stock' => function($q) {
+                            $q->where('quantity', '>', 0);
+                        }]);
 
         // Apply filters
         if ($request->filled('status')) {
@@ -69,160 +116,113 @@ class WarehouseController extends Controller
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('city', 'like', "%{$search}%");
+                ->orWhere('code', 'like', "%{$search}%")
+                ->orWhere('city', 'like', "%{$search}%");
             });
         }
 
-        $warehouses = $query->orderBy('priority', 'desc')
-                           ->orderBy('is_default', 'desc')
-                           ->get();
+        return DataTables::of($query)
+            ->addColumn('info', function($warehouse) {
+                return '<div>
+                    <strong>' . e($warehouse->name) . '</strong><br>
+                    <small class="text-muted">Code: ' . e($warehouse->code) . '</small>
+                </div>';
+            })
+            ->addColumn('location', function($warehouse) {
+                return $warehouse->getFullAddress() ?: '<span class="text-muted">—</span>';
+            })
+            ->addColumn('contact', function($warehouse) {
+                $html = '';
+                if ($warehouse->email) {
+                    $html .= '<div><i class="bi bi-envelope"></i> ' . e($warehouse->email) . '</div>';
+                }
+                if ($warehouse->phone) {
+                    $html .= '<div><i class="bi bi-telephone"></i> ' . e($warehouse->phone) . '</div>';
+                }
+                return $html ?: '<span class="text-muted">—</span>';
+            })
+            ->addColumn('stock_info', function($warehouse) {
+                $totalStock = $warehouse->getTotalStock();
+                $totalValue = $warehouse->getTotalStockValue();
+                $stockCount = $warehouse->stock_count ?? 0;
 
-        $data = $warehouses->map(function($warehouse) {
-            return [
-                'id' => $warehouse->id,
-                'name' => $warehouse->name,
-                'code' => $warehouse->code,
-                'is_active' => $warehouse->is_active,
-                'is_default' => $warehouse->is_default,
-                'priority' => $warehouse->priority,
-                'full_address' => $warehouse->getFullAddress(),
-                'stock_count' => $warehouse->stock_count ?? 0,
-                'total_stock' => $warehouse->getTotalStock(),
-                'total_value' => $warehouse->getTotalStockValue(),
-                'low_stock_count' => $warehouse->getLowStockCount(),
-                'out_of_stock_count' => $warehouse->getOutOfStockCount(),
-                'has_stock' => $warehouse->hasStock(),
-                'can_update' => auth('admin')->user()->hasPermission('inventory.update'),
-                'can_delete' => auth('admin')->user()->hasPermission('inventory.delete'),
-            ];
-        });
+                return '<div>
+                    <strong>' . number_format($totalStock) . '</strong> units<br>
+                    <small class="text-muted">' . $stockCount . ' products</small><br>
+                    <small class="text-success">' . store_currency_symbol() . number_format($totalValue, 2) . '</small>
+                </div>';
+            })
+            ->addColumn('alerts', function($warehouse) {
+                $lowStock = $warehouse->getLowStockCount();
+                $outOfStock = $warehouse->getOutOfStockCount();
 
-        return response()->json(['data' => $data]);
-    }
+                $html = '';
+                if ($outOfStock > 0) {
+                    $html .= '<span class="badge bg-danger">' . $outOfStock . ' Out</span> ';
+                }
+                if ($lowStock > 0) {
+                    $html .= '<span class="badge bg-warning text-dark">' . $lowStock . ' Low</span>';
+                }
 
-    // Handle DataTable request (table view)
-    $query = Warehouse::withCount(['stock', 'movements', 'alerts'])
-                      ->with(['stock' => function($q) {
-                          $q->where('quantity', '>', 0);
-                      }]);
+                return $html ?: '<span class="badge bg-success">All Good</span>';
+            })
+            ->addColumn('status', function($warehouse) {
+                $badge = $warehouse->is_active ?
+                    '<span class="badge bg-success">Active</span>' :
+                    '<span class="badge bg-secondary">Inactive</span>';
 
-    // Apply filters
-    if ($request->filled('status')) {
-        $query->where('is_active', $request->status === 'active');
-    }
+                if ($warehouse->is_default) {
+                    $badge .= ' <span class="badge bg-primary ms-1">Default</span>';
+                }
 
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('code', 'like', "%{$search}%")
-              ->orWhere('city', 'like', "%{$search}%");
-        });
-    }
+                return $badge;
+            })
+            ->addColumn('priority', function($warehouse) {
+                return '<span class="badge bg-info">' . $warehouse->priority . '</span>';
+            })
+            ->addColumn('actions', function($warehouse) {
+                $actions = '<div class="btn-group" role="group">';
 
-    return DataTables::of($query)
-        ->addColumn('info', function($warehouse) {
-            return '<div>
-                <strong>' . e($warehouse->name) . '</strong><br>
-                <small class="text-muted">Code: ' . e($warehouse->code) . '</small>
-            </div>';
-        })
-        ->addColumn('location', function($warehouse) {
-            return $warehouse->getFullAddress() ?: '<span class="text-muted">—</span>';
-        })
-        ->addColumn('contact', function($warehouse) {
-            $html = '';
-            if ($warehouse->email) {
-                $html .= '<div><i class="bi bi-envelope"></i> ' . e($warehouse->email) . '</div>';
-            }
-            if ($warehouse->phone) {
-                $html .= '<div><i class="bi bi-telephone"></i> ' . e($warehouse->phone) . '</div>';
-            }
-            return $html ?: '<span class="text-muted">—</span>';
-        })
-        ->addColumn('stock_info', function($warehouse) {
-            $totalStock = $warehouse->getTotalStock();
-            $totalValue = $warehouse->getTotalStockValue();
-            $stockCount = $warehouse->stock_count ?? 0;
+                if (auth('admin')->user()->hasPermission('inventory.read')) {
+                    $actions .= '<a href="' . route('admin.warehouses.show', $warehouse->id) . '"
+                        class="btn btn-sm btn-info" title="View Details">
+                        <i class="bi bi-eye"></i>
+                    </a>';
+                }
 
-            return '<div>
-                <strong>' . number_format($totalStock) . '</strong> units<br>
-                <small class="text-muted">' . $stockCount . ' products</small><br>
-                <small class="text-success">' . store_currency_symbol() . number_format($totalValue, 2) . '</small>
-            </div>';
-        })
-        ->addColumn('alerts', function($warehouse) {
-            $lowStock = $warehouse->getLowStockCount();
-            $outOfStock = $warehouse->getOutOfStockCount();
+                if (auth('admin')->user()->hasPermission('inventory.update')) {
+                    $actions .= '<a href="' . route('admin.warehouses.edit', $warehouse->id) . '"
+                        class="btn btn-sm btn-primary" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </a>';
 
-            $html = '';
-            if ($outOfStock > 0) {
-                $html .= '<span class="badge bg-danger">' . $outOfStock . ' Out</span> ';
-            }
-            if ($lowStock > 0) {
-                $html .= '<span class="badge bg-warning text-dark">' . $lowStock . ' Low</span>';
-            }
+                    if (!$warehouse->is_default) {
+                        $actions .= '<button type="button" class="btn btn-sm btn-success"
+                            onclick="setDefaultWarehouse(\'' . $warehouse->id . '\')" title="Set as Default">
+                            <i class="bi bi-star"></i>
+                        </button>';
+                    }
 
-            return $html ?: '<span class="badge bg-success">All Good</span>';
-        })
-        ->addColumn('status', function($warehouse) {
-            $badge = $warehouse->is_active ?
-                '<span class="badge bg-success">Active</span>' :
-                '<span class="badge bg-secondary">Inactive</span>';
-
-            if ($warehouse->is_default) {
-                $badge .= ' <span class="badge bg-primary ms-1">Default</span>';
-            }
-
-            return $badge;
-        })
-        ->addColumn('priority', function($warehouse) {
-            return '<span class="badge bg-info">' . $warehouse->priority . '</span>';
-        })
-        ->addColumn('actions', function($warehouse) {
-            $actions = '<div class="btn-group" role="group">';
-
-            if (auth('admin')->user()->hasPermission('inventory.read')) {
-                $actions .= '<a href="' . route('admin.warehouses.show', $warehouse->id) . '"
-                    class="btn btn-sm btn-info" title="View Details">
-                    <i class="bi bi-eye"></i>
-                </a>';
-            }
-
-            if (auth('admin')->user()->hasPermission('inventory.update')) {
-                $actions .= '<a href="' . route('admin.warehouses.edit', $warehouse->id) . '"
-                    class="btn btn-sm btn-primary" title="Edit">
-                    <i class="bi bi-pencil"></i>
-                </a>';
-
-                if (!$warehouse->is_default) {
-                    $actions .= '<button type="button" class="btn btn-sm btn-success"
-                        onclick="setDefaultWarehouse(\'' . $warehouse->id . '\')" title="Set as Default">
-                        <i class="bi bi-star"></i>
+                    $statusIcon = $warehouse->is_active ? 'toggle-on' : 'toggle-off';
+                    $actions .= '<button type="button" class="btn btn-sm btn-warning"
+                        onclick="toggleWarehouseStatus(\'' . $warehouse->id . '\')" title="Toggle Status">
+                        <i class="bi bi-' . $statusIcon . '"></i>
                     </button>';
                 }
 
-                $statusIcon = $warehouse->is_active ? 'toggle-on' : 'toggle-off';
-                $actions .= '<button type="button" class="btn btn-sm btn-warning"
-                    onclick="toggleWarehouseStatus(\'' . $warehouse->id . '\')" title="Toggle Status">
-                    <i class="bi bi-' . $statusIcon . '"></i>
-                </button>';
-            }
+                if (auth('admin')->user()->hasPermission('inventory.delete') && !$warehouse->is_default && !$warehouse->hasStock()) {
+                    $actions .= '<button type="button" class="btn btn-sm btn-danger"
+                        onclick="deleteWarehouse(\'' . $warehouse->id . '\')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>';
+                }
 
-            if (auth('admin')->user()->hasPermission('inventory.delete') && !$warehouse->is_default && !$warehouse->hasStock()) {
-                $actions .= '<button type="button" class="btn btn-sm btn-danger"
-                    onclick="deleteWarehouse(\'' . $warehouse->id . '\')" title="Delete">
-                    <i class="bi bi-trash"></i>
-                </button>';
-            }
-
-            $actions .= '</div>';
-            return $actions;
-        })
-        ->rawColumns(['info', 'location', 'contact', 'stock_info', 'alerts', 'status', 'priority', 'actions'])
-        ->make(true);
-}
+                $actions .= '</div>';
+                return $actions;
+            })
+            ->rawColumns(['info', 'location', 'contact', 'stock_info', 'alerts', 'status', 'priority', 'actions'])
+            ->make(true);
+    }
 
     /**
      * Show create warehouse form
@@ -428,18 +428,21 @@ class WarehouseController extends Controller
                 }
 
                 if (auth('admin')->user()->hasPermission('inventory.update')) {
-                    $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-stock"
-                        data-id="' . $stock->id . '"
-                        data-product="' . htmlspecialchars($stock->product->name) . '"
-                        data-warehouse="' . htmlspecialchars($warehouse->name) . '"
-                        data-quantity="' . $stock->quantity . '"
-                        title="Adjust Stock">
+                    // $actions .= '<button type="button" class="btn btn-sm btn-primary adjust-stock"
+                    //     data-id="' . $stock->id . '"
+                    //     data-product="' . htmlspecialchars($stock->product->name) . '"
+                    //     data-warehouse="' . htmlspecialchars($warehouse->name) . '"
+                    //     data-quantity="' . $stock->quantity . '"
+                    //     title="Adjust Stock">
+                    //     <i class="bi bi-pencil"></i>
+                    // </button>';
+                    $actions .= '<a href="' . route('admin.products.edit', $stock->product_id) . '" class="btn btn-sm btn-primary" title="Edit Product" target="_blank">
                         <i class="bi bi-pencil"></i>
-                    </button>';
+                    </a>';
                 }
 
                 $actions .= '<a href="' . route('admin.products.show', $stock->product_id) . '"
-                    class="btn btn-sm btn-info" title="View Product">
+                    class="btn btn-sm btn-info" title="View Product" target="_blank">
                     <i class="bi bi-eye"></i>
                 </a>';
 
