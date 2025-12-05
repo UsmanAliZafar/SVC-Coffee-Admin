@@ -37,7 +37,7 @@
                                 <div>
                                     <h4 class="mb-1">{{ $user->name }}</h4>
                                     <p class="text-muted mb-0">{{ $user->email }}</p>
-                                    <p class="text-muted mb-0">@{{ $user->username }}</p>
+                                    <p class="text-muted mb-0" title="Username">{{ $user->username }}</p>
                                 </div>
                             </div>
 

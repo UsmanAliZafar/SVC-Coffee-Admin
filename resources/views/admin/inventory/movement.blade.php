@@ -157,7 +157,7 @@
                         <select id="filterType" class="form-select">
                             <option value="">All Types</option>
                             <option value="adjustment">Adjustment</option>
-                            <option value="purchase">Purchase</option>
+                            {{-- <option value="purchase">Purchase</option>
                             <option value="sale">Sale</option>
                             <option value="return">Return</option>
                             <option value="transfer">Transfer</option>
@@ -165,7 +165,7 @@
                             <option value="lost">Lost</option>
                             <option value="found">Found</option>
                             <option value="manufacturing">Manufacturing</option>
-                            <option value="sync">Sync</option>
+                            <option value="sync">Sync</option> --}}
                         </select>
                     </div>
 

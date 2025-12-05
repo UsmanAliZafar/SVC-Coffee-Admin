@@ -114,6 +114,7 @@ class InventoryController extends Controller
             }
         }
 
+
         if ($warehouseId) {
             return $this->getWarehouseStockDataTable($query);
         } else {
@@ -755,11 +756,29 @@ class InventoryController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+            $query->where('created_at', '>=', $request->date_from . ' 00:00:00');
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
+            $query->where('created_at', '<=', $request->date_to . ' 23:59:59');
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->whereHas('product', function($productQuery) use ($search) {
+                    $productQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('sku', 'like', "%{$search}%");
+                })->orWhereHas('variant', function($variantQuery) use ($search) {
+                    $variantQuery->where('sku', 'like', "%{$search}%");
+                })->orWhereHas('creator', function($creatorQuery) use ($search) {
+                    $creatorQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                })->orWhere('type', 'like', "%{$search}%")
+                ->orWhere('reason', 'like', "%{$search}%")
+                ->orWhere('notes', 'like', "%{$search}%")
+                ->orWhere('id', 'like', "%{$search}%");
+            });
         }
 
         return DataTables::of($query)
@@ -1804,34 +1823,41 @@ class InventoryController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $query = InventoryMovement::query();
+        // Base query builder
+        $baseQuery = InventoryMovement::query();
 
-        // Apply filters
+        // Apply common filters to base query
         if ($request->filled('warehouse_id')) {
-            $query->where('warehouse_id', $request->warehouse_id);
+            $baseQuery->where('warehouse_id', $request->warehouse_id);
         }
 
         if ($request->filled('type')) {
-            $query->where('type', $request->type);
+            $baseQuery->where('type', $request->type);
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+            $baseQuery->whereDate('created_at', '>=', $request->date_from);
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
+            $baseQuery->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $total = $query->count();
-        $added = $query->where('quantity', '>', 0)->sum('quantity');
-        $removed = $query->where('quantity', '<', 0)->sum('quantity');
+        // Clone the query for each calculation
+        $totalQuery = clone $baseQuery;
+        $addedQuery = clone $baseQuery;
+        $removedQuery = clone $baseQuery;
+
+        // Calculate statistics
+        $total = $totalQuery->count();
+        $added = $addedQuery->where('quantity', '>', 0)->sum('quantity');
+        $removed = abs($removedQuery->where('quantity', '<', 0)->sum('quantity')); // Use abs() for removed count
 
         return response()->json([
             'total' => $total,
             'added' => $added,
             'removed' => $removed,
-            'net' => $added + $removed
+            'net' => $added - $removed // Changed from + to - since removed is positive now
         ]);
     }
 

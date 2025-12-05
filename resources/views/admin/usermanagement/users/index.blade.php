@@ -86,6 +86,69 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
+             <!-- Quick Stats Cards -->
+            <div class="row mt-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h3 class="mb-0" id="totalUsers">0</h3>
+                                    <p class="mb-0">Total Users</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-person-gear" style="font-size: 2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h3 class="mb-0" id="activeUsers">0</h3>
+                                    <p class="mb-0">Active Users</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-person-check" style="font-size: 2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h3 class="mb-0" id="inactiveUsers">0</h3>
+                                    <p class="mb-0">Inactive Users</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-person-x" style="font-size: 2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h3 class="mb-0" id="totalRoles">0</h3>
+                                    <p class="mb-0">Available Roles</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-shield-check" style="font-size: 2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center" style="background-color: #5B914C; color: white;">
                     <h5 class="card-title mb-0">
@@ -147,70 +210,6 @@
                                 <!-- DataTable will populate this -->
                             </tbody>
                         </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Stats Cards -->
-            <div class="row mt-4">
-                <div class="col-md-3">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h3 class="mb-0" id="totalUsers">0</h3>
-                                    <p class="mb-0">Total Users</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="bi bi-person-gear" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-success text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h3 class="mb-0" id="activeUsers">0</h3>
-                                    <p class="mb-0">Active Users</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="bi bi-person-check" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-secondary text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h3 class="mb-0" id="inactiveUsers">0</h3>
-                                    <p class="mb-0">Inactive Users</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="bi bi-person-x" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h3 class="mb-0" id="totalRoles">0</h3>
-                                    <p class="mb-0">Available Roles</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="bi bi-shield-check" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
