@@ -413,6 +413,40 @@
         cursor: not-allowed;
         color: #6c757d;
     }
+
+    /* Select2 with Icon Button Styling */
+    .input-group .select2-container {
+        flex: 1;
+    }
+
+    .add-btn-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        background-color: #5B914C;
+        color: white;
+        border: 1px solid #5B914C;
+        border-radius: 0 0.375rem 0.375rem 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .add-btn-icon:hover {
+        background-color: #4a7a3d;
+        border-color: #4a7a3d;
+    }
+
+    .add-btn-icon i {
+        font-size: 1.2rem;
+    }
+
+    /* Adjust Select2 to work with input-group */
+    .input-group .select2-container .select2-selection--single {
+        border-radius: 0.375rem 0 0 0.375rem;
+        border-right: none;
+    }
 </style>
 @endpush
 
@@ -1330,7 +1364,21 @@
 const PRODUCT_ID = '{{ $product->id }}';
 
 $(document).ready(function() {
+    // ✅ Initialize Category Select2
+    $('#categorySelect').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search category...',
+        allowClear: true,
+        width: '100%'
+    });
 
+    // ✅ Initialize Vendor Select2
+    $('#vendorSelect').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search vendor...',
+        allowClear: true,
+        width: '100%'
+    });
     // Initialize CKEditor
     let descriptionEditor;
     ClassicEditor
