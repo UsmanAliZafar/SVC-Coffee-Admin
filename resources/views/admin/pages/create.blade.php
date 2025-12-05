@@ -465,12 +465,15 @@
                         {{-- Menu Label --}}
                         <div class="mb-3">
                             <label for="menu_label" class="form-label">Custom Menu Label</label>
-                            <input type="text"
-                                   class="form-control @error('menu_label') is-invalid @enderror"
-                                   id="menu_label"
-                                   name="menu_label"
-                                   value="{{ old('menu_label') }}"
-                                   placeholder="Leave empty to use page title">
+                            <select class="form-control @error('menu_label') is-invalid @enderror"
+                                    id="menu_label"
+                                    name="menu_label">
+                                <option value="">Leave empty to use page title</option>
+                                <option value="Services" {{ old('menu_label') == 'Services' ? 'selected' : '' }}>Services</option>
+                                <option value="Support" {{ old('menu_label') == 'Support' ? 'selected' : '' }}>Support</option>
+                                <option value="Company" {{ old('menu_label') == 'Company' ? 'selected' : '' }}>Company</option>
+                                <option value="Legal" {{ old('menu_label') == 'Legal' ? 'selected' : '' }}>Legal</option>
+                            </select>
                             @error('menu_label')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
