@@ -237,6 +237,7 @@
                             <th width="100">Visibility</th>
                             <th width="120">Navigation</th>
                             <th width="120">Template</th>
+                            <th width="150">Menu Label</th>
                             <th width="150">Created At</th>
                             <th width="180">Actions</th>
                         </tr>
@@ -315,6 +316,7 @@ $(document).ready(function() {
             { data: 'visibility_badge', orderable: false },
             { data: 'navigation_badges', orderable: false },
             { data: 'template_badge', orderable: false },
+            { data: 'menu_label', orderable: false },
             { data: 'created_at_formatted' },
             { data: 'actions', orderable: false, searchable: false }
         ],

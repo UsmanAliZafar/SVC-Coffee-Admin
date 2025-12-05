@@ -236,6 +236,9 @@ class PageController extends Controller
 
                 return '<span class="badge bg-light text-dark">' . $templateName . '</span>';
             })
+            ->addColumn('menu_label', function($page) {
+                return $page->menu_label ?? '<span class="text-muted small">—</span>';
+            })
             ->addColumn('created_at_formatted', function($page) {
                 $html = '<div class="created-at-container">';
                 $html .= '<div>' . $page->created_at->format('M d, Y') . '</div>';
