@@ -97,10 +97,9 @@
                                 Page Content <span class="text-danger">*</span>
                             </label>
                             <textarea class="form-control @error('content') is-invalid @enderror"
-                                      id="content"
-                                      name="content"
-                                      rows="15"
-                                      required>{{ old('content') }}</textarea>
+                                    id="content"
+                                    name="content"
+                                    rows="15">{{ old('content') }}</textarea>
                             @error('content')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -630,10 +629,11 @@
         tinymce.triggerSave();
 
         // Check if content is empty
-        const content = document.getElementById('content').value.trim();
-        if (!content) {
+        const content = tinymce.get('content').getContent().trim();
+        if (!content || content === '') {
             e.preventDefault();
             alert('Please add some content to the page.');
+            tinymce.get('content').focus();
             return false;
         }
     });
