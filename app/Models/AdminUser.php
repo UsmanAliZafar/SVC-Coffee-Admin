@@ -32,10 +32,17 @@ class AdminUser extends Authenticatable
         'is_active' => 'boolean',
     ];
 
-    // Automatically hash password
+    /**
+     * Automatically hash password only if it's not already hashed
+     */
     public function setPasswordAttribute($value)
     {
-        $this->attributes['password'] = Hash::make($value);
+        // Check if password is already hashed (bcrypt hashes start with $2y$)
+        if (!empty($value) && !preg_match('/^\$2y\$/', $value)) {
+            $this->attributes['password'] = Hash::make($value);
+        } else {
+            $this->attributes['password'] = $value;
+        }
     }
 
     // Relationships

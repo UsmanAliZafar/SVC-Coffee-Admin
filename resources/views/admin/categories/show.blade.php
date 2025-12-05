@@ -633,12 +633,12 @@
                 <div class="label">Total Products</div>
             </div>
 
-            <div class="stat-box" style="background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);">
+            <div class="stat-box d-none" style="background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);">
                 <div class="value">{{ $category->views_count }}</div>
                 <div class="label">Total Views</div>
             </div>
 
-            <div class="stat-box" style="background: linear-gradient(135deg, #fd7e14 0%, #ca6510 100%);">
+            <div class="stat-box d-none" style="background: linear-gradient(135deg, #fd7e14 0%, #ca6510 100%);">
                 <div class="value">{{ $category->clicks_count }}</div>
                 <div class="label">Total Clicks</div>
             </div>

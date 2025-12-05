@@ -157,6 +157,7 @@ public function getData(Request $request)
             'phone' => $request->phone,
             'is_active' => $request->has('is_active') ? 1 : 0,
             'created_by' => auth('admin')->id(),
+            'email_verified_at' => now(),
         ]);
 
         // Assign roles
