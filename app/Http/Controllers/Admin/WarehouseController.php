@@ -3,14 +3,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Warehouse;
-use App\Models\Product;
-use App\Models\ProductWarehouseStock;
-use App\Models\InventoryMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Support\Str;
+// Models
+use App\Models\Warehouse;
+use App\Models\Product;
+use App\Models\ProductWarehouseStock;
+use App\Models\InventoryMovement;
+
 
 class WarehouseController extends Controller
 {
@@ -450,6 +453,126 @@ class WarehouseController extends Controller
                 return $actions;
             })
             ->rawColumns(['product_info', 'quantity', 'available', 'reserved', 'location', 'value', 'actions'])
+            ->make(true);
+    }
+
+    /**
+     * Get warehouse movements data (AJAX) for DataTable
+     */
+    public function getMovementsData(Request $request, string $id)
+    {
+        if (!auth('admin')->user()->hasPermission('inventory.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $warehouse = Warehouse::findOrFail($id);
+
+        $query = InventoryMovement::with(['product', 'variant', 'fromWarehouse', 'toWarehouse', 'creator'])
+                                ->where(function($q) use ($id) {
+                                    $q->where('warehouse_id', $id)
+                                        ->orWhere('from_warehouse_id', $id)
+                                        ->orWhere('to_warehouse_id', $id);
+                                });
+
+        // Apply filters
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->input('search.value', $request->input('search'));
+            if (is_array($search)) {
+                $search = trim(implode(' ', $search));
+            }
+
+            if ($search !== null && $search !== '') {
+                $query->where(function($q) use ($search) {
+                    $q->whereHas('product', function($pq) use ($search) {
+                        $pq->where('name', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%");
+                    })
+                    ->orWhere('reason', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
+                });
+            }
+        }
+
+        return DataTables::of($query)
+            ->addColumn('date', function($movement) {
+                return '<div>
+                    <strong>' . $movement->created_at->format('M d, Y') . '</strong><br>
+                    <small class="text-muted">' . $movement->created_at->format('h:i A') . '</small>
+                </div>';
+            })
+            ->addColumn('product_info', function($movement) {
+                if (!$movement->product) {
+                    return '<span class="badge bg-danger">Product Deleted</span>';
+                }
+
+                $html = '<div><strong>' . htmlspecialchars($movement->product->name) . '</strong><br>';
+                $html .= '<small class="text-muted">SKU: ' . htmlspecialchars($movement->product->sku) . '</small>';
+
+                if ($movement->variant) {
+                    $html .= '<br><small class="text-info">' . htmlspecialchars($movement->variant->getFullName()) . '</small>';
+                }
+
+                $html .= '</div>';
+                return $html;
+            })
+            ->addColumn('type_badge', function($movement) {
+                return $movement->getTypeBadge();
+            })
+            ->addColumn('quantity_change', function($movement) {
+                $class = $movement->quantity > 0 ? 'text-success' : 'text-danger';
+                $icon = $movement->quantity > 0 ? 'arrow-up' : 'arrow-down';
+
+                return '<span class="fw-bold ' . $class . '">
+                    <i class="bi bi-' . $icon . '"></i> ' . $movement->getFormattedQuantity() . '
+                </span>';
+            })
+            ->addColumn('warehouse_info', function($movement) use ($id) {
+                if ($movement->type === 'transfer') {
+                    $from = $movement->fromWarehouse ? htmlspecialchars($movement->fromWarehouse->name) : 'N/A';
+                    $to = $movement->toWarehouse ? htmlspecialchars($movement->toWarehouse->name) : 'N/A';
+
+                    return '<div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-secondary">' . $from . '</span>
+                        <i class="bi bi-arrow-right"></i>
+                        <span class="badge bg-primary">' . $to . '</span>
+                    </div>';
+                }
+
+                return '<span class="text-muted">—</span>';
+            })
+            ->addColumn('reason_notes', function($movement) {
+                $html = '<div>';
+                if ($movement->reason) {
+                    $html .= '<strong>' . htmlspecialchars(Str::limit($movement->reason, 40)) . '</strong>';
+                }
+                if ($movement->notes) {
+                    $html .= '<br><small class="text-muted">' . htmlspecialchars(Str::limit($movement->notes, 50)) . '</small>';
+                }
+                if (!$movement->reason && !$movement->notes) {
+                    $html .= '<span class="text-muted">—</span>';
+                }
+                $html .= '</div>';
+                return $html;
+            })
+            ->addColumn('created_by', function($movement) {
+                if ($movement->creator) {
+                    return '<small>' . htmlspecialchars($movement->creator->name) . '</small>';
+                }
+                return '<span class="text-muted">System</span>';
+            })
+            ->rawColumns(['date', 'product_info', 'type_badge', 'quantity_change', 'warehouse_info', 'reason_notes', 'created_by'])
             ->make(true);
     }
 

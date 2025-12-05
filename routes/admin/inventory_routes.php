@@ -142,6 +142,7 @@ Route::prefix('warehouses')->name('warehouses.')->group(function () {
     Route::middleware('admin.permission:inventory.read')->group(function () {
         Route::get('/{warehouse}/stock', [WarehouseController::class, 'stock'])->name('stock');
         Route::get('/{warehouse}/stock-data', [WarehouseController::class, 'getStockData'])->name('stock.data');
+        Route::get('/{warehouse}/movements-data', [WarehouseController::class, 'getMovementsData'])->name('movements.data');
         Route::get('/{warehouse}/statistics', [WarehouseController::class, 'statistics'])->name('statistics');
         Route::get('/{warehouse}/export-stock', [WarehouseController::class, 'exportStock'])->name('export-stock');
 

@@ -469,7 +469,7 @@
                 <div class="tab-pane fade" id="movements" role="tabpanel">
                     <div class="tab-content-section">
                         <h5 class="info-card-title">
-                            <i class="bi bi-arrow-left-right"></i> Recent Movements (Last 30 Days)
+                            <i class="bi bi-arrow-left-right"></i> Stock Movements
                         </h5>
 
                         <div class="table-responsive">
@@ -482,42 +482,11 @@
                                         <th>Quantity</th>
                                         <th>From/To</th>
                                         <th>Reason</th>
+                                        <th>By</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse($warehouse->movements()->recent(30)->get() as $movement)
-                                    <tr>
-                                        <td>{{ $movement->created_at->format('M d, Y H:i') }}</td>
-                                        <td>
-                                            <a href="{{ route('admin.products.show', $movement->product_id) }}">
-                                                {{ $movement->product->name ?? 'N/A' }}
-                                            </a>
-                                        </td>
-                                        <td>{!! $movement->getTypeBadge() !!}</td>
-                                        <td>
-                                            <span class="fw-bold {{ $movement->quantity > 0 ? 'text-success' : 'text-danger' }}">
-                                                {{ $movement->getFormattedQuantity() }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            @if($movement->type === 'transfer')
-                                                {{ $movement->fromWarehouse->name ?? 'N/A' }}
-                                                <i class="bi bi-arrow-right"></i>
-                                                {{ $movement->toWarehouse->name ?? 'N/A' }}
-                                            @else
-                                                <span class="text-muted">—</span>
-                                            @endif
-                                        </td>
-                                        <td>{{ Str::limit($movement->reason ?? 'N/A', 30) }}</td>
-                                    </tr>
-                                    @empty
-                                    <tr>
-                                        <td colspan="6" class="text-center text-muted py-4">
-                                            <i class="bi bi-inbox" style="font-size: 2rem;"></i>
-                                            <p class="mt-2">No movements found in the last 30 days</p>
-                                        </td>
-                                    </tr>
-                                    @endforelse
+                                    {{-- Data loaded via AJAX --}}
                                 </tbody>
                             </table>
                         </div>
@@ -636,15 +605,46 @@
 @push('scripts')
 <script>
 let stockTable;
+ let stockTableInitialized = false;
+let movementsTable; //Declare variable
+let movementsTableInitialized = false; //Add flag
 
 $(document).ready(function() {
     // Initialize stock DataTable - but only when the tab is shown for the first time
-    let stockTableInitialized = false;
-    movementsTable = $('#movementsTable').DataTable({
-        order: [[0, 'asc']],
-        pageLength: 25,
 
+    // Initialize Movements DataTable when tab is shown
+    $('button[data-bs-target="#movements"]').on('shown.bs.tab', function() {
+        if (!movementsTableInitialized) {
+            movementsTable = $('#movementsTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: '{{ route("admin.warehouses.movements.data", $warehouse->id) }}',
+                columns: [
+                    { data: 'date', name: 'created_at' },
+                    { data: 'product_info', name: 'product_id', orderable: false },
+                    { data: 'type_badge', name: 'type' },
+                    { data: 'quantity_change', name: 'quantity' },
+                    { data: 'warehouse_info', name: 'warehouse_info', orderable: false },
+                    { data: 'reason_notes', name: 'reason', orderable: false },
+                    { data: 'created_by', name: 'created_by', orderable: false }
+                ],
+                order: [[0, 'desc']], // ✅ Latest on top
+                pageLength: 25,
+                language: {
+                    processing: '<i class="bi bi-hourglass-split"></i> Loading...',
+                    emptyTable: 'No movements found'
+                },
+                responsive: true,
+                autoWidth: false
+            });
+
+            movementsTableInitialized = true;
+        } else {
+            movementsTable.ajax.reload();
+            movementsTable.columns.adjust().draw();
+        }
     });
+
     // Load stock table when tab is shown
     $('button[data-bs-target="#stock"]').on('shown.bs.tab', function() {
         if (!stockTableInitialized) {
