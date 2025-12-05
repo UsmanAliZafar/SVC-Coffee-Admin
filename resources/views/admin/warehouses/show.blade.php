@@ -641,7 +641,7 @@ $(document).ready(function() {
     // Initialize stock DataTable - but only when the tab is shown for the first time
     let stockTableInitialized = false;
     movementsTable = $('#movementsTable').DataTable({
-        order: [[0, 'desc']],
+        order: [[0, 'asc']],
         pageLength: 25,
 
     });
