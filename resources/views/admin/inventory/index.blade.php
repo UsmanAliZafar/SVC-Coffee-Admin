@@ -128,6 +128,27 @@
     .warehouse-tab.active .warehouse-count {
         background-color: #5B914C !important;
     }
+
+    /* Select2 Custom Styling for Modals */
+    .modal .select2-container--default .select2-selection--single {
+        height: 38px;
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+    }
+    .modal .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 36px;
+        color: #495057;
+    }
+    .modal .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px;
+    }
+    .modal .select2-container--default.select2-container--focus .select2-selection--single {
+        border-color: #5B914C;
+        box-shadow: 0 0 0 0.25rem rgba(91, 145, 76, 0.25);
+    }
+    .modal .select2-container {
+        width: 100% !important;
+    }
 </style>
 @endpush
 
@@ -427,7 +448,7 @@ $(document).ready(function() {
 
     // Load statistics
     loadStatistics();
-
+    initializeProductSelect2();
     // Load products for dropdowns
     loadProducts();
 
@@ -474,7 +495,6 @@ $(document).ready(function() {
         const warehouseId = $('#adjustWarehouseId').val();
 
         if (productId) {
-            // Load product details including variants
             loadProductVariants(productId);
 
             if (warehouseId) {
@@ -494,12 +514,10 @@ $(document).ready(function() {
                 if (response.success && response.product) {
                     const product = response.product;
 
-                    // Check if product has variants
                     if (product.has_variants && product.variants && product.variants.length > 0) {
                         let variantOptions = '<option value="">Main Product (No Variant)</option>';
 
                         product.variants.forEach(variant => {
-                            // Check status from the nested status object
                             const isActive = variant.status && variant.status.key_code === 'VARIANT_ACTIVE';
 
                             if (isActive) {
@@ -510,6 +528,20 @@ $(document).ready(function() {
                         });
 
                         $('#adjustVariantId').html(variantOptions);
+
+                        // ✅ Initialize Select2 on variant dropdown
+                        if (!$('#adjustVariantId').hasClass('select2-hidden-accessible')) {
+                            $('#adjustVariantId').select2({
+                                theme: 'bootstrap-5',
+                                placeholder: 'Select variant...',
+                                allowClear: true,
+                                width: '100%',
+                                dropdownParent: $('#adjustStockModal')
+                            });
+                        } else {
+                            $('#adjustVariantId').trigger('change.select2');
+                        }
+
                         $('#variantSelectionDiv').slideDown();
                     } else {
                         $('#variantSelectionDiv').hide();
@@ -552,6 +584,62 @@ $(document).ready(function() {
         updateActionHint(actionType);
     });
 });
+
+// Initialize Select2 for product dropdowns
+function initializeProductSelect2() {
+    // Adjust Stock Modal - Product Select
+    $('#adjustProductId').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search by product name or SKU...',
+        allowClear: true,
+        width: '100%',
+        dropdownParent: $('#adjustStockModal'),
+        templateResult: formatProductOption,
+        templateSelection: formatProductSelection
+    });
+
+    // Transfer Stock Modal - Product Select
+    $('#transferProductId').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search by product name or SKU...',
+        allowClear: true,
+        width: '100%',
+        dropdownParent: $('#transferStockModal'),
+        templateResult: formatProductOption,
+        templateSelection: formatProductSelection
+    });
+}
+
+function formatProductOption(product) {
+    if (!product.id) {
+        return product.text;
+    }
+
+    // Get product data from productsData array
+    const productData = productsData.find(p => p.id == product.id);
+
+    if (productData) {
+        const stockBadge = productData.stock_quantity > 0
+            ? `<span class="badge bg-success ms-2">${productData.stock_quantity} in stock</span>`
+            : `<span class="badge bg-danger ms-2">Out of stock</span>`;
+
+        var $product = $(
+            '<div class="select2-product-option">' +
+                '<div><strong>' + productData.name + '</strong></div>' +
+                '<div><small class="text-muted">SKU: ' + productData.sku + '</small>' + stockBadge + '</div>' +
+            '</div>'
+        );
+
+        return $product;
+    }
+
+    return product.text;
+}
+
+// Custom formatter for selected product
+function formatProductSelection(product) {
+    return product.text || 'Select Product';
+}
 
 // Initialize DataTable
 function initializeDataTable() {
@@ -620,11 +708,11 @@ function loadStatistics() {
 // Load products for dropdowns - FIXED
 function loadProducts() {
     $.ajax({
-        url: '{{ route("admin.products.ajax-list") }}',  // FIXED: Correct route
+        url: '{{ route("admin.products.ajax-list") }}',
         method: 'GET',
         data: {
             track_inventory: 1,
-            limit: 500  // Load more products
+            limit: 500
         },
         success: function(response) {
             if (response.success && response.products) {
@@ -635,7 +723,13 @@ function loadProducts() {
                     options += `<option value="${product.id}">${product.name} (${product.sku})</option>`;
                 });
 
+                // Update select options
                 $('#adjustProductId, #transferProductId').html(options);
+
+                // ✅ Refresh Select2 after loading options
+                $('#adjustProductId').trigger('change.select2');
+                $('#transferProductId').trigger('change.select2');
+
                 console.log('Products loaded:', response.products.length);
             } else {
                 console.warn('No products found in response');
@@ -654,6 +748,17 @@ function loadProducts() {
     });
 }
 
+// Handle modal close - clear Select2
+$('#adjustStockModal').on('hidden.bs.modal', function () {
+    $('#adjustProductId').val(null).trigger('change');
+    $('#adjustVariantId').val(null).trigger('change');
+    $('#currentStockInfo').hide();
+    $('#variantSelectionDiv').hide();
+});
+
+$('#transferStockModal').on('hidden.bs.modal', function () {
+    $('#transferProductId').val(null).trigger('change');
+});
 // Load product stock for selected warehouse
 function loadProductStock(productId, warehouseId, variantId = null) {
     $.ajax({
@@ -808,12 +913,24 @@ function refreshData() {
 function openAdjustModal() {
     $('#adjustStockForm')[0].reset();
     $('#currentStockInfo').hide();
+    $('#variantSelectionDiv').hide();
+
+    // Clear Select2 selections
+    $('#adjustProductId').val(null).trigger('change');
+    if ($('#adjustVariantId').hasClass('select2-hidden-accessible')) {
+        $('#adjustVariantId').val(null).trigger('change');
+    }
+
     $('#adjustStockModal').modal('show');
 }
 
 // Open transfer modal
 function openTransferModal() {
     $('#transferStockForm')[0].reset();
+
+    // Clear Select2 selection
+    $('#transferProductId').val(null).trigger('change');
+
     $('#transferStockModal').modal('show');
 }
 
