@@ -2,586 +2,724 @@
 
 @section('title', 'Manage Pages')
 
+@push('styles')
+<style>
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    .filter-card .form-label {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #5B914C;
+    }
+    .btn-filter {
+        background-color: #5B914C;
+        border-color: #5B914C;
+        color: white;
+    }
+    .btn-filter:hover {
+        background-color: #4a7a3d;
+        border-color: #4a7a3d;
+    }
+    .page-stats {
+        background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    .stat-item {
+        text-align: center;
+    }
+    .stat-item .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .stat-item .stat-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+    .page-details {
+        line-height: 1.6;
+    }
+    .page-title {
+        margin-bottom: 3px;
+    }
+    .page-slug {
+        margin-bottom: 3px;
+    }
+    .page-excerpt {
+        font-size: 0.85em;
+        margin-top: 3px;
+    }
+    .page-link:hover {
+        color: #5B914C !important;
+        text-decoration: underline !important;
+    }
+    .created-at-container,
+    .updated-at-container {
+        line-height: 1.5;
+        font-size: 0.9em;
+    }
+    .form-check-input:checked {
+        background-color: #5B914C;
+        border-color: #5B914C;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="container-fluid">
     {{-- Page Header --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 mb-1">Pages Management</h1>
-            <p class="text-muted mb-0">Manage dynamic content pages for your website</p>
+            <h2 class="mb-1"><i class="bi bi-file-earmark-text"></i> Pages Management</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Pages</li>
+                </ol>
+            </nav>
         </div>
-        @if(auth('admin')->user()->hasPermission('content.create'))
-        <a href="{{ route('admin.pages.create') }}" class="btn btn-success">
-            <i class="bi bi-plus-circle me-2"></i>Create New Page
-        </a>
-        @endif
+        <div>
+            @if(auth('admin')->user()->hasPermission('content.create'))
+            <a href="{{ route('admin.pages.create') }}" class="btn btn-success">
+                <i class="bi bi-plus-circle me-2"></i>Create New Page
+            </a>
+            @endif
+        </div>
     </div>
 
     {{-- Statistics Cards --}}
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="text-muted mb-1 small">Total Pages</p>
-                            <h3 class="mb-0">{{ $stats['total'] }}</h3>
-                        </div>
-                        <div class="text-primary">
-                            <i class="bi bi-file-earmark fs-1"></i>
-                        </div>
-                    </div>
-                </div>
+    <div class="page-stats">
+        <div class="row">
+            <div class="col-md-3 stat-item">
+                <div class="stat-value" id="totalPages">{{ $stats['total'] }}</div>
+                <div class="stat-label">Total Pages</div>
             </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="text-muted mb-1 small">Published</p>
-                            <h3 class="mb-0 text-success">{{ $stats['published'] }}</h3>
-                        </div>
-                        <div class="text-success">
-                            <i class="bi bi-check-circle fs-1"></i>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-md-3 stat-item">
+                <div class="stat-value text-success" id="publishedPages">{{ $stats['published'] }}</div>
+                <div class="stat-label">Published</div>
             </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="text-muted mb-1 small">Drafts</p>
-                            <h3 class="mb-0 text-warning">{{ $stats['draft'] }}</h3>
-                        </div>
-                        <div class="text-warning">
-                            <i class="bi bi-pencil-square fs-1"></i>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-md-3 stat-item">
+                <div class="stat-value text-warning" id="draftPages">{{ $stats['draft'] }}</div>
+                <div class="stat-label">Drafts</div>
             </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="text-muted mb-1 small">Archived</p>
-                            <h3 class="mb-0 text-secondary">{{ $stats['archived'] }}</h3>
-                        </div>
-                        <div class="text-secondary">
-                            <i class="bi bi-archive fs-1"></i>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-md-3 stat-item">
+                <div class="stat-value" id="archivedPages">{{ $stats['archived'] }}</div>
+                <div class="stat-label">Archived</div>
             </div>
         </div>
     </div>
 
-    {{-- Filters and Search --}}
-    <div class="card border-0 shadow-sm mb-4">
+    {{-- Filters --}}
+    <div class="card filter-card">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Search</label>
+                <input type="text" id="searchFilter" class="form-control"
+                       placeholder="Search by title, slug, content...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select id="statusFilter" class="form-select">
+                    <option value="">All Statuses</option>
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                    <option value="archived">Archived</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Visibility</label>
+                <select id="visibilityFilter" class="form-select">
+                    <option value="">All</option>
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Hierarchy</label>
+                <select id="parentFilter" class="form-select">
+                    <option value="">All Pages</option>
+                    <option value="parent">Parent Only</option>
+                    <option value="child">Child Only</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Navigation</label>
+                <select id="navigationFilter" class="form-select">
+                    <option value="">All</option>
+                    <option value="header">In Header</option>
+                    <option value="footer">In Footer</option>
+                    <option value="none">None</option>
+                </select>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="button" id="resetFilters" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+        <div class="row g-3 mt-2">
+            <div class="col-md-2">
+                <label class="form-label">Parent Page</label>
+                <select id="parentIdFilter" class="form-select">
+                    <option value="">All Parents</option>
+                    @foreach($parentPages as $parent)
+                        <option value="{{ $parent->id }}">{{ $parent->title }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Template</label>
+                <select id="templateFilter" class="form-select">
+                    <option value="">All Templates</option>
+                    @foreach($templates as $key => $name)
+                        <option value="{{ $key }}">{{ $name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Date From</label>
+                <input type="date" id="dateFrom" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Date To</label>
+                <input type="date" id="dateTo" class="form-control">
+            </div>
+        </div>
+    </div>
+
+    {{-- DataTable Card --}}
+    <div class="card shadow-sm">
         <div class="card-body">
-            <form action="{{ route('admin.pages.index') }}" method="GET" id="filterForm">
-                <div class="row g-3">
-                    {{-- Search --}}
-                    <div class="col-md-3">
-                        <label class="form-label small text-muted">Search</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-white">
-                                <i class="bi bi-search"></i>
-                            </span>
-                            <input type="text"
-                                   name="search"
-                                   class="form-control"
-                                   placeholder="Search pages..."
-                                   value="{{ request('search') }}">
-                        </div>
-                    </div>
-
-                    {{-- Status Filter --}}
-                    <div class="col-md-2">
-                        <label class="form-label small text-muted">Status</label>
-                        <select name="status" class="form-select">
-                            <option value="">All Status</option>
-                            <option value="published" {{ request('status') == 'published' ? 'selected' : '' }}>Published</option>
-                            <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
-                            <option value="archived" {{ request('status') == 'archived' ? 'selected' : '' }}>Archived</option>
-                        </select>
-                    </div>
-
-                    {{-- Visibility Filter --}}
-                    <div class="col-md-2">
-                        <label class="form-label small text-muted">Visibility</label>
-                        <select name="visibility" class="form-select">
-                            <option value="">All Visibility</option>
-                            <option value="public" {{ request('visibility') == 'public' ? 'selected' : '' }}>Public</option>
-                            <option value="private" {{ request('visibility') == 'private' ? 'selected' : '' }}>Private</option>
-                        </select>
-                    </div>
-
-                    {{-- Parent/Child Filter --}}
-                    <div class="col-md-2">
-                        <label class="form-label small text-muted">Hierarchy</label>
-                        <select name="parent_filter" class="form-select">
-                            <option value="">All Pages</option>
-                            <option value="parent" {{ request('parent_filter') == 'parent' ? 'selected' : '' }}>Parent Only</option>
-                            <option value="child" {{ request('parent_filter') == 'child' ? 'selected' : '' }}>Child Only</option>
-                        </select>
-                    </div>
-
-                    {{-- Navigation Filter --}}
-                    <div class="col-md-2">
-                        <label class="form-label small text-muted">Navigation</label>
-                        <select name="navigation" class="form-select">
-                            <option value="">All Navigation</option>
-                            <option value="header" {{ request('navigation') == 'header' ? 'selected' : '' }}>In Header</option>
-                            <option value="footer" {{ request('navigation') == 'footer' ? 'selected' : '' }}>In Footer</option>
-                        </select>
-                    </div>
-
-                    {{-- Action Buttons --}}
-                    <div class="col-md-1">
-                        <label class="form-label small text-muted d-block">&nbsp;</label>
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-funnel"></i>
+            {{-- Bulk Actions --}}
+            <div class="mb-3 d-none" id="bulkActionsBar">
+                <div class="alert alert-info d-flex justify-content-between align-items-center mb-0">
+                    <span><strong id="selectedCount">0</strong> page(s) selected</span>
+                    <div>
+                        @if(auth('admin')->user()->hasPermission('content.update'))
+                        <button type="button" class="btn btn-sm btn-primary" id="bulkUpdateStatus">
+                            <i class="bi bi-arrow-repeat"></i> Update Status
+                        </button>
+                        <button type="button" class="btn btn-sm btn-success" id="bulkPublish">
+                            <i class="bi bi-check-circle"></i> Publish
+                        </button>
+                        @endif
+                        @if(auth('admin')->user()->hasPermission('content.delete'))
+                        <button type="button" class="btn btn-sm btn-danger" id="bulkDelete">
+                            <i class="bi bi-trash"></i> Delete Selected
+                        </button>
+                        @endif
+                        <button type="button" class="btn btn-sm btn-secondary" id="deselectAll">
+                            <i class="bi bi-x"></i> Deselect All
                         </button>
                     </div>
                 </div>
-
-                {{-- Active Filters Display --}}
-                @if(request()->hasAny(['search', 'status', 'visibility', 'parent_filter', 'navigation']))
-                <div class="mt-3 d-flex align-items-center">
-                    <span class="text-muted small me-2">Active Filters:</span>
-                    @if(request('search'))
-                        <span class="badge bg-light text-dark me-2">Search: {{ request('search') }}</span>
-                    @endif
-                    @if(request('status'))
-                        <span class="badge bg-light text-dark me-2">Status: {{ ucfirst(request('status')) }}</span>
-                    @endif
-                    @if(request('visibility'))
-                        <span class="badge bg-light text-dark me-2">Visibility: {{ ucfirst(request('visibility')) }}</span>
-                    @endif
-                    @if(request('parent_filter'))
-                        <span class="badge bg-light text-dark me-2">Type: {{ ucfirst(request('parent_filter')) }}</span>
-                    @endif
-                    @if(request('navigation'))
-                        <span class="badge bg-light text-dark me-2">Navigation: {{ ucfirst(request('navigation')) }}</span>
-                    @endif
-                    <a href="{{ route('admin.pages.index') }}" class="btn btn-sm btn-link text-decoration-none">
-                        <i class="bi bi-x-circle me-1"></i>Clear All
-                    </a>
-                </div>
-                @endif
-            </form>
-        </div>
-    </div>
-
-    {{-- Pages Table --}}
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white py-3">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0">Pages List</h5>
-                    <small class="text-muted">Showing {{ $pages->firstItem() ?? 0 }} to {{ $pages->lastItem() ?? 0 }} of {{ $pages->total() }} pages</small>
-                </div>
-                @if(auth('admin')->user()->hasPermission('content.delete'))
-                <button type="button"
-                        class="btn btn-sm btn-danger"
-                        id="bulkDeleteBtn"
-                        style="display: none;"
-                        onclick="confirmBulkDelete()">
-                    <i class="bi bi-trash me-1"></i>Delete Selected (<span id="selectedCount">0</span>)
-                </button>
-                @endif
             </div>
-        </div>
 
-        <div class="card-body p-0">
-            @if($pages->count() > 0)
+            {{-- Table --}}
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
+                <table id="pagesTable" class="table table-hover table-striped">
+                    <thead class="table-light">
                         <tr>
                             @if(auth('admin')->user()->hasPermission('content.delete'))
-                            <th style="width: 40px;">
-                                <input type="checkbox" class="form-check-input" id="selectAll">
+                            <th width="30">
+                                <input type="checkbox" id="selectAll" class="form-check-input">
                             </th>
                             @endif
-                            <th>
-                                <a href="{{ route('admin.pages.index', array_merge(request()->all(), ['sort_by' => 'title', 'sort_order' => request('sort_order') == 'asc' ? 'desc' : 'asc'])) }}"
-                                   class="text-decoration-none text-dark">
-                                    Title
-                                    @if(request('sort_by') == 'title')
-                                        <i class="bi bi-arrow-{{ request('sort_order') == 'asc' ? 'up' : 'down' }}"></i>
-                                    @endif
-                                </a>
-                            </th>
-                            <th>Slug</th>
-                            <th>Parent</th>
-                            <th>Status</th>
-                            <th>Visibility</th>
-                            <th>Navigation</th>
-                            <th>
-                                <a href="{{ route('admin.pages.index', array_merge(request()->all(), ['sort_by' => 'created_at', 'sort_order' => request('sort_order') == 'asc' ? 'desc' : 'asc'])) }}"
-                                   class="text-decoration-none text-dark">
-                                    Created
-                                    @if(request('sort_by') == 'created_at' || !request('sort_by'))
-                                        <i class="bi bi-arrow-{{ request('sort_order') == 'desc' || !request('sort_order') ? 'down' : 'up' }}"></i>
-                                    @endif
-                                </a>
-                            </th>
-                            <th style="width: 180px;" class="text-end">Actions</th>
+                            <th>Page Info</th>
+                            <th width="150">Parent/Children</th>
+                            <th width="100">Status</th>
+                            <th width="100">Visibility</th>
+                            <th width="120">Navigation</th>
+                            <th width="120">Template</th>
+                            <th width="150">Created At</th>
+                            <th width="180">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @foreach($pages as $page)
-                        <tr>
-                            @if(auth('admin')->user()->hasPermission('content.delete'))
-                            <td>
-                                <input type="checkbox"
-                                       class="form-check-input page-checkbox"
-                                       value="{{ $page->id }}"
-                                       data-page-title="{{ $page->title }}">
-                            </td>
-                            @endif
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    @if($page->featured_image)
-                                    <img src="{{ Storage::url($page->featured_image) }}"
-                                         alt="{{ $page->title }}"
-                                         class="rounded me-2"
-                                         style="width: 40px; height: 40px; object-fit: cover;">
-                                    @else
-                                    <div class="bg-light rounded me-2 d-flex align-items-center justify-content-center"
-                                         style="width: 40px; height: 40px;">
-                                        <i class="bi bi-file-earmark text-muted"></i>
-                                    </div>
-                                    @endif
-                                    <div>
-                                        <div class="fw-semibold">{{ Str::limit($page->title, 40) }}</div>
-                                        @if($page->excerpt)
-                                        <small class="text-muted">{{ Str::limit($page->excerpt, 60) }}</small>
-                                        @endif
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                <code class="small">{{ $page->slug }}</code>
-                            </td>
-                            <td>
-                                @if($page->parent)
-                                <span class="badge bg-light text-dark">
-                                    <i class="bi bi-arrow-return-right me-1"></i>{{ $page->parent->title }}
-                                </span>
-                                @else
-                                <span class="text-muted small">—</span>
-                                @endif
-                            </td>
-                            <td>
-                                <span class="badge {{ $page->status_badge_class }}">
-                                    {{ $page->status_label }}
-                                </span>
-                            </td>
-                            <td>
-                                @if($page->visibility == 'public')
-                                <span class="badge bg-info">
-                                    <i class="bi bi-eye me-1"></i>Public
-                                </span>
-                                @else
-                                <span class="badge bg-secondary">
-                                    <i class="bi bi-eye-slash me-1"></i>Private
-                                </span>
-                                @endif
-                            </td>
-                            <td>
-                                <div class="d-flex gap-1">
-                                    @if($page->show_in_header)
-                                    <span class="badge bg-primary" title="In Header">
-                                        <i class="bi bi-layout-text-window-reverse"></i>
-                                    </span>
-                                    @endif
-                                    @if($page->show_in_footer)
-                                    <span class="badge bg-dark" title="In Footer">
-                                        <i class="bi bi-layout-text-window"></i>
-                                    </span>
-                                    @endif
-                                    @if(!$page->show_in_header && !$page->show_in_footer)
-                                    <span class="text-muted small">—</span>
-                                    @endif
-                                </div>
-                            </td>
-                            <td>
-                                <small class="text-muted">
-                                    {{ $page->created_at->format('M d, Y') }}
-                                    @if($page->creator)
-                                    <br>by {{ $page->creator->name }}
-                                    @endif
-                                </small>
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    {{-- View --}}
-                                    @if(auth('admin')->user()->hasPermission('content.read'))
-                                    <a href="{{ route('admin.pages.show', $page) }}"
-                                       class="btn btn-outline-info"
-                                       title="View">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    @endif
-
-                                    {{-- Edit --}}
-                                    @if(auth('admin')->user()->hasPermission('content.update'))
-                                    <a href="{{ route('admin.pages.edit', $page) }}"
-                                       class="btn btn-outline-primary"
-                                       title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    @endif
-
-                                    {{-- Dropdown Actions --}}
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <button type="button"
-                                                class="btn btn-outline-secondary dropdown-toggle"
-                                                data-bs-toggle="dropdown">
-                                            <i class="bi bi-three-dots-vertical"></i>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end">
-                                            {{-- Quick Status Changes --}}
-                                            @if(auth('admin')->user()->hasPermission('content.update'))
-                                                @if($page->status == 'draft')
-                                                <li>
-                                                    <form action="{{ route('admin.pages.publish', $page) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="dropdown-item">
-                                                            <i class="bi bi-check-circle text-success me-2"></i>Publish
-                                                        </button>
-                                                    </form>
-                                                </li>
-                                                @endif
-                                                @if($page->status == 'published')
-                                                <li>
-                                                    <form action="{{ route('admin.pages.unpublish', $page) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="dropdown-item">
-                                                            <i class="bi bi-pencil-square text-warning me-2"></i>Set to Draft
-                                                        </button>
-                                                    </form>
-                                                </li>
-                                                @endif
-                                                @if($page->status != 'archived')
-                                                <li>
-                                                    <form action="{{ route('admin.pages.archive', $page) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="dropdown-item">
-                                                            <i class="bi bi-archive text-secondary me-2"></i>Archive
-                                                        </button>
-                                                    </form>
-                                                </li>
-                                                @endif
-                                                <li><hr class="dropdown-divider"></li>
-                                            @endif
-
-                                            {{-- Duplicate --}}
-                                            @if(auth('admin')->user()->hasPermission('content.create'))
-                                            <li>
-                                                <form action="{{ route('admin.pages.duplicate', $page) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="dropdown-item">
-                                                        <i class="bi bi-copy text-info me-2"></i>Duplicate
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            @endif
-
-                                            {{-- Preview --}}
-                                            <li>
-                                                <a href="{{ route('admin.pages.preview', $page) }}"
-                                                   class="dropdown-item"
-                                                   target="_blank">
-                                                    <i class="bi bi-eye text-primary me-2"></i>Preview
-                                                </a>
-                                            </li>
-
-                                            {{-- Delete --}}
-                                            @if(auth('admin')->user()->hasPermission('content.delete'))
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <button type="button"
-                                                        class="dropdown-item text-danger"
-                                                        onclick="confirmDelete('{{ $page->id }}', '{{ $page->title }}')">
-                                                    <i class="bi bi-trash me-2"></i>Delete
-                                                </button>
-                                            </li>
-                                            @endif
-                                        </ul>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
-
-            {{-- Pagination --}}
-            <div class="card-footer bg-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="text-muted small">
-                        Showing {{ $pages->firstItem() ?? 0 }} to {{ $pages->lastItem() ?? 0 }} of {{ $pages->total() }} entries
-                    </div>
-                    <div>
-                        {{ $pages->links() }}
-                    </div>
-                </div>
-            </div>
-            @else
-            {{-- Empty State --}}
-            <div class="text-center py-5">
-                <i class="bi bi-file-earmark-text text-muted" style="font-size: 4rem;"></i>
-                <h5 class="mt-3">No Pages Found</h5>
-                <p class="text-muted">
-                    @if(request()->hasAny(['search', 'status', 'visibility', 'parent_filter', 'navigation']))
-                        No pages match your current filters.
-                        <br>
-                        <a href="{{ route('admin.pages.index') }}" class="btn btn-sm btn-link">Clear Filters</a>
-                    @else
-                        Get started by creating your first page.
-                        <br>
-                        @if(auth('admin')->user()->hasPermission('content.create'))
-                        <a href="{{ route('admin.pages.create') }}" class="btn btn-success btn-sm mt-2">
-                            <i class="bi bi-plus-circle me-1"></i>Create Page
-                        </a>
-                        @endif
-                    @endif
-                </p>
-            </div>
-            @endif
         </div>
     </div>
 </div>
 
-{{-- Delete Form (Hidden) --}}
-<form id="deleteForm" method="POST" style="display: none;">
-    @csrf
-    @method('DELETE')
-</form>
-
-{{-- Bulk Delete Form (Hidden) --}}
-<form id="bulkDeleteForm" action="{{ route('admin.pages.bulk-delete') }}" method="POST" style="display: none;">
-    @csrf
-    <div id="bulkDeleteInput"></div>
-</form>
+{{-- Bulk Update Status Modal --}}
+<div class="modal fade" id="bulkUpdateStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrow-repeat"></i> Bulk Update Status
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Select Status</label>
+                    <select class="form-select" id="bulkStatusSelect" required>
+                        <option value="published">Published</option>
+                        <option value="draft">Draft</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <span id="bulkStatusCount">0</span> page(s) will be updated
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="executeBulkStatus">Update Status</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @endsection
 
-@push('styles')
-<style>
-    .table tbody tr:hover {
-        background-color: #f8f9fa;
-    }
-
-    .badge {
-        font-weight: 500;
-        padding: 0.35em 0.65em;
-    }
-
-    .btn-group-sm .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-
-    .form-check-input:checked {
-        background-color: #5B914C;
-        border-color: #5B914C;
-    }
-
-    .dropdown-menu {
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
-</style>
-@endpush
-
 @push('scripts')
 <script>
-    // Select All Checkbox
-    document.getElementById('selectAll')?.addEventListener('change', function() {
-        const checkboxes = document.querySelectorAll('.page-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
-        });
-        updateBulkDeleteButton();
+$(document).ready(function() {
+    let selectedPages = [];
+
+    // Initialize DataTable
+    const table = $('#pagesTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '{{ route("admin.pages.get-data") }}',
+            data: function(d) {
+                d.status = $('#statusFilter').val();
+                d.visibility = $('#visibilityFilter').val();
+                d.parent_filter = $('#parentFilter').val();
+                d.parent_id = $('#parentIdFilter').val();
+                d.template = $('#templateFilter').val();
+                d.navigation = $('#navigationFilter').val();
+                d.date_from = $('#dateFrom').val();
+                d.date_to = $('#dateTo').val();
+                d.search = $('#searchFilter').val();
+            }
+        },
+        columns: [
+            @if(auth('admin')->user()->hasPermission('content.delete'))
+            { data: 'checkbox', orderable: false, searchable: false },
+            @endif
+            { data: 'page_info', orderable: false },
+            { data: 'parent_badge', orderable: false },
+            { data: 'status_badge', orderable: false },
+            { data: 'visibility_badge', orderable: false },
+            { data: 'navigation_badges', orderable: false },
+            { data: 'template_badge', orderable: false },
+            { data: 'created_at_formatted' },
+            { data: 'actions', orderable: false, searchable: false }
+        ],
+        order: [[7, 'desc']],
+        pageLength: 25,
+        responsive: true,
+        language: {
+            processing: `
+                <div class="datatable-loading-container">
+                    <div class="bars-loader">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div class="datatable-loading-text">Loading Pages...</div>
+                </div>
+            `
+        },
+        drawCallback: function() {
+            $('[data-bs-toggle="tooltip"]').tooltip();
+        }
     });
 
-    // Individual Checkbox
-    document.querySelectorAll('.page-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            updateBulkDeleteButton();
-
-            // Update "Select All" checkbox state
-            const allCheckboxes = document.querySelectorAll('.page-checkbox');
-            const checkedCheckboxes = document.querySelectorAll('.page-checkbox:checked');
-            document.getElementById('selectAll').checked = allCheckboxes.length === checkedCheckboxes.length;
-        });
+    // Filter change events
+    $('#statusFilter, #visibilityFilter, #parentFilter, #parentIdFilter, #templateFilter, #navigationFilter, #dateFrom, #dateTo').on('change', function() {
+        table.draw();
     });
 
-    // Update Bulk Delete Button Visibility
-    function updateBulkDeleteButton() {
-        const checkedCheckboxes = document.querySelectorAll('.page-checkbox:checked');
-        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-        const selectedCount = document.getElementById('selectedCount');
+    // Search with delay
+    let searchDelay;
+    $('#searchFilter').on('keyup', function() {
+        clearTimeout(searchDelay);
+        searchDelay = setTimeout(function() {
+            table.draw();
+        }, 500);
+    });
 
-        if (checkedCheckboxes.length > 0) {
-            bulkDeleteBtn.style.display = 'block';
-            selectedCount.textContent = checkedCheckboxes.length;
+    // Reset filters
+    $('#resetFilters').on('click', function() {
+        $('#searchFilter').val('');
+        $('#statusFilter').val('');
+        $('#visibilityFilter').val('');
+        $('#parentFilter').val('');
+        $('#parentIdFilter').val('');
+        $('#templateFilter').val('');
+        $('#navigationFilter').val('');
+        $('#dateFrom').val('');
+        $('#dateTo').val('');
+        table.draw();
+    });
+
+    // Select all checkbox
+    $('#selectAll').on('change', function() {
+        $('.page-checkbox').prop('checked', this.checked);
+        updateBulkActions();
+    });
+
+    // Individual checkbox
+    $(document).on('change', '.page-checkbox', function() {
+        updateBulkActions();
+        const totalCheckboxes = $('.page-checkbox').length;
+        const checkedCheckboxes = $('.page-checkbox:checked').length;
+        $('#selectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
+    });
+
+    // Update bulk actions visibility
+    function updateBulkActions() {
+        selectedPages = [];
+        $('.page-checkbox:checked').each(function() {
+            selectedPages.push($(this).val());
+        });
+
+        $('#selectedCount').text(selectedPages.length);
+        $('#bulkStatusCount').text(selectedPages.length);
+
+        if (selectedPages.length > 0) {
+            $('#bulkActionsBar').removeClass('d-none');
         } else {
-            bulkDeleteBtn.style.display = 'none';
+            $('#bulkActionsBar').addClass('d-none');
         }
     }
 
-    // Confirm Single Delete
-    function confirmDelete(pageId, pageTitle) {
-        if (confirm(`Are you sure you want to delete the page "${pageTitle}"?\n\nThis action cannot be undone.`)) {
-            const form = document.getElementById('deleteForm');
-            form.action = `/admin/pages/${pageId}`;
-            form.submit();
+    // Deselect all
+    $('#deselectAll').on('click', function() {
+        $('.page-checkbox').prop('checked', false);
+        $('#selectAll').prop('checked', false);
+        updateBulkActions();
+    });
+
+    // Bulk Update Status
+    $('#bulkUpdateStatus').on('click', function() {
+        if (selectedPages.length === 0) {
+            showNotification('Please select at least one page', 'warning');
+            return;
         }
-    }
+        $('#bulkUpdateStatusModal').modal('show');
+    });
 
-    // Confirm Bulk Delete
-    function confirmBulkDelete() {
-        const checkedCheckboxes = document.querySelectorAll('.page-checkbox:checked');
-        const count = checkedCheckboxes.length;
+    $('#executeBulkStatus').on('click', function() {
+        const status = $('#bulkStatusSelect').val();
 
-        if (count === 0) {
-            alert('Please select at least one page to delete.');
+        if (!status) {
+            showNotification('Please select a status', 'warning');
             return;
         }
 
-        if (confirm(`Are you sure you want to delete ${count} page(s)?\n\nThis action cannot be undone.`)) {
-            const form = document.getElementById('bulkDeleteForm');
-            const inputContainer = document.getElementById('bulkDeleteInput');
-            inputContainer.innerHTML = '';
-
-            checkedCheckboxes.forEach(checkbox => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'page_ids[]';
-                input.value = checkbox.value;
-                inputContainer.appendChild(input);
-            });
-
-            form.submit();
-        }
-    }
-
-    // Auto-submit filters on change
-    document.querySelectorAll('#filterForm select').forEach(select => {
-        select.addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
+        Swal.fire({
+            title: `Update ${selectedPages.length} page(s)?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, update them!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '{{ route("admin.pages.bulk-status") }}',
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        page_ids: selectedPages,
+                        status: status
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        $('#bulkUpdateStatusModal').modal('hide');
+                        table.draw();
+                        $('#deselectAll').click();
+                    },
+                    error: function(xhr) {
+                        showNotification('An error occurred', 'error');
+                    }
+                });
+            }
         });
     });
+
+    // Bulk Publish
+    $('#bulkPublish').on('click', function() {
+        if (selectedPages.length === 0) {
+            showNotification('Please select at least one page', 'warning');
+            return;
+        }
+
+        Swal.fire({
+            title: `Publish ${selectedPages.length} page(s)?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, publish them!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '{{ route("admin.pages.bulk-status") }}',
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        page_ids: selectedPages,
+                        status: 'published'
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+                        $('#deselectAll').click();
+                    },
+                    error: function(xhr) {
+                        showNotification('An error occurred', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Bulk Delete
+    $('#bulkDelete').on('click', function() {
+        if (selectedPages.length === 0) {
+            showNotification('Please select at least one page', 'warning');
+            return;
+        }
+
+        Swal.fire({
+            title: `Delete ${selectedPages.length} page(s)?`,
+            text: "This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete them!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '{{ route("admin.pages.bulk-delete") }}',
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        page_ids: selectedPages
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+                        $('#deselectAll').click();
+                    },
+                    error: function(xhr) {
+                        showNotification('An error occurred', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Publish Page
+    $(document).on('click', '.publish-page', function() {
+        const id = $(this).data('id');
+        const title = $(this).data('title');
+
+        Swal.fire({
+            title: `Publish "${title}"?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, publish it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/admin/pages/${id}/publish`,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+                    },
+                    error: function(xhr) {
+                        showNotification('An error occurred', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Unpublish Page
+    $(document).on('click', '.unpublish-page', function() {
+        const id = $(this).data('id');
+        const title = $(this).data('title');
+
+        Swal.fire({
+            title: `Unpublish "${title}"?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, set to draft!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/admin/pages/${id}/unpublish`,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+                    },
+                    error: function(xhr) {
+                        showNotification('An error occurred', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Archive Page
+    $(document).on('click', '.archive-page', function() {
+        const id = $(this).data('id');
+        const title = $(this).data('title');
+
+        Swal.fire({
+            title: `Archive "${title}"?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, archive it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/admin/pages/${id}/archive`,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+                    },
+                    error: function(xhr) {
+                        showNotification('An error occurred', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Duplicate Page
+    $(document).on('click', '.duplicate-page', function() {
+        const id = $(this).data('id');
+        const title = $(this).data('title');
+
+        Swal.fire({
+            title: `Duplicate "${title}"?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, duplicate it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/admin/pages/${id}/duplicate`,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+
+                        // Optionally redirect to edit the duplicate
+                        if (response.redirect_url) {
+                            setTimeout(function() {
+                                window.location.href = response.redirect_url;
+                            }, 1500);
+                        }
+                    },
+                    error: function(xhr) {
+                        showNotification('An error occurred', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Delete Page
+    $(document).on('click', '.delete-page', function() {
+        const id = $(this).data('id');
+        const title = $(this).data('title');
+
+        Swal.fire({
+            title: `Delete "${title}"?`,
+            text: "This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/admin/pages/${id}`,
+                    method: 'DELETE',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+                    },
+                    error: function(xhr) {
+                        const errorMessage = xhr.responseJSON?.message || 'An error occurred';
+                        showNotification(errorMessage, 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Notification Helper
+    function showNotification(message, type = 'info') {
+        const alertClass = {
+            'success': 'alert-success',
+            'error': 'alert-danger',
+            'warning': 'alert-warning',
+            'info': 'alert-info'
+        }[type] || 'alert-info';
+
+        const notification = $(`
+            <div class="alert ${alertClass} alert-dismissible fade show position-fixed top-0 end-0 m-3"
+                 role="alert" style="z-index: 9999; min-width: 300px;">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `);
+
+        $('body').append(notification);
+
+        setTimeout(function() {
+            notification.alert('close');
+        }, 5000);
+    }
+});
 </script>
 @endpush

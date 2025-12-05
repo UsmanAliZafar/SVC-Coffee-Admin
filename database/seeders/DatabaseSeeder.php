@@ -19,7 +19,7 @@ class DatabaseSeeder extends Seeder
             SystemStatusSeeder::class,
             // DefaultWarehouseSeeder::class,
             // CouponSeeder::class,
-            // PageSeeder::class,
+            PageSeeder::class,
             // StoreSettingSeeder::class,
             // ContactUsSeeder::class,
         ]);

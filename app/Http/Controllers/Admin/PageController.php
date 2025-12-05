@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Yajra\DataTables\Facades\DataTables;
 
 class PageController extends Controller
 {
@@ -23,59 +24,6 @@ class PageController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
-        $query = Page::with(['creator', 'parent']);
-
-        // Search functionality
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('slug', 'like', "%{$search}%")
-                  ->orWhere('content', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by status
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Filter by visibility
-        if ($request->filled('visibility')) {
-            $query->where('visibility', $request->visibility);
-        }
-
-        // Filter by parent/child
-        if ($request->filled('parent_filter')) {
-            if ($request->parent_filter === 'parent') {
-                $query->whereNull('parent_id');
-            } elseif ($request->parent_filter === 'child') {
-                $query->whereNotNull('parent_id');
-            }
-        }
-
-        // Filter by navigation
-        if ($request->filled('navigation')) {
-            if ($request->navigation === 'header') {
-                $query->where('show_in_header', true);
-            } elseif ($request->navigation === 'footer') {
-                $query->where('show_in_footer', true);
-            }
-        }
-
-        // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
-
-        $allowedSorts = ['title', 'created_at', 'updated_at', 'display_order', 'status'];
-        if (in_array($sortBy, $allowedSorts)) {
-            $query->orderBy($sortBy, $sortOrder);
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
-
-        $pages = $query->paginate(15)->withQueryString();
-
         // Get statistics
         $stats = [
             'total' => Page::count(),
@@ -84,7 +32,335 @@ class PageController extends Controller
             'archived' => Page::where('status', 'archived')->count(),
         ];
 
-        return view('admin.pages.index', compact('pages', 'stats'));
+        // Get parent pages for filter
+        $parentPages = Page::whereNull('parent_id')
+                          ->orderBy('title')
+                          ->get();
+
+        // Available templates
+        $templates = [
+            'default' => 'Default Template',
+            'full-width' => 'Full Width',
+            'sidebar-left' => 'Sidebar Left',
+            'sidebar-right' => 'Sidebar Right',
+            'landing' => 'Landing Page',
+        ];
+
+        return view('admin.pages.index', compact('stats', 'parentPages', 'templates'));
+    }
+
+    /**
+     * Get pages data for DataTable (AJAX)
+     */
+    public function getData(Request $request)
+    {
+        // Check permission
+        if (!Auth::guard('admin')->user()->hasPermission('content.read')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $query = Page::with(['creator', 'updater', 'parent', 'children'])
+                    ->orderBy('created_at', 'desc');
+
+        // Apply filters
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('visibility')) {
+            $query->where('visibility', $request->visibility);
+        }
+
+        if ($request->filled('parent_filter')) {
+            if ($request->parent_filter === 'parent') {
+                $query->whereNull('parent_id');
+            } elseif ($request->parent_filter === 'child') {
+                $query->whereNotNull('parent_id');
+            }
+        }
+
+        if ($request->filled('parent_id')) {
+            $query->where('parent_id', $request->parent_id);
+        }
+
+        if ($request->filled('template')) {
+            $query->where('template', $request->template);
+        }
+
+        if ($request->filled('navigation')) {
+            if ($request->navigation === 'header') {
+                $query->where('show_in_header', true);
+            } elseif ($request->navigation === 'footer') {
+                $query->where('show_in_footer', true);
+            } elseif ($request->navigation === 'none') {
+                $query->where('show_in_header', false)
+                      ->where('show_in_footer', false);
+            }
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('slug', 'like', "%{$search}%")
+                  ->orWhere('content', 'like', "%{$search}%")
+                  ->orWhere('excerpt', 'like', "%{$search}%")
+                  ->orWhere('meta_title', 'like', "%{$search}%")
+                  ->orWhere('meta_description', 'like', "%{$search}%");
+            });
+        }
+
+        return DataTables::of($query)
+            ->addColumn('checkbox', function($page) {
+                if (Auth::guard('admin')->user()->hasPermission('content.delete')) {
+                    return '<input type="checkbox" class="form-check-input page-checkbox" value="' . $page->id . '">';
+                }
+                return '';
+            })
+            ->addColumn('page_info', function($page) {
+                $viewUrl = route('admin.pages.show', $page->id);
+
+                $html = '<div class="d-flex align-items-center">';
+
+                // Featured Image or Placeholder
+                if ($page->featured_image && Storage::disk('public')->exists($page->featured_image)) {
+                    $html .= '<img src="' . Storage::url($page->featured_image) . '"
+                             alt="' . htmlspecialchars($page->title) . '"
+                             class="rounded me-2"
+                             style="width: 50px; height: 50px; object-fit: cover;">';
+                } else {
+                    $html .= '<div class="bg-light rounded me-2 d-flex align-items-center justify-content-center"
+                             style="width: 50px; height: 50px;">
+                             <i class="bi bi-file-earmark text-muted fs-4"></i>
+                             </div>';
+                }
+
+                // Title and Excerpt
+                $html .= '<div class="page-details">';
+                $html .= '<div class="page-title">';
+                $html .= '<strong><a href="' . $viewUrl . '" class="text-decoration-none page-link">'
+                     . htmlspecialchars(Str::limit($page->title, 50)) . '</a></strong>';
+                $html .= '</div>';
+
+                // Slug
+                $html .= '<div class="page-slug">';
+                $html .= '<code class="small text-muted">' . htmlspecialchars($page->slug) . '</code>';
+                $html .= '</div>';
+
+                // Excerpt if available
+                if ($page->excerpt) {
+                    $html .= '<div class="page-excerpt">';
+                    $html .= '<small class="text-muted">' . htmlspecialchars(Str::limit($page->excerpt, 60)) . '</small>';
+                    $html .= '</div>';
+                }
+
+                $html .= '</div>';
+                $html .= '</div>';
+
+                return $html;
+            })
+            ->addColumn('parent_badge', function($page) {
+                if ($page->parent) {
+                    return '<span class="badge bg-light text-dark">
+                            <i class="bi bi-arrow-return-right me-1"></i>'
+                            . htmlspecialchars($page->parent->title) .
+                            '</span>';
+                }
+
+                // Show child count if it has children
+                if ($page->children && $page->children->count() > 0) {
+                    return '<span class="badge bg-info">
+                            <i class="bi bi-diagram-3 me-1"></i>'
+                            . $page->children->count() . ' child(ren)
+                            </span>';
+                }
+
+                return '<span class="text-muted small">—</span>';
+            })
+            ->addColumn('status_badge', function($page) {
+                $badges = [
+                    'published' => '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Published</span>',
+                    'draft' => '<span class="badge bg-warning"><i class="bi bi-pencil-square me-1"></i>Draft</span>',
+                    'archived' => '<span class="badge bg-secondary"><i class="bi bi-archive me-1"></i>Archived</span>',
+                ];
+
+                return $badges[$page->status] ?? '<span class="badge bg-secondary">' . ucfirst($page->status) . '</span>';
+            })
+            ->addColumn('visibility_badge', function($page) {
+                if ($page->visibility == 'public') {
+                    return '<span class="badge bg-info"><i class="bi bi-eye me-1"></i>Public</span>';
+                }
+                return '<span class="badge bg-secondary"><i class="bi bi-eye-slash me-1"></i>Private</span>';
+            })
+            ->addColumn('navigation_badges', function($page) {
+                $html = '<div class="d-flex gap-1">';
+
+                if ($page->show_in_header) {
+                    $html .= '<span class="badge bg-primary" title="In Header">
+                             <i class="bi bi-layout-text-window-reverse"></i> Header
+                             </span>';
+                }
+
+                if ($page->show_in_footer) {
+                    $html .= '<span class="badge bg-dark" title="In Footer">
+                             <i class="bi bi-layout-text-window"></i> Footer
+                             </span>';
+                }
+
+                if (!$page->show_in_header && !$page->show_in_footer) {
+                    $html .= '<span class="text-muted small">None</span>';
+                }
+
+                $html .= '</div>';
+
+                return $html;
+            })
+            ->addColumn('template_badge', function($page) {
+                $templates = [
+                    'default' => 'Default',
+                    'full-width' => 'Full Width',
+                    'sidebar-left' => 'Sidebar Left',
+                    'sidebar-right' => 'Sidebar Right',
+                    'landing' => 'Landing',
+                ];
+
+                $templateName = $templates[$page->template] ?? ucfirst(str_replace('-', ' ', $page->template));
+
+                return '<span class="badge bg-light text-dark">' . $templateName . '</span>';
+            })
+            ->addColumn('created_at_formatted', function($page) {
+                $html = '<div class="created-at-container">';
+                $html .= '<div>' . $page->created_at->format('M d, Y') . '</div>';
+                $html .= '<small class="text-muted">' . $page->created_at->format('h:i A') . '</small>';
+
+                if ($page->creator) {
+                    $html .= '<div><small class="text-muted">by ' . htmlspecialchars($page->creator->name) . '</small></div>';
+                }
+
+                $html .= '<div><small class="text-muted">' . $page->created_at->diffForHumans() . '</small></div>';
+                $html .= '</div>';
+
+                return $html;
+            })
+            ->addColumn('updated_at_formatted', function($page) {
+                if (!$page->updated_at || $page->updated_at->eq($page->created_at)) {
+                    return '<span class="text-muted small">Never</span>';
+                }
+
+                $html = '<div class="updated-at-container">';
+                $html .= '<div>' . $page->updated_at->format('M d, Y') . '</div>';
+                $html .= '<small class="text-muted">' . $page->updated_at->format('h:i A') . '</small>';
+
+                if ($page->updater) {
+                    $html .= '<div><small class="text-muted">by ' . htmlspecialchars($page->updater->name) . '</small></div>';
+                }
+
+                $html .= '</div>';
+
+                return $html;
+            })
+            ->addColumn('actions', function($page) {
+                $actions = '<div class="btn-group" role="group">';
+
+                // View button
+                if (Auth::guard('admin')->user()->hasPermission('content.read')) {
+                    $actions .= '<a href="' . route('admin.pages.show', $page->id) . '"
+                                class="btn btn-sm btn-info" title="View">
+                                <i class="bi bi-eye"></i>
+                                </a>';
+                }
+
+                // Edit button
+                if (Auth::guard('admin')->user()->hasPermission('content.update')) {
+                    $actions .= '<a href="' . route('admin.pages.edit', $page->id) . '"
+                                class="btn btn-sm btn-primary" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                                </a>';
+                }
+
+                // Dropdown for more actions
+                $actions .= '<div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-sm btn-secondary dropdown-toggle"
+                                    data-bs-toggle="dropdown" title="More Actions">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">';
+
+                // Status change actions
+                if (Auth::guard('admin')->user()->hasPermission('content.update')) {
+                    if ($page->status == 'draft') {
+                        $actions .= '<li><button type="button" class="dropdown-item publish-page"
+                                    data-id="' . $page->id . '" data-title="' . htmlspecialchars($page->title) . '">
+                                    <i class="bi bi-check-circle text-success me-2"></i>Publish
+                                    </button></li>';
+                    }
+
+                    if ($page->status == 'published') {
+                        $actions .= '<li><button type="button" class="dropdown-item unpublish-page"
+                                    data-id="' . $page->id . '" data-title="' . htmlspecialchars($page->title) . '">
+                                    <i class="bi bi-pencil-square text-warning me-2"></i>Set to Draft
+                                    </button></li>';
+                    }
+
+                    if ($page->status != 'archived') {
+                        $actions .= '<li><button type="button" class="dropdown-item archive-page"
+                                    data-id="' . $page->id . '" data-title="' . htmlspecialchars($page->title) . '">
+                                    <i class="bi bi-archive text-secondary me-2"></i>Archive
+                                    </button></li>';
+                    }
+
+                    $actions .= '<li><hr class="dropdown-divider"></li>';
+                }
+
+                // Duplicate
+                if (Auth::guard('admin')->user()->hasPermission('content.create')) {
+                    $actions .= '<li><button type="button" class="dropdown-item duplicate-page"
+                                data-id="' . $page->id . '" data-title="' . htmlspecialchars($page->title) . '">
+                                <i class="bi bi-copy text-info me-2"></i>Duplicate
+                                </button></li>';
+                }
+
+                // Preview
+                $actions .= '<li><a href="' . route('admin.pages.preview', $page->id) . '"
+                            class="dropdown-item" target="_blank">
+                            <i class="bi bi-eye text-primary me-2"></i>Preview
+                            </a></li>';
+
+                // Delete
+                if (Auth::guard('admin')->user()->hasPermission('content.delete')) {
+                    $actions .= '<li><hr class="dropdown-divider"></li>';
+                    $actions .= '<li><button type="button" class="dropdown-item text-danger delete-page"
+                                data-id="' . $page->id . '" data-title="' . htmlspecialchars($page->title) . '">
+                                <i class="bi bi-trash me-2"></i>Delete
+                                </button></li>';
+                }
+
+                $actions .= '</ul></div>';
+                $actions .= '</div>';
+
+                return $actions;
+            })
+            ->rawColumns([
+                'checkbox',
+                'page_info',
+                'parent_badge',
+                'status_badge',
+                'visibility_badge',
+                'navigation_badges',
+                'template_badge',
+                'created_at_formatted',
+                'updated_at_formatted',
+                'actions'
+            ])
+            ->make(true);
     }
 
     /**
@@ -350,14 +626,15 @@ class PageController extends Controller
     {
         // Check permission
         if (!Auth::guard('admin')->user()->hasPermission('content.delete')) {
-            abort(403, 'Unauthorized action.');
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         // Check if page has children
         if ($page->hasChildren()) {
-            return redirect()
-                ->route('admin.pages.index')
-                ->with('error', 'Cannot delete page with child pages. Please delete or reassign child pages first.');
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete page with child pages. Please delete or reassign child pages first.'
+            ], 400);
         }
 
         // Delete featured image
@@ -374,9 +651,10 @@ class PageController extends Controller
         // Delete page
         $page->delete();
 
-        return redirect()
-            ->route('admin.pages.index')
-            ->with('success', 'Page deleted successfully!');
+        return response()->json([
+            'success' => true,
+            'message' => 'Page deleted successfully!'
+        ]);
     }
 
     /**
@@ -386,7 +664,7 @@ class PageController extends Controller
     {
         // Check permission
         if (!Auth::guard('admin')->user()->hasPermission('content.delete')) {
-            abort(403, 'Unauthorized action.');
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $request->validate([
@@ -395,10 +673,13 @@ class PageController extends Controller
         ]);
 
         $pages = Page::whereIn('id', $request->page_ids)->get();
+        $deletedCount = 0;
+        $skippedCount = 0;
 
         foreach ($pages as $page) {
             // Skip if has children
             if ($page->hasChildren()) {
+                $skippedCount++;
                 continue;
             }
 
@@ -414,11 +695,18 @@ class PageController extends Controller
                 ->log('Bulk deleted page: ' . $page->title);
 
             $page->delete();
+            $deletedCount++;
         }
 
-        return redirect()
-            ->route('admin.pages.index')
-            ->with('success', 'Selected pages deleted successfully!');
+        $message = "{$deletedCount} page(s) deleted successfully!";
+        if ($skippedCount > 0) {
+            $message .= " {$skippedCount} page(s) skipped (has child pages).";
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message
+        ]);
     }
 
     /**
@@ -428,7 +716,7 @@ class PageController extends Controller
     {
         // Check permission
         if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
-            abort(403, 'Unauthorized action.');
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $page->publish();
@@ -439,9 +727,10 @@ class PageController extends Controller
             ->performedOn($page)
             ->log('Published page: ' . $page->title);
 
-        return redirect()
-            ->back()
-            ->with('success', 'Page published successfully!');
+        return response()->json([
+            'success' => true,
+            'message' => 'Page published successfully!'
+        ]);
     }
 
     /**
@@ -451,7 +740,7 @@ class PageController extends Controller
     {
         // Check permission
         if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
-            abort(403, 'Unauthorized action.');
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $page->unpublish();
@@ -462,9 +751,10 @@ class PageController extends Controller
             ->performedOn($page)
             ->log('Unpublished page: ' . $page->title);
 
-        return redirect()
-            ->back()
-            ->with('success', 'Page unpublished successfully!');
+        return response()->json([
+            'success' => true,
+            'message' => 'Page unpublished successfully!'
+        ]);
     }
 
     /**
@@ -474,7 +764,7 @@ class PageController extends Controller
     {
         // Check permission
         if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
-            abort(403, 'Unauthorized action.');
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $page->archive();
@@ -485,9 +775,10 @@ class PageController extends Controller
             ->performedOn($page)
             ->log('Archived page: ' . $page->title);
 
-        return redirect()
-            ->back()
-            ->with('success', 'Page archived successfully!');
+        return response()->json([
+            'success' => true,
+            'message' => 'Page archived successfully!'
+        ]);
     }
 
     /**
@@ -497,7 +788,7 @@ class PageController extends Controller
     {
         // Check permission
         if (!Auth::guard('admin')->user()->hasPermission('content.create')) {
-            abort(403, 'Unauthorized action.');
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         // Create duplicate
@@ -527,9 +818,11 @@ class PageController extends Controller
             ->performedOn($duplicate)
             ->log('Duplicated page: ' . $page->title);
 
-        return redirect()
-            ->route('admin.pages.edit', $duplicate)
-            ->with('success', 'Page duplicated successfully!');
+        return response()->json([
+            'success' => true,
+            'message' => 'Page duplicated successfully!',
+            'redirect_url' => route('admin.pages.edit', $duplicate)
+        ]);
     }
 
     /**
@@ -539,7 +832,7 @@ class PageController extends Controller
     {
         // Check permission
         if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
-            abort(403, 'Unauthorized action.');
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $request->validate([
@@ -568,5 +861,30 @@ class PageController extends Controller
         }
 
         return view('admin.pages.preview', compact('page'));
+    }
+
+    /**
+     * Bulk update status
+     */
+    public function bulkUpdateStatus(Request $request)
+    {
+        // Check permission
+        if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'page_ids' => 'required|array',
+            'page_ids.*' => 'exists:pages,id',
+            'status' => 'required|in:draft,published,archived',
+        ]);
+
+        Page::whereIn('id', $request->page_ids)
+            ->update(['status' => $request->status]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status updated for ' . count($request->page_ids) . ' page(s)!'
+        ]);
     }
 }

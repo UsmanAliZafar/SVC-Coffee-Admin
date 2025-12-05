@@ -276,10 +276,22 @@ Pakistan</p>',
             ],
         ];
 
+        $createdCount = 0;
+        $skippedCount = 0;
+
         foreach ($defaultPages as $pageData) {
+            // Check if page with this slug already exists
+            if (Page::where('slug', $pageData['slug'])->exists()) {
+                $this->command->warn("Page '{$pageData['title']}' (slug: {$pageData['slug']}) already exists. Skipping...");
+                $skippedCount++;
+                continue;
+            }
+
             Page::create($pageData);
+            $this->command->info("Created page: {$pageData['title']}");
+            $createdCount++;
         }
 
-        $this->command->info('Default pages created successfully!');
+        $this->command->info("Page seeding completed! Created: {$createdCount}, Skipped: {$skippedCount}");
     }
 }
