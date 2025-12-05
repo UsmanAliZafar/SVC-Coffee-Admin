@@ -38,20 +38,29 @@ class OrdersController extends Controller
     /**
      * Display listing page
      */
-    public function index()
+    public function index(Request $request)
     {
         $statusList = SystemStatus::where('module', 'orders')->get();
         $paymentStatusList = SystemStatus::where('module', 'payments')->get();
+        $customers = Customer::active()->orderBy('first_name')->get();
+
+        // Base query for stats with customer filter
+        $statsQuery = Order::query();
+        $selectedCustomerId = $request->input('customer_id');
+
+        if ($selectedCustomerId) {
+            $statsQuery->where('customer_id', $selectedCustomerId);
+        }
 
         $stats = [
-            'total_orders' => Order::count(),
-            'pending_orders' => Order::pending()->count(),
-            'processing_orders' => Order::processing()->count(),
-            'today_orders' => Order::today()->count(),
-            'today_revenue' => Order::today()->paid()->sum('total_amount'),
+            'total_orders' => (clone $statsQuery)->count(),
+            'pending_orders' => (clone $statsQuery)->pending()->count(),
+            'processing_orders' => (clone $statsQuery)->processing()->count(),
+            'today_orders' => (clone $statsQuery)->today()->count(),
+            'today_revenue' => (clone $statsQuery)->today()->paid()->sum('total_amount'),
         ];
 
-        return view('admin.orders.index', compact('statusList', 'paymentStatusList', 'stats'));
+        return view('admin.orders.index', compact('statusList', 'paymentStatusList', 'stats', 'customers', 'request', 'selectedCustomerId'));
     }
 
     /**
@@ -82,7 +91,7 @@ class OrdersController extends Controller
         if ($request->filled('date_to')) {
             $query->whereDate('created_at', '<=', $request->date_to);
         }
-
+        // dd($request->customer_id);
         if ($request->filled('customer_id')) {
             $query->where('customer_id', $request->customer_id);
         }

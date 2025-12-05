@@ -3,32 +3,32 @@
 @section('title', 'Orders Management')
 @section('styles')
 <style>
-.btn-primary,
-.bg-primary,
-.badge.bg-primary {
-    background-color: #5B914C !important;
-    border-color: #5B914C !important;
-}
+    .btn-primary,
+    .bg-primary,
+    .badge.bg-primary {
+        background-color: #5B914C !important;
+        border-color: #5B914C !important;
+    }
 
-.text-primary {
-    color: #5B914C !important;
-}
+    .text-primary {
+        color: #5B914C !important;
+    }
 
-.btn-primary:hover {
-    background-color: #4a7a3d !important;
-    border-color: #4a7a3d !important;
-}
+    .btn-primary:hover {
+        background-color: #4a7a3d !important;
+        border-color: #4a7a3d !important;
+    }
 
-.btn-outline-primary {
-    color: #5B914C !important;
-    border-color: #5B914C !important;
-}
+    .btn-outline-primary {
+        color: #5B914C !important;
+        border-color: #5B914C !important;
+    }
 
-.btn-outline-primary:hover {
-    background-color: #5B914C !important;
-    border-color: #5B914C !important;
-    color: white !important;
-}
+    .btn-outline-primary:hover {
+        background-color: #5B914C !important;
+        border-color: #5B914C !important;
+        color: white !important;
+    }
 </style>
 @endsection
 @section('content')
@@ -205,6 +205,17 @@
             <div class="card-body border-bottom bg-light">
                 <form id="filterForm">
                     <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Customer</label>
+                            <select class="form-select" name="customer_id" id="filterCustomer">
+                                <option value="">All Customers</option>
+                                @foreach($customers as $customer)
+                                <option value="{{ $customer->id }}">
+                                    {{ $customer->first_name }} {{ $customer->last_name }} ({{ $customer->email }})
+                                </option>
+                                @endforeach
+                            </select>
+                        </div>
                         <div class="col-md-3">
                             <label class="form-label">Order Status</label>
                             <select class="form-select" name="status" id="filterStatus">
@@ -446,10 +457,30 @@
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script>
 $(document).ready(function() {
+    $('#filterCustomer').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search customer...',
+        allowClear: true
+    });
     let ordersTable;
     let selectedOrders = [];
     let deleteOrderId = null;
+     // ✅ Get customer_id from PHP variable (cleaner than request())
+    const urlCustomerId = '{{ $selectedCustomerId ?? "" }}';
 
+    // Set dropdown value from URL if exists
+    if (urlCustomerId) {
+        $('#filterCustomer').val(urlCustomerId);
+    }
+
+    // Initialize Select2 if using it
+    if ($.fn.select2) {
+        $('#filterCustomer').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Search customer...',
+            allowClear: true
+        });
+    }
     // Initialize DataTable
     function initDataTable() {
         ordersTable = $('#ordersTable').DataTable({
@@ -461,6 +492,7 @@ $(document).ready(function() {
                     d.status = $('#filterStatus').val();
                     d.payment_status = $('#filterPaymentStatus').val();
                     d.order_source = $('#filterSource').val();
+                    d.customer_id = $('#filterCustomer').val();
                     d.date_from = $('#filterDateFrom').val();
                     d.date_to = $('#filterDateTo').val();
                 }
@@ -954,5 +986,6 @@ $(document).ready(function() {
         });
     });
 });
+
 </script>
 @endpush

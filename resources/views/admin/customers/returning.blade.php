@@ -236,54 +236,32 @@
 
     {{-- Loyalty Segments Info --}}
     <div class="row mb-4">
+        @php
+            $segments = [
+                ['orders' => '2-3', 'name' => 'Repeat Buyers', 'icon' => 'bi-star-fill', 'color' => 'warning', 'desc' => 'Starting to build loyalty'],
+                ['orders' => '4-6', 'name' => 'Regular Customers', 'icon' => 'bi-heart-fill', 'color' => 'info', 'desc' => 'Consistent engagement'],
+                ['orders' => '7-10', 'name' => 'Loyal Customers', 'icon' => 'bi-trophy-fill', 'color' => 'primary', 'desc' => 'Strong relationship'],
+                ['orders' => '11+', 'name' => 'VIP Advocates', 'icon' => 'bi-gem', 'color' => 'success', 'desc' => 'Brand ambassadors'],
+            ];
+        @endphp
+
+        @foreach($segments as $segment)
         <div class="col-md-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body text-center">
-                    <div class="loyalty-badge bg-warning text-dark mb-2">
-                        <i class="bi bi-star-fill"></i> 2-3 Orders
+                    <div class="loyalty-badge bg-{{ $segment['color'] }} {{ $segment['color'] === 'warning' ? 'text-dark' : 'text-white' }} mb-2">
+                        <i class="{{ $segment['icon'] }}"></i> {{ $segment['orders'] }} Orders
                     </div>
-                    <h6 class="fw-bold">Repeat Buyers</h6>
-                    <p class="text-muted small mb-0">Starting to build loyalty</p>
+                    <h6 class="fw-bold">{{ $segment['name'] }}</h6>
+                    <p class="text-muted small mb-0">{{ $segment['desc'] }}</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="loyalty-badge bg-info text-white mb-2">
-                        <i class="bi bi-heart-fill"></i> 4-6 Orders
-                    </div>
-                    <h6 class="fw-bold">Regular Customers</h6>
-                    <p class="text-muted small mb-0">Consistent engagement</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="loyalty-badge bg-primary text-white mb-2">
-                        <i class="bi bi-trophy-fill"></i> 7-10 Orders
-                    </div>
-                    <h6 class="fw-bold">Loyal Customers</h6>
-                    <p class="text-muted small mb-0">Strong relationship</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="loyalty-badge bg-success text-white mb-2">
-                        <i class="bi bi-gem"></i> 11+ Orders
-                    </div>
-                    <h6 class="fw-bold">VIP Advocates</h6>
-                    <p class="text-muted small mb-0">Brand ambassadors</p>
-                </div>
-            </div>
-        </div>
+        @endforeach
     </div>
 
     {{-- Filters --}}
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card border-0 shadow-sm mb-4 d-none">
         <div class="card-body">
             <div class="d-flex flex-wrap align-items-center">
                 <span class="text-muted me-3 fw-semibold">
@@ -330,13 +308,13 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-semibold">
-                    <i class="bi bi-currency-dollar"></i> Total Spent (Min)
+                    {{ store_currency_symbol() }} Total Spent (Min)
                 </label>
                 <input type="number" class="form-control form-control-sm" id="filterMinSpent" placeholder="0.00" step="0.01">
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-semibold">
-                    <i class="bi bi-currency-dollar"></i> Total Spent (Max)
+                    {{ store_currency_symbol() }} Total Spent (Max)
                 </label>
                 <input type="number" class="form-control form-control-sm" id="filterMaxSpent" placeholder="10000.00" step="0.01">
             </div>

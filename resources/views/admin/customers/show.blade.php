@@ -260,8 +260,9 @@
                             <i class="bi bi-cart-fill"></i>
                         </div>
                         <div class="ms-3 flex-grow-1">
-                            <div class="stat-label">Total Orders</div>
+                            <div class="stat-label">Total Orders </div>
                             <div class="stat-value">{{ number_format($stats['total_orders']) }}</div>
+                            <small class="text-muted">Only CONFIRMED & DELIVERED Orders</small>
                         </div>
                     </div>
                 </div>
@@ -273,7 +274,7 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="stat-icon bg-success bg-opacity-10 text-success">
-                            <i class="bi bi-currency-dollar"></i>
+                            {{ store_currency_symbol() }}
                         </div>
                         <div class="ms-3 flex-grow-1">
                             <div class="stat-label">Total Spent</div>
@@ -326,7 +327,7 @@
                 <div class="card-body text-center">
                     <i class="bi bi-check-circle-fill text-success fs-2 mb-2"></i>
                     <h4 class="mb-0 fw-bold text-success">{{ $stats['completed_orders'] }}</h4>
-                    <small class="text-muted">Completed Orders</small>
+                    <small class="text-muted">Delivered Orders</small>
                 </div>
             </div>
         </div>
@@ -348,7 +349,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
+        <div class="col-md-3 mb-3 d-none">
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center">
                     <i class="bi bi-people-fill text-info fs-2 mb-2"></i>
@@ -402,7 +403,7 @@
 
                         @if($customer->orders->count() > 10)
                         <div class="text-center mt-3">
-                            <a href="{{ route('admin.orders.index', ['customer_id' => $customer->id]) }}" class="btn btn-outline-primary">
+                            <a href="{{ route('admin.orders.index', ['customer_id' => $customer->id]) }}" target="_blank" class="btn btn-outline-primary">
                                 <i class="bi bi-arrow-right-circle"></i> View All Orders ({{ $customer->orders->count() }})
                             </a>
                         </div>

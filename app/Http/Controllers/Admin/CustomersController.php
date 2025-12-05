@@ -316,7 +316,7 @@ class CustomersController extends Controller
     {
         $customer = Customer::with([
             'orders' => function($q) {
-                $q->orderBy('created_at', 'desc')->limit(10);
+                $q->orderBy('created_at', 'desc');
             },
             'orders.items',
             'referrals',
@@ -329,7 +329,7 @@ class CustomersController extends Controller
             'total_spent' => $customer->total_spent,
             'average_order_value' => $customer->average_order_value,
             'pending_orders' => $customer->orders()->where('status_key_code', 'ORDER_PENDING')->count(),
-            'completed_orders' => $customer->orders()->where('status_key_code', 'ORDER_COMPLETED')->count(),
+            'completed_orders' => $customer->orders()->where('status_key_code', 'ORDER_DELIVERED')->count(),
             'cancelled_orders' => $customer->orders()->where('status_key_code', 'ORDER_CANCELLED')->count(),
             'lifetime_value' => $customer->getLifetimeValue(),
             'days_since_last_order' => $customer->getDaysSinceLastOrder(),
@@ -343,7 +343,7 @@ class CustomersController extends Controller
         $topProducts = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->where('orders.customer_id', $customer->id)
-            ->whereIn('orders.status_key_code', ['ORDER_COMPLETED', 'ORDER_DELIVERED'])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_DELIVERED'])
             ->select(
                 'order_items.product_name',
                 DB::raw('SUM(order_items.quantity) as total_quantity'),
@@ -594,7 +594,7 @@ class CustomersController extends Controller
 
             // Get completed and delivered orders only
             $orders = $customer->orders()
-                ->whereIn('status_key_code', ['ORDER_COMPLETED', 'ORDER_DELIVERED'])
+                ->whereIn('status_key_code', ['ORDER_CONFIRMED', 'ORDER_DELIVERED'])
                 ->get();
 
             $totalOrders = $orders->count();
@@ -615,7 +615,7 @@ class CustomersController extends Controller
 
             // Set preferred currency from store if not already set
             if (empty($customer->preferred_currency)) {
-                $updateData['preferred_currency'] = store_currency_code();
+                $updateData['preferred_currency'] = store_currency_symbol();
             }
 
             $customer->update($updateData);

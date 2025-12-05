@@ -663,31 +663,150 @@ class Customer extends Authenticatable
     }
 
     /**
-     * Get customer segment
+     * Get customer loyalty segment based on order count
      */
     public function getSegment(): string
     {
-        if ($this->total_orders === 0) {
+        $orders = $this->total_orders;
+
+        // No orders
+        if ($orders === 0) {
             return 'New';
         }
 
-        if ($this->total_orders === 1) {
+        // One-time buyer
+        if ($orders === 1) {
             return 'One-time Buyer';
         }
 
-        if ($this->isAtRisk(90)) {
-            return 'At Risk';
+        // Returning customers (2+)
+        if ($orders >= 2 && $orders <= 3) {
+            return 'Repeat Buyer';  // ✅ 2-3 Orders
         }
 
-        if ($this->total_spent >= 5000) {
-            return 'High Value';
+        if ($orders >= 4 && $orders <= 6) {
+            return 'Regular';  // ✅ 4-6 Orders
         }
 
-        if ($this->total_orders >= 5) {
-            return 'Loyal';
+        if ($orders >= 7 && $orders <= 10) {
+            return 'Loyal';  // ✅ 7-10 Orders
+        }
+
+        if ($orders >= 11) {
+            return 'VIP Advocate';  // ✅ 11+ Orders
         }
 
         return 'Regular';
+    }
+
+    /**
+     * Get customer loyalty segment badge HTML
+     */
+    public function getSegmentBadge(): string
+    {
+        $orders = $this->total_orders;
+
+        if ($orders === 0) {
+            return '<span class="badge bg-secondary">New</span>';
+        }
+
+        if ($orders === 1) {
+            return '<span class="badge bg-light text-dark">One-time Buyer</span>';
+        }
+
+        if ($orders >= 2 && $orders <= 3) {
+            return '<span class="loyalty-badge bg-warning text-dark"><i class="bi bi-star-fill"></i> Repeat Buyer</span>';
+        }
+
+        if ($orders >= 4 && $orders <= 6) {
+            return '<span class="loyalty-badge bg-info text-white"><i class="bi bi-heart-fill"></i> Regular</span>';
+        }
+
+        if ($orders >= 7 && $orders <= 10) {
+            return '<span class="loyalty-badge bg-primary text-white"><i class="bi bi-trophy-fill"></i> Loyal</span>';
+        }
+
+        if ($orders >= 11) {
+            return '<span class="loyalty-badge bg-success text-white"><i class="bi bi-gem"></i> VIP Advocate</span>';
+        }
+
+        return '<span class="badge bg-secondary">Unknown</span>';
+    }
+
+    /**
+     * Get segment details with order range
+     */
+    public function getSegmentDetails(): array
+    {
+        $orders = $this->total_orders;
+
+        if ($orders === 0) {
+            return [
+                'name' => 'New',
+                'icon' => 'bi-person-plus',
+                'color' => 'secondary',
+                'range' => '0 orders',
+                'description' => 'Just joined'
+            ];
+        }
+
+        if ($orders === 1) {
+            return [
+                'name' => 'One-time Buyer',
+                'icon' => 'bi-cart',
+                'color' => 'light',
+                'range' => '1 order',
+                'description' => 'First purchase'
+            ];
+        }
+
+        if ($orders >= 2 && $orders <= 3) {
+            return [
+                'name' => 'Repeat Buyer',
+                'icon' => 'bi-star-fill',
+                'color' => 'warning',
+                'range' => '2-3 orders',
+                'description' => 'Starting to build loyalty'
+            ];
+        }
+
+        if ($orders >= 4 && $orders <= 6) {
+            return [
+                'name' => 'Regular',
+                'icon' => 'bi-heart-fill',
+                'color' => 'info',
+                'range' => '4-6 orders',
+                'description' => 'Consistent engagement'
+            ];
+        }
+
+        if ($orders >= 7 && $orders <= 10) {
+            return [
+                'name' => 'Loyal',
+                'icon' => 'bi-trophy-fill',
+                'color' => 'primary',
+                'range' => '7-10 orders',
+                'description' => 'Strong relationship'
+            ];
+        }
+
+        if ($orders >= 11) {
+            return [
+                'name' => 'VIP Advocate',
+                'icon' => 'bi-gem',
+                'color' => 'success',
+                'range' => '11+ orders',
+                'description' => 'Brand ambassador'
+            ];
+        }
+
+        return [
+            'name' => 'Unknown',
+            'icon' => 'bi-question-circle',
+            'color' => 'secondary',
+            'range' => 'N/A',
+            'description' => 'Unknown status'
+        ];
     }
 
     /**
