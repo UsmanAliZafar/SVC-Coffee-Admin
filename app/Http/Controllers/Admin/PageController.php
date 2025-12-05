@@ -467,10 +467,6 @@ class PageController extends Controller
         $page = Page::create($validated);
 
         // Log activity
-        activity()
-            ->causedBy(Auth::guard('admin')->user())
-            ->performedOn($page)
-            ->log('Created page: ' . $page->title);
 
         return redirect()
             ->route('admin.pages.index')
@@ -609,10 +605,7 @@ class PageController extends Controller
         $page->update($validated);
 
         // Log activity
-        activity()
-            ->causedBy(Auth::guard('admin')->user())
-            ->performedOn($page)
-            ->log('Updated page: ' . $page->title);
+
 
         return redirect()
             ->route('admin.pages.index')
@@ -641,12 +634,6 @@ class PageController extends Controller
         if ($page->featured_image && Storage::disk('public')->exists($page->featured_image)) {
             Storage::disk('public')->delete($page->featured_image);
         }
-
-        // Log activity before deletion
-        activity()
-            ->causedBy(Auth::guard('admin')->user())
-            ->performedOn($page)
-            ->log('Deleted page: ' . $page->title);
 
         // Delete page
         $page->delete();
@@ -688,12 +675,6 @@ class PageController extends Controller
                 Storage::disk('public')->delete($page->featured_image);
             }
 
-            // Log activity
-            activity()
-                ->causedBy(Auth::guard('admin')->user())
-                ->performedOn($page)
-                ->log('Bulk deleted page: ' . $page->title);
-
             $page->delete();
             $deletedCount++;
         }
@@ -721,12 +702,6 @@ class PageController extends Controller
 
         $page->publish();
 
-        // Log activity
-        activity()
-            ->causedBy(Auth::guard('admin')->user())
-            ->performedOn($page)
-            ->log('Published page: ' . $page->title);
-
         return response()->json([
             'success' => true,
             'message' => 'Page published successfully!'
@@ -745,11 +720,6 @@ class PageController extends Controller
 
         $page->unpublish();
 
-        // Log activity
-        activity()
-            ->causedBy(Auth::guard('admin')->user())
-            ->performedOn($page)
-            ->log('Unpublished page: ' . $page->title);
 
         return response()->json([
             'success' => true,
@@ -768,12 +738,6 @@ class PageController extends Controller
         }
 
         $page->archive();
-
-        // Log activity
-        activity()
-            ->causedBy(Auth::guard('admin')->user())
-            ->performedOn($page)
-            ->log('Archived page: ' . $page->title);
 
         return response()->json([
             'success' => true,
@@ -811,12 +775,6 @@ class PageController extends Controller
             $duplicate->featured_image = $newImagePath;
             $duplicate->save();
         }
-
-        // Log activity
-        activity()
-            ->causedBy(Auth::guard('admin')->user())
-            ->performedOn($duplicate)
-            ->log('Duplicated page: ' . $page->title);
 
         return response()->json([
             'success' => true,
