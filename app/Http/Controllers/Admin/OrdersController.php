@@ -363,6 +363,10 @@ class OrdersController extends Controller
         }
 
         $validated = $validator->validated();
+
+        $validated['shipping_amount'] = $validated['shipping_amount'] ?? 0;
+        $validated['discount_amount'] = $validated['discount_amount'] ?? 0;
+        $validated['tax_rate'] = $validated['tax_rate'] ?? 0;
         DB::beginTransaction();
 
         try {

@@ -5,7 +5,7 @@
 @push('styles')
 <style>
     .order-item-card {
-        border-left: 4px solid #0d6efd;
+        border-left: 4px solid #5B914C;
     }
     .order-item-image {
         width: 60px;
@@ -20,6 +20,24 @@
     #productSelect option {
         padding: 8px;
         font-size: 14px;
+    }
+
+    /* Select2 Custom Styling */
+    .select2-container--default .select2-selection--single {
+        height: 38px;
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 36px;
+        color: #495057;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px;
+    }
+    .select2-container--default.select2-container--focus .select2-selection--single {
+        border-color: #5B914C;
+        box-shadow: 0 0 0 0.25rem rgba(91, 145, 76, 0.25);
     }
 </style>
 @endpush
@@ -404,7 +422,7 @@
                     </div>
                 </div>
 
-                {{-- ✅ NEW: Discount & Coupon Section --}}
+                {{-- Discount & Coupon Section --}}
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-white border-0 py-3">
                         <h5 class="mb-0"><i class="bi bi-tag text-primary"></i> Discount & Coupon</h5>
@@ -798,6 +816,76 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
+    // Initialize Select2 on customer dropdown
+    $('#customer_id').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search customer by name, email, or company...',
+        allowClear: true,
+        width: '100%',
+        templateResult: formatCustomerOption,
+        templateSelection: formatCustomerSelection,
+        matcher: customMatcher
+    });
+
+    // Custom formatter for dropdown options
+    function formatCustomerOption(customer) {
+        if (!customer.id) {
+            return customer.text;
+        }
+
+        var $customer = $(
+            '<div class="select2-customer-option">' +
+                '<strong>' + customer.text + '</strong>' +
+                (customer.element.dataset.company ? '<br><small class="text-muted">Company: ' + customer.element.dataset.company + '</small>' : '') +
+            '</div>'
+        );
+
+        return $customer;
+    }
+
+    // Custom formatter for selected option
+    function formatCustomerSelection(customer) {
+        return customer.text || 'Choose a customer...';
+    }
+
+    // Custom search matcher (searches in name, email, and company)
+    function customMatcher(params, data) {
+        // If there are no search terms, return all data
+        if ($.trim(params.term) === '') {
+            return data;
+        }
+
+        // Do not display the item if there is no 'text' property
+        if (typeof data.text === 'undefined') {
+            return null;
+        }
+
+        // Search in text (name + email)
+        var searchText = data.text.toLowerCase();
+        var searchTerm = params.term.toLowerCase();
+
+        if (searchText.indexOf(searchTerm) > -1) {
+            return data;
+        }
+
+        // Search in company name
+        var $option = $(data.element);
+        var company = $option.data('company');
+
+        if (company && company.toLowerCase().indexOf(searchTerm) > -1) {
+            return data;
+        }
+
+        // Return `null` if the term should not be displayed
+        return null;
+    }
+
+    // Handle Select2 change event
+    $('#customer_id').on('select2:select', function (e) {
+        // Trigger the original change event to maintain existing functionality
+        $(this).trigger('change');
+    });
+    //
     let orderItems = [];
     let itemCounter = 0;
     let selectedVariant = null;
