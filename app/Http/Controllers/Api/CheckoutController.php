@@ -163,7 +163,6 @@ class CheckoutController extends Controller
                     'message' => 'System error: No default warehouse configured. Please contact support.',
                 ], 500);
             }
-
             // Check stock for each item
             foreach ($cart as $item) {
                 $product = Product::find($item['product_id']);
@@ -176,40 +175,34 @@ class CheckoutController extends Controller
                     ? \App\Models\ProductVariant::find($item['variant_id'])
                     : null;
 
-                // Get warehouse stock
-                $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                // ✅ Get TOTAL available stock across ALL warehouses
+                $totalAvailableStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
                     ->where('variant_id', $variant ? $variant->id : null)
-                    ->where('warehouse_id', $defaultWarehouse->id)
-                    ->first();
+                    ->sum('available_quantity');
 
-                if (!$warehouseStock) {
+                $itemName = $variant
+                    ? "{$product->name} ({$variant->getFullName()})"
+                    : $product->name;
+
+                // ✅ Check if ANY warehouse has stock
+                if ($totalAvailableStock <= 0) {
                     DB::rollBack();
-
-                    $itemName = $variant
-                        ? "{$product->name} ({$variant->getFullName()})"
-                        : $product->name;
 
                     return response()->json([
                         'success' => false,
-                        'message' => "Stock record not found for {$itemName}",
+                        'message' => "No stock available for {$itemName}",
                     ], 400);
                 }
 
-                // ✅ Check available stock (considering reservations)
-                if ($warehouseStock->available_quantity < $item['quantity']) {
+                // ✅ Check if TOTAL available stock is sufficient
+                if ($totalAvailableStock < $item['quantity']) {
                     DB::rollBack();
 
-                    $itemName = $variant
-                        ? "{$product->name} ({$variant->getFullName()})"
-                        : $product->name;
-
-                    \Log::error('❌ Insufficient stock', [
+                    \Log::error('❌ Insufficient stock across all warehouses', [
                         'product' => $product->name,
                         'variant' => $variant ? $variant->getFullName() : null,
                         'requested' => $item['quantity'],
-                        'available' => $warehouseStock->available_quantity,
-                        'warehouse_qty' => $warehouseStock->quantity,
-                        'reserved' => $warehouseStock->reserved_quantity,
+                        'total_available' => $totalAvailableStock,
                     ]);
 
                     return response()->json([
@@ -218,7 +211,7 @@ class CheckoutController extends Controller
                         'details' => [
                             'product' => $itemName,
                             'requested' => $item['quantity'],
-                            'available' => $warehouseStock->available_quantity,
+                            'available' => $totalAvailableStock,
                         ],
                     ], 400);
                 }
