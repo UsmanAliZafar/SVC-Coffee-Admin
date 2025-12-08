@@ -163,7 +163,6 @@ class CheckoutController extends Controller
                     'message' => 'System error: No default warehouse configured. Please contact support.',
                 ], 500);
             }
-            // Check stock for each item
             foreach ($cart as $item) {
                 $product = Product::find($item['product_id']);
 
