@@ -330,7 +330,7 @@ class CheckoutController extends Controller
             }
 
             // ============================================================
-            // RESERVE STOCK (STAGE 1) ✅
+            // RESERVE STOCK (STAGE 1) ✅ MULTI-WAREHOUSE ALLOCATION
             // ============================================================
             \Log::info('📦 Reserving stock for web order', [
                 'order' => $order->order_number,
@@ -348,31 +348,80 @@ class CheckoutController extends Controller
                     ? \App\Models\ProductVariant::find($item['variant_id'])
                     : null;
 
-                $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
-                    ->where('variant_id', $variant ? $variant->id : null)
-                    ->where('warehouse_id', $defaultWarehouse->id)
-                    ->first();
+                $quantityNeeded = $item['quantity'];
+                $itemName = $variant
+                    ? "{$product->name} ({$variant->getFullName()})"
+                    : $product->name;
 
-                if ($warehouseStock && $warehouseStock->reserveStock($item['quantity'])) {
-                    // Update order item
-                    OrderItem::where('order_id', $order->id)
-                        ->where('product_id', $product->id)
-                        ->where('product_variant_id', $variant ? $variant->id : null)
-                        ->update([
-                            'stock_reserved' => true,
-                            'stock_reserved_at' => now(),
+                // ✅ Get warehouses with available stock, prioritize default warehouse
+                $warehouseStocks = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                    ->where('variant_id', $variant ? $variant->id : null)
+                    ->where('available_quantity', '>', 0)
+                    ->join('warehouses', 'product_warehouse_stock.warehouse_id', '=', 'warehouses.id')
+                    ->select('product_warehouse_stock.*', 'warehouses.name as warehouse_name', 'warehouses.is_default')
+                    ->orderBy('warehouses.is_default', 'desc') // Default warehouse first
+                    ->orderBy('warehouses.priority', 'desc')
+                    ->get();
+
+                if ($warehouseStocks->isEmpty()) {
+                    DB::rollBack();
+                    \Log::error('❌ No warehouse stock available during reservation', [
+                        'product' => $itemName,
+                        'quantity_needed' => $quantityNeeded,
+                    ]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Stock not available for {$itemName}",
+                    ], 400);
+                }
+
+                // ✅ Reserve from warehouses until quantity is fulfilled
+                foreach ($warehouseStocks as $warehouseStock) {
+                    if ($quantityNeeded <= 0) {
+                        break;
+                    }
+
+                    $reserveQty = min($quantityNeeded, $warehouseStock->available_quantity);
+
+                    if ($warehouseStock->reserveStock($reserveQty)) {
+                        // Update order item with warehouse info
+                        $orderItem = OrderItem::where('order_id', $order->id)
+                            ->where('product_id', $product->id)
+                            ->where('product_variant_id', $variant ? $variant->id : null)
+                            ->first();
+
+                        if ($orderItem) {
+                            $orderItem->update([
+                                'stock_reserved' => true,
+                                'stock_reserved_at' => now(),
+                                'warehouse_id' => $warehouseStock->warehouse_id,
+                            ]);
+                        }
+
+                        \Log::info('🔒 RESERVED (Web Order)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                            'quantity' => $reserveQty,
+                            'warehouse' => $warehouseStock->warehouse_name,
+                            'warehouse_id' => $warehouseStock->warehouse_id,
                         ]);
 
-                    $itemName = $variant
-                        ? "{$product->name} ({$variant->getFullName()})"
-                        : $product->name;
+                        $quantityNeeded -= $reserveQty;
+                    }
+                }
 
-                    \Log::info('🔒 RESERVED (Web Order)', [
-                        'order' => $order->order_number,
+                // ✅ Verify all quantity was reserved
+                if ($quantityNeeded > 0) {
+                    DB::rollBack();
+                    \Log::error('❌ Failed to reserve full quantity', [
                         'product' => $itemName,
-                        'quantity' => $item['quantity'],
-                        'warehouse' => $defaultWarehouse->name,
+                        'quantity_needed' => $item['quantity'],
+                        'quantity_remaining' => $quantityNeeded,
                     ]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Failed to reserve stock for {$itemName}",
+                    ], 400);
                 }
             }
 
