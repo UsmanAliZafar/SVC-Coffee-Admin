@@ -456,6 +456,8 @@ class PageController extends Controller
             'display_order' => $page->display_order,
             'menu_label' => $page->menu_label,
             'parent_id' => $page->parent_id,
+            'show_in_header' => $page->show_in_header,
+            'show_in_footer' => $page->show_in_footer,
             'has_children' => $page->hasChildren(),
             'published_date' => $page->published_date,
             'created_at' => $page->created_at->toIso8601String(),
