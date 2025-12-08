@@ -153,6 +153,8 @@ class CheckoutController extends Controller
             // ============================================================
             // VALIDATE STOCK AVAILABILITY BEFORE CREATING ORDER
             // ============================================================
+
+            // Get default warehouse for reservations
             $defaultWarehouse = \App\Models\Warehouse::where('is_default', true)->first();
 
             if (!$defaultWarehouse) {
@@ -163,6 +165,8 @@ class CheckoutController extends Controller
                     'message' => 'System error: No default warehouse configured. Please contact support.',
                 ], 500);
             }
+
+            // Check stock for each item
             foreach ($cart as $item) {
                 $product = Product::find($item['product_id']);
 
@@ -182,16 +186,6 @@ class CheckoutController extends Controller
                 $itemName = $variant
                     ? "{$product->name} ({$variant->getFullName()})"
                     : $product->name;
-
-                // ✅ Check if ANY warehouse has stock
-                if ($totalAvailableStock <= 0) {
-                    DB::rollBack();
-
-                    return response()->json([
-                        'success' => false,
-                        'message' => "No stock available for {$itemName}",
-                    ], 400);
-                }
 
                 // ✅ Check if TOTAL available stock is sufficient
                 if ($totalAvailableStock < $item['quantity']) {
