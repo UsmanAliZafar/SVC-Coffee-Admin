@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Support\Str;
+use App\Traits\HasTranslations;
 
 class Page extends Model
 {
     use HasFactory, SoftDeletes, HasUuids;
+    use HasTranslations;
 
     /**
      * The table associated with the model.
@@ -353,16 +355,18 @@ class Page extends Model
     {
         return [
             'title',
-            'short_description',
-            'description',
+            'excerpt',
+            'content',
             'meta_title',
             'meta_description',
             'meta_keywords',
+            'featured_image_alt',
+            'menu_label',
         ];
     }
 
     protected function getTranslationModule(): string
     {
-        return 'pages';
+        return 'page';
     }
 }

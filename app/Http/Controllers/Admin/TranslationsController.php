@@ -15,6 +15,7 @@ use App\Models\Product;
 use App\Models\ProductsCategories;
 use App\Models\Vendor;
 use App\Models\ProductTag;
+use App\Models\Page;
 
 class TranslationsController extends Controller
 {
@@ -50,8 +51,8 @@ class TranslationsController extends Controller
             'permission' => 'tags',
             'fields' => ['name', 'description'],
         ],
-        'pages' => [
-            'model' => \App\Models\Page::class,
+        'page' => [
+            'model' => Page::class,
             'table' => 'pages',
             'name_field' => 'title',
             'permission' => 'pages',
@@ -279,7 +280,7 @@ class TranslationsController extends Controller
             $itemId = $request->input('item_id');
             $lang = $request->input('lang');
             $translations = $request->input('translations');
-
+            // dd($module);
             // Check permission
             if (!$this->checkPermission($module, 'update')) {
                 return response()->json([

@@ -95,13 +95,13 @@ if (!function_exists('get_available_languages')) {
                 'flag' => '🇸🇦',
                 'direction' => 'rtl',
             ],
-            'es' => [
-                'code' => 'es',
-                'name' => 'Spanish',
-                'native_name' => 'Español',
-                'flag' => '🇪🇸',
-                'direction' => 'ltr',
-            ],
+            // 'es' => [
+            //     'code' => 'es',
+            //     'name' => 'Spanish',
+            //     'native_name' => 'Español',
+            //     'flag' => '🇪🇸',
+            //     'direction' => 'ltr',
+            // ],
             // 'fr' => [
             //     'code' => 'fr',
             //     'name' => 'French',

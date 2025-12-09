@@ -584,7 +584,7 @@
 </div>
 {{-- Translation button --}}
 @include('admin.components.translation-modal', [
-    'module' => 'pages',
+    'module' => 'page',
     'itemId' => $page->id,
     'itemName' => $page->title
 ])

@@ -41,6 +41,8 @@ trait HasTranslations
             return 'vendor';
         } elseif ($tableName === 'product_tags') {
             return 'tag';
+        } elseif ($tableName === 'pages') {
+            return 'page';
         }
 
         return rtrim($tableName, 's');
