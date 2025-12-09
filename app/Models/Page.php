@@ -348,4 +348,21 @@ class Page extends Model
         $this->status = 'archived';
         return $this->save();
     }
+
+    public function getTranslatableFields(): array
+    {
+        return [
+            'title',
+            'short_description',
+            'description',
+            'meta_title',
+            'meta_description',
+            'meta_keywords',
+        ];
+    }
+
+    protected function getTranslationModule(): string
+    {
+        return 'pages';
+    }
 }

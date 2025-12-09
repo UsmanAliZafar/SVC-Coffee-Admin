@@ -20,7 +20,7 @@ class PageController extends Controller
     public function index(Request $request)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.read')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.read')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -55,7 +55,7 @@ class PageController extends Controller
     public function getData(Request $request)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.read')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.read')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -120,7 +120,7 @@ class PageController extends Controller
 
         return DataTables::of($query)
             ->addColumn('checkbox', function($page) {
-                if (Auth::guard('admin')->user()->hasPermission('content.delete')) {
+                if (Auth::guard('admin')->user()->hasPermission('pages.delete')) {
                     return '<input type="checkbox" class="form-check-input page-checkbox" value="' . $page->id . '">';
                 }
                 return '';
@@ -274,7 +274,7 @@ class PageController extends Controller
                 $actions = '<div class="btn-group" role="group">';
 
                 // View button
-                if (Auth::guard('admin')->user()->hasPermission('content.read')) {
+                if (Auth::guard('admin')->user()->hasPermission('pages.read')) {
                     $actions .= '<a href="' . route('admin.pages.show', $page->id) . '"
                                 class="btn btn-sm btn-info" title="View">
                                 <i class="bi bi-eye"></i>
@@ -282,7 +282,7 @@ class PageController extends Controller
                 }
 
                 // Edit button
-                if (Auth::guard('admin')->user()->hasPermission('content.update')) {
+                if (Auth::guard('admin')->user()->hasPermission('pages.update')) {
                     $actions .= '<a href="' . route('admin.pages.edit', $page->id) . '"
                                 class="btn btn-sm btn-primary" title="Edit">
                                 <i class="bi bi-pencil"></i>
@@ -298,7 +298,7 @@ class PageController extends Controller
                             <ul class="dropdown-menu dropdown-menu-end">';
 
                 // Status change actions
-                if (Auth::guard('admin')->user()->hasPermission('content.update')) {
+                if (Auth::guard('admin')->user()->hasPermission('pages.update')) {
                     if ($page->status == 'draft') {
                         $actions .= '<li><button type="button" class="dropdown-item publish-page"
                                     data-id="' . $page->id . '" data-title="' . htmlspecialchars($page->title) . '">
@@ -324,7 +324,7 @@ class PageController extends Controller
                 }
 
                 // Duplicate
-                if (Auth::guard('admin')->user()->hasPermission('content.create')) {
+                if (Auth::guard('admin')->user()->hasPermission('pages.create')) {
                     $actions .= '<li><button type="button" class="dropdown-item duplicate-page"
                                 data-id="' . $page->id . '" data-title="' . htmlspecialchars($page->title) . '">
                                 <i class="bi bi-copy text-info me-2"></i>Duplicate
@@ -338,7 +338,7 @@ class PageController extends Controller
                             </a></li>';
 
                 // Delete
-                if (Auth::guard('admin')->user()->hasPermission('content.delete')) {
+                if (Auth::guard('admin')->user()->hasPermission('pages.delete')) {
                     $actions .= '<li><hr class="dropdown-divider"></li>';
                     $actions .= '<li><button type="button" class="dropdown-item text-danger delete-page"
                                 data-id="' . $page->id . '" data-title="' . htmlspecialchars($page->title) . '">
@@ -372,7 +372,7 @@ class PageController extends Controller
     public function create()
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.create')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.create')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -399,7 +399,7 @@ class PageController extends Controller
     public function store(Request $request)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.create')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.create')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -482,7 +482,7 @@ class PageController extends Controller
     public function show(Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.read')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.read')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -497,7 +497,7 @@ class PageController extends Controller
     public function edit(Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.update')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -525,7 +525,7 @@ class PageController extends Controller
     public function update(Request $request, Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.update')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -621,7 +621,7 @@ class PageController extends Controller
     public function destroy(Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.delete')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.delete')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -653,7 +653,7 @@ class PageController extends Controller
     public function bulkDelete(Request $request)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.delete')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.delete')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -699,7 +699,7 @@ class PageController extends Controller
     public function publish(Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.update')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -717,7 +717,7 @@ class PageController extends Controller
     public function unpublish(Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.update')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -736,7 +736,7 @@ class PageController extends Controller
     public function archive(Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.update')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -754,7 +754,7 @@ class PageController extends Controller
     public function duplicate(Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.create')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.create')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -792,7 +792,7 @@ class PageController extends Controller
     public function updateOrder(Request $request)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.update')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -817,7 +817,7 @@ class PageController extends Controller
     public function preview(Page $page)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.read')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.read')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -830,7 +830,7 @@ class PageController extends Controller
     public function bulkUpdateStatus(Request $request)
     {
         // Check permission
-        if (!Auth::guard('admin')->user()->hasPermission('content.update')) {
+        if (!Auth::guard('admin')->user()->hasPermission('pages.update')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 

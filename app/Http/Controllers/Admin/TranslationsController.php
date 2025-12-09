@@ -50,6 +50,13 @@ class TranslationsController extends Controller
             'permission' => 'tags',
             'fields' => ['name', 'description'],
         ],
+        'pages' => [
+            'model' => \App\Models\Page::class,
+            'table' => 'pages',
+            'name_field' => 'title',
+            'permission' => 'pages',
+            'fields' => ['title', 'excerpt', 'content', 'meta_title', 'meta_description', 'meta_keywords', 'featured_image_alt', 'menu_label'],
+        ],
     ];
 
     /**

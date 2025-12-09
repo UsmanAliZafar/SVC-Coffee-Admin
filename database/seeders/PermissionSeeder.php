@@ -42,7 +42,7 @@ class PermissionSeeder extends Seeder
             'permissions' => ['read', 'update'],
             'tags' => ['create', 'read', 'update', 'delete'],
             'vendors' => ['create', 'read', 'update', 'delete'],
-            'content' => ['create', 'read', 'update', 'delete'],
+            'pages' => ['create', 'read', 'update', 'delete'],
             'coupons' => ['create', 'read', 'update', 'delete'],
             'notifications' => ['read', 'update', 'delete'],
             'contact_us'=>['read', 'update', 'delete'],

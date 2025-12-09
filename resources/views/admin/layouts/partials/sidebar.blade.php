@@ -600,24 +600,24 @@
             @endif
             {{-- Notifications Management --}}
 
-            {{-- Content Management --}}
-            @if(auth('admin')->user()->hasPermission('content.read'))
+            {{-- pages Management --}}
+            @if(auth('admin')->user()->hasPermission('pages.read'))
                 <li class="nav-item has-dropdown {{ request()->routeIs('admin.pages.*') ? 'open' : '' }}">
                     <a class="nav-link {{ request()->routeIs('admin.pages.*') ? 'active' : '' }}"
                     href="{{ route('admin.pages.index') }}"
-                    data-tooltip="Content">
+                    data-tooltip="Pages">
                         <i class="bi bi-file-text"></i>
-                        <span class="nav-text">Content</span>
+                        <span class="nav-text">Pages & Content</span>
                         <i class="bi bi-chevron-down dropdown-arrow"></i>
                     </a>
                     <ul class="submenu">
-                        @if(auth('admin')->user()->hasPermission('content.read'))
+                        @if(auth('admin')->user()->hasPermission('pages.read'))
                         <li>
                             <a href="{{ route('admin.pages.index') }}" class="{{ request()->routeIs('admin.pages.index') ? 'active' : '' }}">
                                 <i class="bi bi-file-earmark"></i> Pages
                             </a>
                         </li>
-                        @if(auth('admin')->user()->hasPermission('content.create'))
+                        @if(auth('admin')->user()->hasPermission('pages.create'))
                         <li>
                             <a href="{{ route('admin.pages.create') }}" class="{{ request()->routeIs('admin.pages.create') ? 'active' : '' }}">
                                 <i class="bi bi-plus-square"></i> Add New Page

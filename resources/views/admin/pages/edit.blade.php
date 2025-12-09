@@ -582,6 +582,13 @@
         </div>
     </form>
 </div>
+{{-- Translation button --}}
+@include('admin.components.translation-modal', [
+    'module' => 'pages',
+    'itemId' => $page->id,
+    'itemName' => $page->title
+])
+{{-- Translation button --}}
 @endsection
 
 @push('styles')
