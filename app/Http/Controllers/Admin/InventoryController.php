@@ -420,7 +420,7 @@ class InventoryController extends Controller
                     '<span class="badge bg-warning">' . $item['reserved'] . '</span>' :
                     '<span class="text-muted">0</span>';
             })
-            ->addColumn('warehouses', function($item) {
+           ->addColumn('warehouses', function($item) {
                 if ($item['warehouse_count'] === 0) {
                     return '<div>
                         <span class="badge bg-warning text-dark">
@@ -432,11 +432,41 @@ class InventoryController extends Controller
                 }
 
                 $html = '';
+
                 foreach ($item['warehouses'] as $stock) {
-                    $html .= '<div class="mb-1">
-                        <small><strong>' . htmlspecialchars($stock->warehouse->name) . ':</strong> ' . $stock->quantity . '</small>
-                    </div>';
+                    $warehouseName = htmlspecialchars($stock->warehouse->name);
+                    $totalQty = $stock->quantity;
+                    $reservedQty = $stock->reserved_quantity;
+                    $availableQty = $stock->available_quantity;
+
+                    // Determine stock status color
+                    $stockClass = $totalQty <= 0 ? 'text-danger' :
+                                ($availableQty <= 0 ? 'text-warning' : 'text-success');
+
+                    $html .= '<div class="mb-1 small">
+                        <strong class="' . $stockClass . '">
+                            <i class="bi bi-building"></i> ' . $warehouseName . ':
+                        </strong>
+                        <span class="badge bg-secondary">' . $totalQty . '</span>';
+
+                    // Available quantity
+                    $html .= ' <span class="text-success">(<i class="bi bi-check-circle"></i> ' . $availableQty . '</span>';
+
+                    // Reserved quantity (only show if > 0)
+                    if ($reservedQty > 0) {
+                        $html .= ' <span class="text-warning">| <i class="bi bi-lock"></i> ' . $reservedQty . '</span>';
+                    }
+
+                    $html .= ')';
+
+                    // Location (only show if set)
+                    if (!empty($stock->location)) {
+                        $html .= ' <span class="text-muted">- <i class="bi bi-geo-alt"></i> ' . htmlspecialchars($stock->location) . '</span>';
+                    }
+
+                    $html .= '</div>';
                 }
+
                 return $html;
             })
             ->addColumn('actions', function($item) {
