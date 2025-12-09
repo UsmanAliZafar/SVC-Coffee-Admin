@@ -70,6 +70,13 @@ class CustomersController extends Controller
             $query->dateRange($request->date_from, $request->date_to);
         }
 
+        if ($request->filled('min_spent')) {
+            $query->where('total_spent', '>=', (float)$request->min_spent);
+        }
+        if ($request->filled('max_spent')) {
+            $query->where('total_spent', '<=', (float)$request->max_spent);
+        }
+
         if ($request->filled('search')) {
             $searchTerm = is_array($request->search) ? $request->search['value'] : $request->search;
             if (!empty($searchTerm)) {

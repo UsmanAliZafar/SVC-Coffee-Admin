@@ -358,7 +358,7 @@
                             <th><i class="bi bi-person"></i> Customer</th>
                             <th><i class="bi bi-tag"></i> Type</th>
                             <th class="text-center"><i class="bi bi-cart"></i> Orders</th>
-                            <th class="text-end"><i class="bi bi-currency-dollar"></i> Total Spent</th>
+                            <th class="text-end">{{ store_currency_symbol() }}</i> Total Spent</th>
                             <th class="text-end"><i class="bi bi-graph-up"></i> Avg Value</th>
                             <th><i class="bi bi-trophy"></i> Loyalty</th>
                             <th><i class="bi bi-clock-history"></i> Last Order</th>
