@@ -271,30 +271,6 @@ class CheckoutController extends Controller
             $order = Order::create($orderData);
 
             // ============================================================
-            // NOTIFICATIONS
-            // ============================================================
-            app(\App\Services\NotificationService::class)->notify('order_created', [
-                'order_id' => $order->id,
-                'order_number' => $order->order_number,
-                'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
-                'customer_name' => $order->getCustomerName(),
-                'customer_email' => $order->getCustomerEmail(),
-                'items_count' => count($cart),
-                'payment_method' => ucfirst($validated['payment_method']),
-            ]);
-            // High-value order notification
-            if (exceeds_order_threshold($order->total_amount)) {
-                app(\App\Services\NotificationService::class)->notify('customer_high_value_order', [
-                    'order_id' => $order->id,
-                    'order_number' => $order->order_number,
-                    'customer_name' => $order->getCustomerName(),
-                    'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
-                ]);
-            }
-
-            app(\App\Services\NotificationService::class)->notifyCustomer('order_created', $order);
-
-            // ============================================================
             // CREATE ORDER ITEMS
             // ============================================================
             foreach ($cart as $item) {

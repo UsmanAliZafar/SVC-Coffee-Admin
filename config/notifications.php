@@ -345,36 +345,36 @@ return [
             'icon' => 'bi-cart',
             'color' => 'primary',
         ],
-        'inventory' => [
-            'label' => 'Inventory & Stock',
-            'icon' => 'bi-box-seam',
-            'color' => 'warning',
-        ],
+        // 'inventory' => [
+        //     'label' => 'Inventory & Stock',
+        //     'icon' => 'bi-box-seam',
+        //     'color' => 'warning',
+        // ],
         'payments' => [
             'label' => 'Payments & Transactions',
             'icon' => 'bi-credit-card',
             'color' => 'success',
         ],
-        'customers' => [
-            'label' => 'Customer Management',
-            'icon' => 'bi-people',
-            'color' => 'info',
-        ],
-        'products' => [
-            'label' => 'Product Management',
-            'icon' => 'bi-bag',
-            'color' => 'secondary',
-        ],
-        'reports' => [
-            'label' => 'Reports & Analytics',
-            'icon' => 'bi-graph-up',
-            'color' => 'primary',
-        ],
-        'system' => [
-            'label' => 'System Alerts',
-            'icon' => 'bi-gear',
-            'color' => 'danger',
-        ],
+        // 'customers' => [
+        //     'label' => 'Customer Management',
+        //     'icon' => 'bi-people',
+        //     'color' => 'info',
+        // ],
+        // 'products' => [
+        //     'label' => 'Product Management',
+        //     'icon' => 'bi-bag',
+        //     'color' => 'secondary',
+        // ],
+        // 'reports' => [
+        //     'label' => 'Reports & Analytics',
+        //     'icon' => 'bi-graph-up',
+        //     'color' => 'primary',
+        // ],
+        // 'system' => [
+        //     'label' => 'System Alerts',
+        //     'icon' => 'bi-gear',
+        //     'color' => 'danger',
+        // ],
     ],
 
     /**

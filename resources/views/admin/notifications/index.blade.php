@@ -1,7 +1,35 @@
 @extends('admin.layouts.app')
 
 @section('title', 'Notifications')
+@push('styles')
+<!-- Add Toastr CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 
+<style>
+.notification-item {
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.notification-item:hover {
+    background-color: #f8f9fa !important;
+}
+
+.notification-item.bg-light {
+    border-left-color: #0d6efd;
+}
+
+.notification-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f8f9fa;
+    border-radius: 50%;
+}
+</style>
+@endpush
 @section('content')
 <div class="container-fluid">
     <!-- Page Header -->
@@ -163,6 +191,20 @@
     </div>
 </div>
 @push('scripts')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script>
+toastr.options = {
+    "closeButton": true,
+    "progressBar": true,
+    "positionClass": "toast-top-right",
+    "timeOut": "3000",
+    "extendedTimeOut": "1000",
+    "showEasing": "swing",
+    "hideEasing": "linear",
+    "showMethod": "fadeIn",
+    "hideMethod": "fadeOut"
+};
+</script>
 <script>
 $(document).ready(function() {
     // Initialize DataTable
@@ -297,6 +339,17 @@ $(document).ready(function() {
 
     // Mark all as read
     $('#markAllReadBtn').on('click', function() {
+        // Show confirmation dialog instead of alert
+        if (!confirm('Are you sure you want to mark all notifications as read?')) {
+            return;
+        }
+
+        // Show loading state
+        const btn = $(this);
+        const originalHtml = btn.html();
+        btn.prop('disabled', true)
+        .html('<span class="spinner-border spinner-border-sm me-2"></span>Processing...');
+
         $.ajax({
             url: '{{ route("admin.notifications.mark-all-as-read") }}',
             type: 'POST',
@@ -304,12 +357,17 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.success) {
                     toastr.success(response.message);
-                    table.ajax.reload();
-                    updateUnreadCount();
+
+                    // Option 1: Reload page after toastr (recommended)
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500); // Wait 1.5 seconds to show toastr
                 }
             },
             error: function() {
                 toastr.error('Failed to mark all as read');
+                // Re-enable button on error
+                btn.prop('disabled', false).html(originalHtml);
             }
         });
     });
