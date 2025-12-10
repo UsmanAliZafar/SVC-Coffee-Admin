@@ -2933,6 +2933,19 @@ class OrdersController extends Controller
             }
 
             $transaction = Transaction::create($transactionData);
+            //
+            if ($order->payment_method !== 'cod') {
+                $this->notificationService->notify('payment_pending', [
+                    'transaction_id' => $transaction->id,
+                    'transaction_number' => $transaction->transaction_number,
+                    'order_number' => $order->order_number,
+                    'amount' => $order->currency . ' ' . number_format($transaction->amount, 2),
+                    'payment_method' => ucfirst($transaction->payment_method),
+                    'payment_gateway' => $transaction->payment_gateway,
+                    'customer_name' => $order->getCustomerName(),
+                    'customer_email' => $order->getCustomerEmail(),
+                ]);
+            }
 
             \Log::info('✅ Transaction created for admin order', [
                 'order' => $order->order_number,

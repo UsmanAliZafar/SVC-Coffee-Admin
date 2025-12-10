@@ -946,6 +946,7 @@ class CheckoutController extends Controller
                 'order_number' => $order->order_number,
                 'reason' => $validated['error_message'] ?? 'Payment gateway error',  // ← Added
             ]);
+            $this->notificationService->notifyCustomer('payment_failed', $order);
 
             return response()->json([
                 'success' => true,
