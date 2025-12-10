@@ -700,21 +700,4 @@ class PageController extends Controller
             'has_translations' => !empty($groupedTranslations),
         ]);
     }
-
-    public function testActualResponse(string $slug)
-    {
-        $page = Page::where('slug', $slug)->firstOrFail();
-
-        // Test the helper function
-        $availableLanguages = get_available_languages(false);
-
-        // Test the actual method
-        $translations = $this->getPageTranslations($page);
-
-        return response()->json([
-            'available_languages_helper' => $availableLanguages,
-            'grouped_translations' => $page->getTranslationsGroupedByLanguage(),
-            'final_translations_output' => $translations,
-        ]);
-    }
 }

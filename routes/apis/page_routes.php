@@ -19,7 +19,6 @@ Route::prefix('pages')->name('pages.')->group(function () {
     // GET /api/pages?per_page=20
     Route::get('/', [PageController::class, 'index'])
         ->name('index');
-    Route::get('/test-translations/{slug}', [PageController::class, 'testActualResponse']);
     // Get pages for header menu
     // GET /api/pages/menu/header
     Route::get('/menu/header', [PageController::class, 'headerMenu'])
