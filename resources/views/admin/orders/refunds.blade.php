@@ -86,7 +86,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             <div class="bg-danger bg-opacity-10 text-danger rounded-3 p-3">
-                                <i class="bi bi-currency-dollar fs-4"></i>
+                                {{ store_currency_symbol() }}
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">

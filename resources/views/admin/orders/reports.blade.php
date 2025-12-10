@@ -91,12 +91,12 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             <div class="bg-success bg-opacity-10 text-success rounded-3 p-3">
-                                <i class="bi bi-currency-dollar fs-4"></i>
+                                {{ store_currency_symbol() }}
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="text-muted mb-1">Total Revenue</h6>
-                            <h3 class="mb-0" id="totalRevenue">${{ number_format($stats['total_revenue'] ?? 0, 2) }}</h3>
+                            <h3 class="mb-0" id="totalRevenue">{{ store_currency_symbol() }} {{ number_format($stats['total_revenue'] ?? 0, 2) }}</h3>
                             <small class="text-muted" id="revenueChange">-</small>
                         </div>
                     </div>
@@ -115,7 +115,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="text-muted mb-1">Average Order Value</h6>
-                            <h3 class="mb-0" id="avgOrderValue">${{ number_format($stats['average_order_value'] ?? 0, 2) }}</h3>
+                            <h3 class="mb-0" id="avgOrderValue">{{ store_currency_symbol() }}{{ number_format($stats['average_order_value'] ?? 0, 2) }}</h3>
                             <small class="text-muted" id="avgChange">-</small>
                         </div>
                     </div>
@@ -479,8 +479,8 @@ $(document).ready(function() {
 
     function updateMetrics(data) {
         $('#totalOrders').text(number_format(data.total_orders || 0));
-        $('#totalRevenue').text('$' + number_format(data.total_revenue || 0, 2));
-        $('#avgOrderValue').text('$' + number_format(data.avg_order_value || 0, 2));
+        $('#totalRevenue').text('{{ store_currency_symbol() }}' + number_format(data.total_revenue || 0, 2));
+        $('#avgOrderValue').text('{{ store_currency_symbol() }}' + number_format(data.avg_order_value || 0, 2));
         $('#pendingOrders').text(number_format(data.pending_orders || 0));
 
         // Status counts
@@ -601,7 +601,7 @@ $(document).ready(function() {
                         <td>${index + 1}</td>
                         <td>${product.name}</td>
                         <td>${product.quantity}</td>
-                        <td><strong>$${number_format(product.revenue, 2)}</strong></td>
+                        <td><strong>{{ store_currency_symbol() }}${number_format(product.revenue, 2)}</strong></td>
                     </tr>
                 `;
             });

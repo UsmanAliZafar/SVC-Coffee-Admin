@@ -263,7 +263,7 @@
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card stat-card shadow-sm h-100">
                 <div class="card-body text-center">
-                    <i class="bi bi-currency-dollar text-success fs-1 mb-2"></i>
+                    {{ store_currency_symbol() }}
                     <div class="stat-value" style="font-size: 1.5rem;" id="potentialRevenue">-</div>
                     <div class="stat-label">Potential Revenue</div>
                     <small class="text-muted">If reactivated</small>

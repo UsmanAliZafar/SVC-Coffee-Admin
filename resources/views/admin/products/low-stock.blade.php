@@ -124,7 +124,7 @@
                 <div class="stat-label">Average Stock Level</div>
             </div>
             <div class="col-md-3 stat-item">
-                <div class="stat-value" id="lowStockValue">$0</div>
+                <div class="stat-value" id="lowStockValue">{{ store_currency_symbol() }}0</div>
                 <div class="stat-label">Total Stock Value</div>
             </div>
         </div>
@@ -662,7 +662,7 @@ $(document).ready(function() {
                 $('#totalLowStock').text(response.total || 0);
                 $('#criticalStock').text(response.critical || 0);
                 $('#averageLowStock').text(response.average_stock || 0);
-                $('#lowStockValue').text('$' + (response.total_value || 0).toLocaleString());
+                $('#lowStockValue').text('{{ store_currency_symbol() }}' + (response.total_value || 0).toLocaleString());
             }
         });
     }

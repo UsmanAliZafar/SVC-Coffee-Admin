@@ -120,7 +120,7 @@
                 <div class="stat-label">Out of Stock</div>
             </div>
             <div class="col-md-3 stat-item">
-                <div class="stat-value" id="inactiveValue">$0</div>
+                <div class="stat-value" id="inactiveValue">{{ store_currency_symbol() }}0</div>
                 <div class="stat-label">Total Inventory Value</div>
             </div>
         </div>
@@ -680,7 +680,7 @@ $(document).ready(function() {
                 $('#totalInactive').text(response.total || 0);
                 $('#inactiveInStock').text(response.in_stock || 0);
                 $('#inactiveOutStock').text(response.out_of_stock || 0);
-                $('#inactiveValue').text('$' + (response.total_value || 0).toLocaleString());
+                $('#inactiveValue').text('{{ store_currency_symbol() }}' + (response.total_value || 0).toLocaleString());
             }
         });
     }

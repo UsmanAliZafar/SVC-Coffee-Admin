@@ -86,7 +86,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             <div class="bg-info bg-opacity-10 text-info rounded-3 p-3">
-                                <i class="bi bi-currency-dollar fs-4"></i>
+                                {{ store_currency_symbol() }}
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
@@ -421,7 +421,7 @@ $(document).ready(function() {
         $('#totalInvoices').text(total);
         $('#paidInvoices').text(paid);
         $('#pendingInvoices').text(pending);
-        $('#totalAmount').text('$' + amount.toFixed(2));
+        $('#totalAmount').text('{{ store_currency_symbol() }}' + amount.toFixed(2));
     }
 
     // Apply Filters

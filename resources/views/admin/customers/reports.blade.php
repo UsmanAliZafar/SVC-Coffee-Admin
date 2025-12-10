@@ -273,7 +273,7 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="stat-icon bg-warning bg-opacity-10 text-warning">
-                            <i class="bi bi-currency-dollar"></i>
+                            {{ store_currency_symbol() }}
                         </div>
                         <div class="ms-3 flex-grow-1">
                             <div class="stat-label">Total Revenue</div>

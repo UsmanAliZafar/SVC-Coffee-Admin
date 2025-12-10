@@ -524,7 +524,7 @@
     <div class="col-xl-2 col-md-4 col-6 mb-3">
         <a href="{{ route('admin.reports.inventory.valuation') }}" class="quick-link-card">
             <div class="quick-link-icon">
-                <i class="bi bi-currency-dollar"></i>
+                {{ store_currency_symbol() }}
             </div>
             <h6>Valuation</h6>
             <small class="text-muted">Stock value</small>

@@ -62,12 +62,12 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             <div class="bg-success bg-opacity-10 text-success rounded-3 p-3">
-                                <i class="bi bi-currency-dollar fs-4"></i>
+                                {{ store_currency_symbol() }}
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="text-muted mb-1">Total Revenue</h6>
-                            <h3 class="mb-0" id="totalRevenue">$0.00</h3>
+                            <h3 class="mb-0" id="totalRevenue">{{ store_currency_symbol() }} 0.00</h3>
                         </div>
                     </div>
                 </div>
@@ -103,7 +103,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="text-muted mb-1">Average Order</h6>
-                            <h3 class="mb-0" id="averageOrderValue">$0.00</h3>
+                            <h3 class="mb-0" id="averageOrderValue">{{ store_currency_symbol() }}0.00</h3>
                         </div>
                     </div>
                 </div>
@@ -348,9 +348,9 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.stats) {
                     $('#totalOrdersCount').text(response.stats.total_orders || 0);
-                    $('#totalRevenue').text('$' + (response.stats.total_revenue || 0).toFixed(2));
+                    $('#totalRevenue').text('{{ store_currency_symbol() }}' + (response.stats.total_revenue || 0).toFixed(2));
                     $('#pendingOrdersCount').text(response.stats.pending_orders || 0);
-                    $('#averageOrderValue').text('$' + (response.stats.average_order || 0).toFixed(2));
+                    $('#averageOrderValue').text('{{ store_currency_symbol() }}' + (response.stats.average_order || 0).toFixed(2));
                 }
             }
         });

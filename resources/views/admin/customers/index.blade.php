@@ -189,7 +189,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             <div class="stat-icon bg-warning bg-opacity-10 text-warning">
-                                <i class="bi bi-currency-dollar fs-3"></i>
+                                {{ store_currency_symbol() }}
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
