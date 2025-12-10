@@ -16,6 +16,7 @@ use App\Models\InventoryMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
@@ -24,6 +25,13 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
+        $user = auth('admin')->user();
+        // Check if user has dashboard.read permission
+        if (!$user->hasPermission('dashboard.read')) {
+            // Show simplified dashboard
+            return view('admin.dashboard-limited', compact('user'));
+        }
+
         $user = auth('admin')->user();
         $period = $request->input('period', 'week'); // Default to week
         // dd($startDate);
