@@ -112,6 +112,12 @@
                             </span>
                             <span class="text-nowrap">Active</span>
                         </p>
+                        @if($stats['period_new_products'] > 0)
+                        <small class="text-muted">
+                            <i class="bi bi-plus-circle text-brand"></i>
+                            {{ number_format($stats['period_new_products']) }} new this {{ $period }}
+                        </small>
+                        @endif
                     </div>
                     <div class="col-auto">
                         <div class="icon icon-shape bg-brand text-white rounded-circle shadow">
@@ -129,8 +135,10 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col">
-                        <h5 class="card-title text-uppercase text-muted mb-0">Total Orders</h5>
-                        <span class="h2 font-weight-bold mb-0">{{ number_format($stats['total_orders']) }}</span>
+                        <h5 class="card-title text-uppercase text-muted mb-0">
+                            {{ ucfirst($period) }} Orders
+                        </h5>
+                        <span class="h2 font-weight-bold mb-0">{{ number_format($stats['period_orders']) }}</span>
                         <p class="mt-2 mb-0 text-muted text-sm">
                             @if($orderStats['orders_require_action'] > 0)
                             <span class="text-warning me-2">
@@ -143,6 +151,7 @@
                             </span>
                             @endif
                         </p>
+                        <small class="text-muted">Total: {{ number_format($stats['total_orders']) }}</small>
                     </div>
                     <div class="col-auto">
                         <div class="icon icon-shape bg-warning text-white rounded-circle shadow">
@@ -167,6 +176,12 @@
                                 <i class="bi bi-person-plus"></i> Registered
                             </span>
                         </p>
+                        @if($stats['period_new_customers'] > 0)
+                        <small class="text-muted">
+                            <i class="bi bi-plus-circle text-brand"></i>
+                            {{ number_format($stats['period_new_customers']) }} new this {{ $period }}
+                        </small>
+                        @endif
                     </div>
                     <div class="col-auto">
                         <div class="icon icon-shape bg-info text-white rounded-circle shadow">
@@ -178,25 +193,31 @@
         </div>
     </div>
 
-    <!-- Total Revenue -->
+    <!-- Period Revenue -->
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card card-stats stat-card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="row">
                     <div class="col">
-                        <h5 class="card-title text-uppercase text-muted mb-0">Month Revenue</h5>
-                        <span class="h2 font-weight-bold mb-0">{{ store_currency_symbol() }} {{ number_format($revenueStats['month_revenue'], 2) }}</span>
+                        <h5 class="card-title text-uppercase text-muted mb-0">
+                            {{ $revenueStats['period_label'] }} Revenue
+                        </h5>
+                        <span class="h2 font-weight-bold mb-0">
+                            {{ store_currency_symbol() }} {{ number_format($revenueStats['period_revenue'], 2) }}
+                        </span>
                         <p class="mt-2 mb-0 text-muted text-sm">
                             @if($revenueStats['revenue_change_percentage'] > 0)
                             <span class="percentage-badge positive">
                                 <i class="bi bi-arrow-up"></i> {{ number_format($revenueStats['revenue_change_percentage'], 1) }}%
                             </span>
+                            <small class="text-muted ms-1">vs last {{ $period }}</small>
                             @elseif($revenueStats['revenue_change_percentage'] < 0)
                             <span class="percentage-badge negative">
                                 <i class="bi bi-arrow-down"></i> {{ number_format(abs($revenueStats['revenue_change_percentage']), 1) }}%
                             </span>
+                            <small class="text-muted ms-1">vs last {{ $period }}</small>
                             @else
-                            <span class="text-muted">No change</span>
+                            <span class="text-muted">No change from last {{ $period }}</span>
                             @endif
                         </p>
                     </div>
@@ -296,6 +317,10 @@
                     <div class="h5 mb-0">{{ store_currency_symbol() }} {{ number_format($revenueStats['week_revenue'], 2) }}</div>
                 </div>
                 <div class="mb-2">
+                    <small class="text-muted">This Month</small>
+                    <div class="h5 mb-0">{{ store_currency_symbol() }} {{ number_format($revenueStats['month_revenue'], 2) }}</div>
+                </div>
+                <div class="mb-2">
                     <small class="text-muted">This Year</small>
                     <div class="h5 mb-0">{{ store_currency_symbol() }} {{ number_format($revenueStats['year_revenue'], 2) }}</div>
                 </div>
@@ -304,10 +329,13 @@
                     <small class="text-muted">Avg Order Value</small>
                     <span class="fw-bold">{{ store_currency_symbol() }} {{ number_format($revenueStats['average_order_value'], 2) }}</span>
                 </div>
+                <div class="d-flex justify-content-between mt-2">
+                    <small class="text-muted">Period</small>
+                    <span class="badge bg-brand">{{ $revenueStats['period_label'] }}</span>
+                </div>
             </div>
         </div>
     </div>
-
     <!-- Warehouses & Alerts -->
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card border-0 shadow-sm h-100">

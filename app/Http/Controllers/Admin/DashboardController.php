@@ -25,9 +25,9 @@ class DashboardController extends Controller
     {
         $user = auth('admin')->user();
         $period = $request->input('period', 'week'); // Default to week
-
+        // dd($startDate);
         // Get dashboard statistics with period filter
-        $stats = $this->getGeneralStats();
+        $stats = $this->getGeneralStats($period);
         $orderStats = $this->getOrderStats($period);
         $inventoryStats = $this->getInventoryStats();
         $revenueStats = $this->getRevenueStats($period);
@@ -61,17 +61,25 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get general statistics
+     * Get general statistics with period filter
      */
-    private function getGeneralStats(): array
+    private function getGeneralStats(string $period = 'week'): array
     {
+        $startDate = $this->getStartDate($period);
+
         return [
+            // Overall stats (no period filter - these are totals)
             'total_products' => Product::count(),
             'active_products' => Product::where('status_key_code', 'PRODUCT_ACTIVE')->count(),
-            'total_orders' => Order::count(),
             'total_customers' => Customer::count(),
             'active_admins' => AdminUser::where('is_active', true)->count(),
             'total_warehouses' => Warehouse::where('is_active', true)->count(),
+
+            // Period-specific stats (filtered by date)
+            'total_orders' => Order::count(), // All time
+            'period_orders' => Order::where('created_at', '>=', $startDate)->count(), // Period filtered
+            'period_new_products' => Product::where('created_at', '>=', $startDate)->count(),
+            'period_new_customers' => Customer::where('created_at', '>=', $startDate)->count(),
         ];
     }
 
@@ -132,7 +140,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get revenue statistics
+     * Get revenue statistics with period filter
      */
     private function getRevenueStats(string $period = 'week'): array
     {
@@ -140,10 +148,15 @@ class DashboardController extends Controller
         $thisWeek = Carbon::now()->startOfWeek();
         $thisMonth = Carbon::now()->startOfMonth();
         $thisYear = Carbon::now()->startOfYear();
+
+        // Get period start date
         $startDate = $this->getStartDate($period);
+
+        // Period revenue (based on selected filter)
         $periodRevenue = Order::where('created_at', '>=', $startDate)
-                         ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
-                         ->sum('total_amount');
+                            ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+                            ->sum('total_amount');
+
         // Today's revenue
         $todayRevenue = Order::whereDate('created_at', $today)
                             ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
@@ -151,8 +164,8 @@ class DashboardController extends Controller
 
         // This week's revenue
         $weekRevenue = Order::where('created_at', '>=', $thisWeek)
-                           ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
-                           ->sum('total_amount');
+                        ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+                        ->sum('total_amount');
 
         // This month's revenue
         $monthRevenue = Order::where('created_at', '>=', $thisMonth)
@@ -161,26 +174,31 @@ class DashboardController extends Controller
 
         // This year's revenue
         $yearRevenue = Order::where('created_at', '>=', $thisYear)
-                           ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
-                           ->sum('total_amount');
+                        ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+                        ->sum('total_amount');
 
         // Total revenue (all time)
         $totalRevenue = Order::whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
                             ->sum('total_amount');
 
-        // Average order value
-        $averageOrderValue = Order::whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
-                                  ->avg('total_amount') ?? 0;
+        // Average order value (for selected period)
+        $averageOrderValue = Order::where('created_at', '>=', $startDate)
+                                ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+                                ->avg('total_amount') ?? 0;
 
-        // Pending payments
+        // Pending payments (all time - no filter)
         $pendingPayments = Order::where('payment_status_key_code', 'PAYMENT_PENDING')
                                 ->whereNotIn('status_key_code', ['ORDER_CANCELLED'])
                                 ->sum('total_amount');
 
-        // Total refunded amount
+        // Total refunded amount (for selected period)
         $totalRefunded = Transaction::where('transaction_type', 'refund')
-                                   ->where('status_key_code', 'TRANSACTION_SUCCESS')
-                                   ->sum('amount');
+                                ->where('status_key_code', 'TRANSACTION_SUCCESS')
+                                ->where('created_at', '>=', $startDate)
+                                ->sum('amount');
+
+        // Calculate percentage change based on period
+        $revenueChangePercentage = $this->calculateRevenueChange($periodRevenue, $period);
 
         return [
             'today_revenue' => $todayRevenue,
@@ -188,12 +206,12 @@ class DashboardController extends Controller
             'month_revenue' => $monthRevenue,
             'year_revenue' => $yearRevenue,
             'total_revenue' => $totalRevenue,
-            'average_order_value' => $averageOrderValue,
+            'period_revenue' => $periodRevenue, // Main revenue for selected period
+            'average_order_value' => $averageOrderValue, // Now filtered by period
             'pending_payments' => $pendingPayments,
-            'total_refunded' => $totalRefunded,
-            // Calculate percentage changes (compared to previous period)
-            'revenue_change_percentage' => $this->calculateRevenueChange($monthRevenue),
-            'period_revenue' => $periodRevenue,
+            'total_refunded' => $totalRefunded, // Now filtered by period
+            'revenue_change_percentage' => $revenueChangePercentage,
+            'period_label' => ucfirst($period), // Add label for display
         ];
     }
 
@@ -361,20 +379,33 @@ class DashboardController extends Controller
                                     ->value('total_value') ?? 0;
     }
 
-    /**
-     * Calculate revenue change percentage
+   /**
+     * Calculate revenue change percentage based on period
      */
-    private function calculateRevenueChange(float $currentRevenue): float
+    private function calculateRevenueChange(float $currentRevenue, string $period = 'week'): float
     {
-        $previousMonthStart = Carbon::now()->subMonth()->startOfMonth();
-        $previousMonthEnd = Carbon::now()->subMonth()->endOfMonth();
+        // Determine previous period dates
+        $previousStart = match($period) {
+            'week' => Carbon::now()->subWeek()->startOfWeek(),
+            'month' => Carbon::now()->subMonth()->startOfMonth(),
+            'year' => Carbon::now()->subYear()->startOfYear(),
+            default => Carbon::now()->subWeek()->startOfWeek()
+        };
 
-        $previousRevenue = Order::whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])
+        $previousEnd = match($period) {
+            'week' => Carbon::now()->subWeek()->endOfWeek(),
+            'month' => Carbon::now()->subMonth()->endOfMonth(),
+            'year' => Carbon::now()->subYear()->endOfYear(),
+            default => Carbon::now()->subWeek()->endOfWeek()
+        };
+
+        // Get previous period revenue
+        $previousRevenue = Order::whereBetween('created_at', [$previousStart, $previousEnd])
                                 ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
                                 ->sum('total_amount');
 
         if ($previousRevenue == 0) {
-            return 0;
+            return $currentRevenue > 0 ? 100 : 0; // If no previous revenue, show 100% increase or 0%
         }
 
         return (($currentRevenue - $previousRevenue) / $previousRevenue) * 100;
