@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Newsletter;
 use App\Models\AdminUser;
+use App\Services\NewsletterVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -13,6 +14,13 @@ use Yajra\DataTables\Facades\DataTables;
 
 class NewsletterController extends Controller
 {
+    protected NewsletterVerificationService $verificationService;
+
+    public function __construct(NewsletterVerificationService $verificationService)
+    {
+        $this->verificationService = $verificationService;
+    }
+
     /**
      * Display a listing of newsletters.
      */
@@ -28,6 +36,8 @@ class NewsletterController extends Controller
             'total' => Newsletter::count(),
             'subscribed' => Newsletter::where('is_subscribed', true)->count(),
             'unsubscribed' => Newsletter::where('is_subscribed', false)->count(),
+            'verified' => Newsletter::where('email_verified', true)->count(),
+            'unverified' => Newsletter::where('email_verified', false)->count(),
             'today' => Newsletter::whereDate('created_at', today())->count(),
             'this_week' => Newsletter::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
             'this_month' => Newsletter::whereMonth('created_at', now()->month)
@@ -56,6 +66,14 @@ class NewsletterController extends Controller
                 $query->where('is_subscribed', true);
             } elseif ($request->status === 'unsubscribed') {
                 $query->where('is_subscribed', false);
+            }
+        }
+
+        if ($request->filled('verification_status')) {
+            if ($request->verification_status === 'verified') {
+                $query->where('email_verified', true);
+            } elseif ($request->verification_status === 'unverified') {
+                $query->where('email_verified', false);
             }
         }
 
@@ -99,6 +117,14 @@ class NewsletterController extends Controller
                 $html .= '<div class="subscriber-email">';
                 $html .= '<strong><a href="' . $viewUrl . '" class="text-decoration-none subscriber-link">'
                      . htmlspecialchars($newsletter->email) . '</a></strong>';
+
+                // Verification badge
+                if ($newsletter->email_verified) {
+                    $html .= ' <i class="bi bi-patch-check-fill text-success" title="Email Verified" data-bs-toggle="tooltip"></i>';
+                } else {
+                    $html .= ' <i class="bi bi-exclamation-circle text-warning" title="Email Not Verified" data-bs-toggle="tooltip"></i>';
+                }
+
                 $html .= '</div>';
 
                 // Name if available
@@ -119,6 +145,12 @@ class NewsletterController extends Controller
                 }
                 return '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Unsubscribed</span>';
             })
+            ->addColumn('verification_badge', function($newsletter) {
+                if ($newsletter->email_verified) {
+                    return '<span class="badge bg-success"><i class="bi bi-patch-check me-1"></i>Verified</span>';
+                }
+                return '<span class="badge bg-warning"><i class="bi bi-exclamation-circle me-1"></i>Unverified</span>';
+            })
             ->addColumn('subscribed_at_formatted', function($newsletter) {
                 if (!$newsletter->subscribed_at) {
                     return '<span class="text-muted small">N/A</span>';
@@ -132,14 +164,14 @@ class NewsletterController extends Controller
 
                 return $html;
             })
-            ->addColumn('unsubscribed_at_formatted', function($newsletter) {
-                if (!$newsletter->unsubscribed_at) {
+            ->addColumn('verified_at_formatted', function($newsletter) {
+                if (!$newsletter->email_verified_at) {
                     return '<span class="text-muted small">—</span>';
                 }
 
-                $html = '<div class="unsubscribed-at-container">';
-                $html .= '<div>' . $newsletter->unsubscribed_at->format('M d, Y') . '</div>';
-                $html .= '<small class="text-muted">' . $newsletter->unsubscribed_at->format('h:i A') . '</small>';
+                $html = '<div class="verified-at-container">';
+                $html .= '<div>' . $newsletter->email_verified_at->format('M d, Y') . '</div>';
+                $html .= '<small class="text-muted">' . $newsletter->email_verified_at->format('h:i A') . '</small>';
                 $html .= '</div>';
 
                 return $html;
@@ -193,6 +225,20 @@ class NewsletterController extends Controller
                                     <i class="bi bi-check-circle text-success me-2"></i>Subscribe
                                     </button></li>';
                     }
+
+                    // Verify/Resend Verification actions
+                    if (!$newsletter->email_verified) {
+                        $actions .= '<li><button type="button" class="dropdown-item resend-verification"
+                                    data-id="' . $newsletter->id . '" data-email="' . htmlspecialchars($newsletter->email) . '">
+                                    <i class="bi bi-envelope text-primary me-2"></i>Resend Verification
+                                    </button></li>';
+
+                        $actions .= '<li><button type="button" class="dropdown-item verify-email"
+                                    data-id="' . $newsletter->id . '" data-email="' . htmlspecialchars($newsletter->email) . '">
+                                    <i class="bi bi-patch-check text-success me-2"></i>Mark as Verified
+                                    </button></li>';
+                    }
+
                     $actions .= '<li><hr class="dropdown-divider"></li>';
                 }
 
@@ -213,8 +259,9 @@ class NewsletterController extends Controller
                 'checkbox',
                 'subscriber_info',
                 'status_badge',
+                'verification_badge',
                 'subscribed_at_formatted',
-                'unsubscribed_at_formatted',
+                'verified_at_formatted',
                 'created_at_formatted',
                 'actions'
             ])
@@ -235,6 +282,8 @@ class NewsletterController extends Controller
             'total' => Newsletter::count(),
             'subscribed' => Newsletter::where('is_subscribed', true)->count(),
             'unsubscribed' => Newsletter::where('is_subscribed', false)->count(),
+            'verified' => Newsletter::where('email_verified', true)->count(),
+            'unverified' => Newsletter::where('email_verified', false)->count(),
             'today' => Newsletter::whereDate('created_at', today())->count(),
             'this_week' => Newsletter::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
             'this_month' => Newsletter::whereMonth('created_at', now()->month)
@@ -275,16 +324,34 @@ class NewsletterController extends Controller
             'email' => 'required|email|unique:newsletters,email',
             'name' => 'nullable|string|max:255',
             'is_subscribed' => 'nullable|boolean',
+            'email_verified' => 'nullable|boolean',
+            'send_verification' => 'nullable|boolean',
         ]);
 
         // Set defaults
-        $validated['is_subscribed'] = $request->has('is_subscribed') ? $request->is_subscribed : true;
-        $validated['subscribed_at'] = $validated['is_subscribed'] ? now() : null;
+        $validated['is_subscribed'] = $request->has('is_subscribed');
+        $validated['email_verified'] = $request->has('email_verified');
+
+        if ($validated['is_subscribed']) {
+            $validated['subscribed_at'] = now();
+        }
+
+        if ($validated['email_verified']) {
+            $validated['email_verified_at'] = now();
+        } else {
+            // Generate verification token if not verified
+            $validated['verification_token'] = Str::random(64);
+        }
 
         // Create newsletter
         $newsletter = Newsletter::create($validated);
 
-        // Log activity (if you have activity logging)
+        // Send verification email if requested and not verified
+        if ($request->has('send_verification') && !$validated['email_verified']) {
+            $this->verificationService->sendVerificationEmail($newsletter, $newsletter->verification_token);
+        }
+
+        // Log activity
 
         return redirect()
             ->route('admin.newsletters.index')
@@ -338,10 +405,25 @@ class NewsletterController extends Controller
             'email' => ['required', 'email', Rule::unique('newsletters', 'email')->ignore($id)],
             'name' => 'nullable|string|max:255',
             'is_subscribed' => 'nullable|boolean',
+            'email_verified' => 'nullable|boolean',
         ]);
 
         // Set subscription status
         $validated['is_subscribed'] = $request->has('is_subscribed');
+        $validated['email_verified'] = $request->has('email_verified');
+
+        // Update timestamps based on status changes
+        if ($validated['is_subscribed'] && !$newsletter->is_subscribed) {
+            $validated['subscribed_at'] = now();
+            $validated['unsubscribed_at'] = null;
+        } elseif (!$validated['is_subscribed'] && $newsletter->is_subscribed) {
+            $validated['unsubscribed_at'] = now();
+        }
+
+        if ($validated['email_verified'] && !$newsletter->email_verified) {
+            $validated['email_verified_at'] = now();
+            $validated['verification_token'] = null;
+        }
 
         // Update newsletter
         $newsletter->update($validated);
@@ -413,6 +495,71 @@ class NewsletterController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Subscriber unsubscribed successfully!'
+        ]);
+    }
+
+    /**
+     * Resend verification email
+     */
+    public function resendVerification($id)
+    {
+        // Check permission
+        if (!Auth::guard('admin')->user()->hasPermission('newsletters.update')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        try {
+            $newsletter = Newsletter::findOrFail($id);
+
+            if ($newsletter->email_verified) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email is already verified!'
+                ], 400);
+            }
+
+            $token = $newsletter->generateVerificationToken();
+            $this->verificationService->sendVerificationEmail($newsletter, $token);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Verification email has been resent successfully!'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to resend verification email.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Manually verify email
+     */
+    public function verifyEmail($id)
+    {
+        // Check permission
+        if (!Auth::guard('admin')->user()->hasPermission('newsletters.update')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $newsletter = Newsletter::findOrFail($id);
+
+        if ($newsletter->email_verified) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email is already verified!'
+            ], 400);
+        }
+
+        $newsletter->verify();
+
+        // Log activity
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email verified successfully!'
         ]);
     }
 
@@ -502,6 +649,14 @@ class NewsletterController extends Controller
             }
         }
 
+        if ($request->filled('verification_status')) {
+            if ($request->verification_status === 'verified') {
+                $query->where('email_verified', true);
+            } elseif ($request->verification_status === 'unverified') {
+                $query->where('email_verified', false);
+            }
+        }
+
         if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
         }
@@ -530,9 +685,11 @@ class NewsletterController extends Controller
                 'ID',
                 'Email',
                 'Name',
-                'Status',
+                'Subscription Status',
+                'Email Verified',
                 'Subscribed At',
                 'Unsubscribed At',
+                'Verified At',
                 'Created At',
                 'Updated At'
             ]);
@@ -544,8 +701,10 @@ class NewsletterController extends Controller
                     $newsletter->email,
                     $newsletter->name ?? 'N/A',
                     $newsletter->is_subscribed ? 'Subscribed' : 'Unsubscribed',
+                    $newsletter->email_verified ? 'Yes' : 'No',
                     $newsletter->subscribed_at?->format('Y-m-d H:i:s') ?? 'N/A',
                     $newsletter->unsubscribed_at?->format('Y-m-d H:i:s') ?? 'N/A',
+                    $newsletter->email_verified_at?->format('Y-m-d H:i:s') ?? 'N/A',
                     $newsletter->created_at->format('Y-m-d H:i:s'),
                     $newsletter->updated_at->format('Y-m-d H:i:s'),
                 ]);

@@ -61,6 +61,13 @@
     .info-box i {
         color: #5B914C;
     }
+    .verification-options {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+    }
 </style>
 @endpush
 
@@ -88,7 +95,7 @@
     {{-- Info Box --}}
     <div class="info-box">
         <i class="bi bi-info-circle me-2"></i>
-        <strong>Note:</strong> Add a new subscriber to your newsletter mailing list. You can manually add subscribers or import them in bulk.
+        <strong>Note:</strong> Add a new subscriber to your newsletter mailing list. You can manually add subscribers with or without email verification.
     </div>
 
     {{-- Form Card --}}
@@ -154,7 +161,7 @@
                             </h5>
 
                             {{-- Is Subscribed --}}
-                            <div class="form-check form-switch">
+                            <div class="form-check form-switch mb-3">
                                 <input class="form-check-input"
                                        type="checkbox"
                                        role="switch"
@@ -166,22 +173,66 @@
                                     <strong>Active Subscription</strong>
                                 </label>
                             </div>
-                            <div class="form-text ms-5 mt-1">
+                            <div class="form-text ms-5 mb-3">
                                 <i class="bi bi-info-circle me-1"></i>
-                                Enable this if the subscriber should receive newsletters immediately
+                                Enable this if the subscriber should receive newsletters
+                            </div>
+                        </div>
+
+                        {{-- Email Verification Section --}}
+                        <div class="mb-4">
+                            <h5 class="form-section-title">
+                                <i class="bi bi-patch-check me-2"></i>Email Verification
+                            </h5>
+
+                            {{-- Email Verified Toggle --}}
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="email_verified"
+                                       name="email_verified"
+                                       value="1"
+                                       {{ old('email_verified', false) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="email_verified">
+                                    <strong>Mark Email as Verified</strong>
+                                </label>
+                            </div>
+                            <div class="form-text ms-5 mb-3">
+                                <i class="bi bi-shield-check me-1"></i>
+                                Check this to manually verify the email without sending verification link
+                            </div>
+
+                            {{-- Send Verification Email --}}
+                            <div class="verification-options" id="verificationOptions" style="display: none;">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           id="send_verification"
+                                           name="send_verification"
+                                           value="1"
+                                           {{ old('send_verification', false) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="send_verification">
+                                        <strong>Send Verification Email</strong>
+                                    </label>
+                                </div>
+                                <div class="form-text ms-4 mt-1">
+                                    <i class="bi bi-envelope-paper me-1"></i>
+                                    If unchecked, the subscriber will be added as unverified without receiving an email
+                                </div>
                             </div>
                         </div>
 
                         {{-- Additional Information --}}
                         <div class="alert alert-light border">
                             <h6 class="alert-heading">
-                                <i class="bi bi-lightbulb me-2"></i>Additional Information
+                                <i class="bi bi-lightbulb me-2"></i>Important Information
                             </h6>
                             <ul class="mb-0 small">
-                                <li>Subscribers will be added with the current timestamp</li>
-                                <li>If subscription is active, the "Subscribed At" date will be set automatically</li>
-                                <li>You can change the subscription status anytime from the subscriber list</li>
-                                <li>Duplicate email addresses are not allowed</li>
+                                <li><strong>Manual Verification:</strong> If you mark email as verified, the subscriber can receive newsletters immediately</li>
+                                <li><strong>Email Verification:</strong> If not verified manually, subscriber must verify their email to receive newsletters</li>
+                                <li><strong>Verification Email:</strong> You can choose to send or skip the verification email for unverified subscribers</li>
+                                <li><strong>Duplicate Check:</strong> System will prevent adding duplicate email addresses</li>
                             </ul>
                         </div>
 
@@ -224,10 +275,19 @@
                     <hr>
                     <div class="mb-3">
                         <h6 class="text-success">
-                            <i class="bi bi-toggle-on me-2"></i>Active Status
+                            <i class="bi bi-patch-check me-2"></i>Email Verification
                         </h6>
                         <p class="small text-muted mb-0">
-                            Keep the subscription toggle ON if you want the subscriber to receive newsletters immediately.
+                            You can manually verify trusted emails or send verification links to new subscribers.
+                        </p>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <h6 class="text-success">
+                            <i class="bi bi-toggle-on me-2"></i>Subscription Status
+                        </h6>
+                        <p class="small text-muted mb-0">
+                            Keep subscription toggle ON if the subscriber should receive newsletters after verification.
                         </p>
                     </div>
                     <hr>
@@ -245,7 +305,7 @@
                             <i class="bi bi-shield-check me-2"></i>Privacy Notice
                         </h6>
                         <p class="small text-muted mb-0">
-                            Make sure you have consent to add subscribers to your mailing list according to privacy regulations.
+                            Make sure you have consent to add subscribers according to privacy regulations (GDPR, CAN-SPAM, etc.).
                         </p>
                     </div>
                 </div>
@@ -267,9 +327,13 @@
                         <span class="text-muted">Active:</span>
                         <strong class="text-success" id="activeStat">Loading...</strong>
                     </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Verified:</span>
+                        <strong class="text-info" id="verifiedStat">Loading...</strong>
+                    </div>
                     <div class="d-flex justify-content-between">
-                        <span class="text-muted">Unsubscribed:</span>
-                        <strong class="text-danger" id="unsubscribedStat">Loading...</strong>
+                        <span class="text-muted">Unverified:</span>
+                        <strong class="text-warning" id="unverifiedStat">Loading...</strong>
                     </div>
                 </div>
             </div>
@@ -283,6 +347,25 @@
 $(document).ready(function() {
     // Load statistics
     loadStatistics();
+
+    // Show/hide verification options based on email_verified checkbox
+    function toggleVerificationOptions() {
+        const emailVerified = $('#email_verified').is(':checked');
+        if (emailVerified) {
+            $('#verificationOptions').slideUp();
+            $('#send_verification').prop('checked', false);
+        } else {
+            $('#verificationOptions').slideDown();
+        }
+    }
+
+    // Initialize on page load
+    toggleVerificationOptions();
+
+    // Handle email_verified checkbox change
+    $('#email_verified').on('change', function() {
+        toggleVerificationOptions();
+    });
 
     // Form validation
     $('#createNewsletterForm').on('submit', function(e) {
@@ -342,6 +425,9 @@ $(document).ready(function() {
             if (result.isConfirmed) {
                 document.getElementById('createNewsletterForm').reset();
                 $('#is_subscribed').prop('checked', true);
+                $('#email_verified').prop('checked', false);
+                $('#send_verification').prop('checked', false);
+                toggleVerificationOptions();
                 $('.is-invalid').removeClass('is-invalid');
                 $('.invalid-feedback').remove();
                 showNotification('Form has been reset', 'info');
@@ -357,12 +443,14 @@ $(document).ready(function() {
             success: function(stats) {
                 $('#totalStat').text(stats.total || 0);
                 $('#activeStat').text(stats.subscribed || 0);
-                $('#unsubscribedStat').text(stats.unsubscribed || 0);
+                $('#verifiedStat').text(stats.verified || 0);
+                $('#unverifiedStat').text(stats.unverified || 0);
             },
             error: function() {
                 $('#totalStat').text('N/A');
                 $('#activeStat').text('N/A');
-                $('#unsubscribedStat').text('N/A');
+                $('#verifiedStat').text('N/A');
+                $('#unverifiedStat').text('N/A');
             }
         });
     }

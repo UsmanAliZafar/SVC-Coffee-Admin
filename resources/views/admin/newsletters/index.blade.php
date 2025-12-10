@@ -58,7 +58,8 @@
     }
     .created-at-container,
     .subscribed-at-container,
-    .unsubscribed-at-container {
+    .unsubscribed-at-container,
+    .verified-at-container {
         line-height: 1.5;
         font-size: 0.9em;
     }
@@ -112,16 +113,16 @@
                 <div class="stat-label">Unsubscribed</div>
             </div>
             <div class="col-md-2 stat-item">
+                <div class="stat-value text-info" id="verifiedCount">{{ $stats['verified'] }}</div>
+                <div class="stat-label">Verified</div>
+            </div>
+            <div class="col-md-2 stat-item">
+                <div class="stat-value text-warning" id="unverifiedCount">{{ $stats['unverified'] }}</div>
+                <div class="stat-label">Unverified</div>
+            </div>
+            <div class="col-md-2 stat-item">
                 <div class="stat-value" id="todayCount">{{ $stats['today'] }}</div>
                 <div class="stat-label">Today</div>
-            </div>
-            <div class="col-md-2 stat-item">
-                <div class="stat-value" id="weekCount">{{ $stats['this_week'] }}</div>
-                <div class="stat-label">This Week</div>
-            </div>
-            <div class="col-md-2 stat-item">
-                <div class="stat-value" id="monthCount">{{ $stats['this_month'] }}</div>
-                <div class="stat-label">This Month</div>
             </div>
         </div>
     </div>
@@ -129,17 +130,25 @@
     {{-- Filters --}}
     <div class="card filter-card">
         <div class="row g-3">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">Search</label>
                 <input type="text" id="searchFilter" class="form-control"
                        placeholder="Search by email or name...">
             </div>
             <div class="col-md-2">
-                <label class="form-label">Status</label>
+                <label class="form-label">Subscription Status</label>
                 <select id="statusFilter" class="form-select">
                     <option value="">All Statuses</option>
                     <option value="subscribed">Subscribed</option>
                     <option value="unsubscribed">Unsubscribed</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Verification Status</label>
+                <select id="verificationStatusFilter" class="form-select">
+                    <option value="">All</option>
+                    <option value="verified">Verified</option>
+                    <option value="unverified">Unverified</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -150,9 +159,9 @@
                 <label class="form-label">Date To</label>
                 <input type="date" id="dateTo" class="form-control">
             </div>
-            <div class="col-md-2 d-flex align-items-end">
+            <div class="col-md-1 d-flex align-items-end">
                 <button type="button" id="resetFilters" class="btn btn-outline-secondary w-100">
-                    <i class="bi bi-arrow-clockwise"></i> Reset
+                    <i class="bi bi-arrow-clockwise"></i>
                 </button>
             </div>
         </div>
@@ -176,16 +185,16 @@
                         @endif
                         @if(auth('admin')->user()->hasPermission('newsletters.read'))
                         <button type="button" class="btn btn-sm btn-primary" id="bulkExport">
-                            <i class="bi bi-download"></i> Export Selected
+                            <i class="bi bi-download"></i> Export
                         </button>
                         @endif
                         @if(auth('admin')->user()->hasPermission('newsletters.delete'))
                         <button type="button" class="btn btn-sm btn-danger" id="bulkDelete">
-                            <i class="bi bi-trash"></i> Delete Selected
+                            <i class="bi bi-trash"></i> Delete
                         </button>
                         @endif
                         <button type="button" class="btn btn-sm btn-secondary" id="deselectAll">
-                            <i class="bi bi-x"></i> Deselect All
+                            <i class="bi bi-x"></i> Deselect
                         </button>
                     </div>
                 </div>
@@ -202,10 +211,11 @@
                             </th>
                             @endif
                             <th>Subscriber Info</th>
-                            <th width="120">Status</th>
-                            <th width="150">Subscribed At</th>
-                            <th width="150">Unsubscribed At</th>
-                            <th width="150">Created At</th>
+                            <th width="120">Subscription</th>
+                            <th width="120">Verification</th>
+                            <th width="140">Subscribed At</th>
+                            <th width="140">Verified At</th>
+                            <th width="140">Created At</th>
                             <th width="180">Actions</th>
                         </tr>
                     </thead>
@@ -230,6 +240,7 @@ $(document).ready(function() {
             url: '{{ route("admin.newsletters.data") }}',
             data: function(d) {
                 d.status = $('#statusFilter').val();
+                d.verification_status = $('#verificationStatusFilter').val();
                 d.date_from = $('#dateFrom').val();
                 d.date_to = $('#dateTo').val();
                 d.search = $('#searchFilter').val();
@@ -241,12 +252,13 @@ $(document).ready(function() {
             @endif
             { data: 'subscriber_info', orderable: false },
             { data: 'status_badge', orderable: false },
+            { data: 'verification_badge', orderable: false },
             { data: 'subscribed_at_formatted', orderable: false },
-            { data: 'unsubscribed_at_formatted', orderable: false },
+            { data: 'verified_at_formatted', orderable: false },
             { data: 'created_at_formatted' },
             { data: 'actions', orderable: false, searchable: false }
         ],
-        order: [[5, 'desc']], // Sort by created_at by default
+        order: [[6, 'desc']], // Sort by created_at by default
         pageLength: 25,
         responsive: true,
         language: {
@@ -269,7 +281,7 @@ $(document).ready(function() {
     });
 
     // Filter change events
-    $('#statusFilter, #dateFrom, #dateTo').on('change', function() {
+    $('#statusFilter, #verificationStatusFilter, #dateFrom, #dateTo').on('change', function() {
         table.draw();
     });
 
@@ -286,6 +298,7 @@ $(document).ready(function() {
     $('#resetFilters').on('click', function() {
         $('#searchFilter').val('');
         $('#statusFilter').val('');
+        $('#verificationStatusFilter').val('');
         $('#dateFrom').val('');
         $('#dateTo').val('');
         table.draw();
@@ -508,6 +521,74 @@ $(document).ready(function() {
         });
     });
 
+    // Resend Verification
+    $(document).on('click', '.resend-verification', function() {
+        const id = $(this).data('id');
+        const email = $(this).data('email');
+
+        Swal.fire({
+            title: `Resend verification to "${email}"?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, resend!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/admin/newsletters/${id}/resend-verification`,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+                    },
+                    error: function(xhr) {
+                        const errorMessage = xhr.responseJSON?.message || 'An error occurred';
+                        showNotification(errorMessage, 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Verify Email
+    $(document).on('click', '.verify-email', function() {
+        const id = $(this).data('id');
+        const email = $(this).data('email');
+
+        Swal.fire({
+            title: `Mark "${email}" as verified?`,
+            text: 'This will manually verify the email address',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, verify!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/admin/newsletters/${id}/verify-email`,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        showNotification(response.message, 'success');
+                        table.draw();
+                        refreshStats();
+                    },
+                    error: function(xhr) {
+                        const errorMessage = xhr.responseJSON?.message || 'An error occurred';
+                        showNotification(errorMessage, 'error');
+                    }
+                });
+            }
+        });
+    });
+
     // Delete Newsletter
     $(document).on('click', '.delete-newsletter', function() {
         const id = $(this).data('id');
@@ -549,11 +630,13 @@ $(document).ready(function() {
 
         let url = '{{ route("admin.newsletters.export") }}';
         const status = $('#statusFilter').val();
+        const verificationStatus = $('#verificationStatusFilter').val();
         const dateFrom = $('#dateFrom').val();
         const dateTo = $('#dateTo').val();
 
         const params = new URLSearchParams();
         if (status) params.append('status', status);
+        if (verificationStatus) params.append('verification_status', verificationStatus);
         if (dateFrom) params.append('date_from', dateFrom);
         if (dateTo) params.append('date_to', dateTo);
 
@@ -574,9 +657,9 @@ $(document).ready(function() {
                 $('#totalSubscribers').text(stats.total);
                 $('#subscribedCount').text(stats.subscribed);
                 $('#unsubscribedCount').text(stats.unsubscribed);
+                $('#verifiedCount').text(stats.verified);
+                $('#unverifiedCount').text(stats.unverified);
                 $('#todayCount').text(stats.today);
-                $('#weekCount').text(stats.this_week);
-                $('#monthCount').text(stats.this_month);
             }
         });
     }

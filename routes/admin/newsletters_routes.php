@@ -30,6 +30,8 @@ Route::prefix('newsletters')->name('newsletters.')->group(function () {
         Route::get('/{id}/edit', [NewsletterController::class, 'edit'])->name('edit');
         Route::put('/{id}', [NewsletterController::class, 'update'])->name('update');
         Route::patch('/{id}', [NewsletterController::class, 'update'])->name('update.patch');
+        Route::post('/{id}/resend-verification', [NewsletterController::class, 'resendVerification'])->name('resend-verification');
+        Route::post('/{id}/verify-email', [NewsletterController::class, 'verifyEmail'])->name('verify-email');
 
         // Subscribe/Unsubscribe Actions
         Route::post('/{id}/subscribe', [NewsletterController::class, 'subscribe'])->name('subscribe');

@@ -98,6 +98,14 @@
         background-color: #dc3545;
         box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
     }
+    .status-indicator.verified {
+        background-color: #17a2b8;
+        box-shadow: 0 0 10px rgba(23, 162, 184, 0.5);
+    }
+    .status-indicator.unverified {
+        background-color: #ffc107;
+        box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+    }
     .timeline-compact {
         font-size: 0.875rem;
     }
@@ -142,6 +150,11 @@
     <div class="info-box">
         <i class="bi bi-info-circle me-2"></i>
         <strong>Editing Subscriber:</strong> You are modifying the information for <strong>{{ $newsletter->email }}</strong>
+        @if($newsletter->email_verified)
+            <span class="badge bg-success ms-2"><i class="bi bi-patch-check"></i> Verified</span>
+        @else
+            <span class="badge bg-warning ms-2"><i class="bi bi-exclamation-circle"></i> Unverified</span>
+        @endif
     </div>
 
     {{-- Form Row --}}
@@ -176,6 +189,11 @@
                                            value="{{ old('email', $newsletter->email) }}"
                                            placeholder="Enter subscriber email"
                                            required>
+                                    @if($newsletter->email_verified)
+                                    <span class="input-group-text bg-success text-white">
+                                        <i class="bi bi-patch-check"></i>
+                                    </span>
+                                    @endif
                                 </div>
                                 <div class="form-text">
                                     <i class="bi bi-shield-check me-1"></i>Changing the email will update the subscriber's primary contact
@@ -247,6 +265,42 @@
                             </div>
                         </div>
 
+                        {{-- Email Verification Section --}}
+                        <div class="mb-4">
+                            <h5 class="form-section-title">
+                                <i class="bi bi-patch-check me-2"></i>Email Verification
+                            </h5>
+
+                            <div class="card bg-light border">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       role="switch"
+                                                       id="email_verified"
+                                                       name="email_verified"
+                                                       value="1"
+                                                       {{ old('email_verified', $newsletter->email_verified) ? 'checked' : '' }}>
+                                                <label class="form-check-label" for="email_verified">
+                                                    <strong>Email Verified</strong>
+                                                </label>
+                                            </div>
+                                            <small class="text-muted ms-5">
+                                                <i class="bi bi-shield-check me-1"></i>
+                                                Mark this email as verified
+                                            </small>
+                                        </div>
+                                        <div>
+                                            <span class="status-indicator" id="verificationIndicator"></span>
+                                            <span id="verificationText" class="fw-bold"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {{-- Current Status Information --}}
                         <div class="alert alert-info border-info">
                             <h6 class="alert-heading">
@@ -254,11 +308,19 @@
                             </h6>
                             <div class="row small">
                                 <div class="col-md-6 mb-2">
-                                    <strong>Status:</strong>
+                                    <strong>Subscription Status:</strong>
                                     @if($newsletter->is_subscribed)
                                         <span class="badge bg-success">Subscribed</span>
                                     @else
                                         <span class="badge bg-danger">Unsubscribed</span>
+                                    @endif
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Email Status:</strong>
+                                    @if($newsletter->email_verified)
+                                        <span class="badge bg-success">Verified</span>
+                                    @else
+                                        <span class="badge bg-warning">Unverified</span>
                                     @endif
                                 </div>
                                 <div class="col-md-6 mb-2">
@@ -267,6 +329,10 @@
                                 <div class="col-md-6 mb-2">
                                     <strong>Subscribed At:</strong>
                                     {{ $newsletter->subscribed_at ? $newsletter->subscribed_at->format('M d, Y h:i A') : 'Never' }}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Verified At:</strong>
+                                    {{ $newsletter->email_verified_at ? $newsletter->email_verified_at->format('M d, Y h:i A') : 'Not verified' }}
                                 </div>
                                 <div class="col-md-6 mb-2">
                                     <strong>Unsubscribed At:</strong>
@@ -278,7 +344,7 @@
                         {{-- Warning Message --}}
                         <div class="alert alert-warning border-warning">
                             <i class="bi bi-exclamation-triangle me-2"></i>
-                            <strong>Important:</strong> Any changes to the subscription status will be logged with the current timestamp.
+                            <strong>Important:</strong> Changes to subscription and verification status will be logged with the current timestamp.
                         </div>
 
                         {{-- Form Actions --}}
@@ -308,7 +374,16 @@
                     {{ strtoupper(substr($newsletter->email, 0, 1)) }}
                 </div>
                 <h5 id="namePreview" class="mb-1">{{ $newsletter->name ?? 'Anonymous Subscriber' }}</h5>
-                <p id="emailPreview" class="mb-0 opacity-75">{{ $newsletter->email }}</p>
+                <p id="emailPreview" class="mb-2 opacity-75">{{ $newsletter->email }}</p>
+                @if($newsletter->email_verified)
+                    <span class="badge bg-light text-dark">
+                        <i class="bi bi-patch-check text-success"></i> Email Verified
+                    </span>
+                @else
+                    <span class="badge bg-light text-dark">
+                        <i class="bi bi-exclamation-circle text-warning"></i> Email Unverified
+                    </span>
+                @endif
             </div>
 
             {{-- Quick Info Card --}}
@@ -366,6 +441,14 @@
                         </div>
                         @endif
 
+                        @if($newsletter->email_verified_at)
+                        <div class="timeline-item">
+                            <i class="bi bi-patch-check text-success"></i>
+                            <strong>Email Verified</strong>
+                            <div class="text-muted small">{{ $newsletter->email_verified_at->diffForHumans() }}</div>
+                        </div>
+                        @endif
+
                         @if($newsletter->unsubscribed_at)
                         <div class="timeline-item">
                             <i class="bi bi-x-circle text-danger"></i>
@@ -403,6 +486,10 @@
                         <i class="bi bi-lightbulb text-warning me-2"></i>
                         <strong>Tip:</strong> Changes take effect immediately after saving.
                     </p>
+                    <p class="small mb-2">
+                        <i class="bi bi-patch-check text-info me-2"></i>
+                        <strong>Verification:</strong> Manually verify trusted emails to skip verification process.
+                    </p>
                     <p class="small mb-0">
                         <i class="bi bi-shield-check text-success me-2"></i>
                         <strong>Security:</strong> All changes are logged and tracked.
@@ -421,9 +508,11 @@ $(document).ready(function() {
     const originalEmail = '{{ old('email', $newsletter->email) }}';
     const originalName = '{{ old('name', $newsletter->name) }}';
     const originalSubscribed = {{ old('is_subscribed', $newsletter->is_subscribed) ? 'true' : 'false' }};
+    const originalVerified = {{ old('email_verified', $newsletter->email_verified) ? 'true' : 'false' }};
 
-    // Update status indicator
+    // Update status indicators
     updateStatusIndicator();
+    updateVerificationIndicator();
 
     // Email input - update preview
     $('#email').on('input', function() {
@@ -450,6 +539,11 @@ $(document).ready(function() {
         updateStatusIndicator();
     });
 
+    // Email verification toggle
+    $('#email_verified').on('change', function() {
+        updateVerificationIndicator();
+    });
+
     // Update status indicator function
     function updateStatusIndicator() {
         const isSubscribed = $('#is_subscribed').is(':checked');
@@ -462,6 +556,21 @@ $(document).ready(function() {
         } else {
             indicator.removeClass('active').addClass('inactive');
             text.text('Inactive').removeClass('text-success').addClass('text-danger');
+        }
+    }
+
+    // Update verification indicator function
+    function updateVerificationIndicator() {
+        const isVerified = $('#email_verified').is(':checked');
+        const indicator = $('#verificationIndicator');
+        const text = $('#verificationText');
+
+        if (isVerified) {
+            indicator.removeClass('unverified').addClass('verified');
+            text.text('Verified').removeClass('text-warning').addClass('text-info');
+        } else {
+            indicator.removeClass('verified').addClass('unverified');
+            text.text('Unverified').removeClass('text-info').addClass('text-warning');
         }
     }
 
@@ -482,6 +591,7 @@ $(document).ready(function() {
                 $('#email').val(originalEmail);
                 $('#name').val(originalName);
                 $('#is_subscribed').prop('checked', originalSubscribed);
+                $('#email_verified').prop('checked', originalVerified);
 
                 // Update previews
                 $('#emailPreview').text(originalEmail);
@@ -489,6 +599,7 @@ $(document).ready(function() {
                 $('#avatarPreview').text(originalEmail.charAt(0).toUpperCase());
 
                 updateStatusIndicator();
+                updateVerificationIndicator();
 
                 // Remove validation errors
                 $('.is-invalid').removeClass('is-invalid');

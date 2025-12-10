@@ -73,6 +73,15 @@
     .info-box i {
         color: #5B914C;
     }
+    .warning-box {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 15px;
+        border-radius: 5px;
+    }
+    .warning-box i {
+        color: #ffc107;
+    }
     .timeline-item {
         padding-left: 30px;
         position: relative;
@@ -160,21 +169,44 @@
                         <p class="text-muted mb-2">
                             <i class="bi bi-envelope me-1"></i>
                             {{ $newsletter->email }}
+                            @if($newsletter->email_verified)
+                                <i class="bi bi-patch-check-fill text-success" title="Email Verified" data-bs-toggle="tooltip"></i>
+                            @endif
                             <i class="bi bi-clipboard copy-btn ms-2"
                                onclick="copyToClipboard('{{ $newsletter->email }}')"
                                title="Copy email"
                                data-bs-toggle="tooltip"></i>
                         </p>
-                        @if($newsletter->is_subscribed)
-                            <span class="badge status-badge-large bg-success">
-                                <i class="bi bi-check-circle me-1"></i>Active Subscriber
-                            </span>
-                        @else
-                            <span class="badge status-badge-large bg-danger">
-                                <i class="bi bi-x-circle me-1"></i>Unsubscribed
-                            </span>
-                        @endif
+                        <div class="mb-2">
+                            @if($newsletter->is_subscribed)
+                                <span class="badge status-badge-large bg-success">
+                                    <i class="bi bi-check-circle me-1"></i>Active Subscriber
+                                </span>
+                            @else
+                                <span class="badge status-badge-large bg-danger">
+                                    <i class="bi bi-x-circle me-1"></i>Unsubscribed
+                                </span>
+                            @endif
+
+                            @if($newsletter->email_verified)
+                                <span class="badge status-badge-large bg-info">
+                                    <i class="bi bi-patch-check me-1"></i>Verified
+                                </span>
+                            @else
+                                <span class="badge status-badge-large bg-warning">
+                                    <i class="bi bi-exclamation-circle me-1"></i>Unverified
+                                </span>
+                            @endif
+                        </div>
                     </div>
+
+                    {{-- Unverified Warning --}}
+                    @if(!$newsletter->email_verified)
+                    <div class="warning-box mb-4">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Email Not Verified:</strong> This subscriber hasn't verified their email address yet.
+                    </div>
+                    @endif
 
                     <hr class="my-4">
 
@@ -236,6 +268,32 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="detail-row">
+                                <div class="detail-label">
+                                    <i class="bi bi-patch-check me-1"></i>Email Verification Status
+                                </div>
+                                <div class="detail-value">
+                                    @if($newsletter->email_verified)
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>Verified
+                                        </span>
+                                        @if($newsletter->email_verified_at)
+                                            <small class="text-muted ms-2">
+                                                on {{ $newsletter->email_verified_at->format('M d, Y \a\t h:i A') }}
+                                            </small>
+                                        @endif
+                                    @else
+                                        <span class="badge bg-warning">
+                                            <i class="bi bi-exclamation-circle me-1"></i>Pending Verification
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -243,7 +301,7 @@
             <div class="card detail-card mb-4">
                 <div class="card-body p-4">
                     <h5 class="detail-section-title">
-                        <i class="bi bi-clock-history me-2"></i>Subscription Timeline
+                        <i class="bi bi-clock-history me-2"></i>Activity Timeline
                     </h5>
 
                     <div class="timeline">
@@ -260,6 +318,22 @@
                                 </p>
                             </div>
                         </div>
+
+                        {{-- Email Verified --}}
+                        @if($newsletter->email_verified_at)
+                        <div class="timeline-item">
+                            <div class="timeline-icon bg-info">
+                                <i class="bi bi-patch-check"></i>
+                            </div>
+                            <div>
+                                <strong>Email Verified</strong>
+                                <p class="text-muted mb-0">
+                                    {{ $newsletter->email_verified_at->format('F d, Y \a\t h:i A') }}
+                                    <small>({{ $newsletter->email_verified_at->diffForHumans() }})</small>
+                                </p>
+                            </div>
+                        </div>
+                        @endif
 
                         {{-- Subscribed --}}
                         @if($newsletter->subscribed_at)
@@ -354,6 +428,20 @@
                         <div class="col-md-6">
                             <div class="detail-row">
                                 <div class="detail-label">
+                                    <i class="bi bi-patch-check me-1"></i>Email Verified Date
+                                </div>
+                                <div class="detail-value">
+                                    @if($newsletter->email_verified_at)
+                                        {{ $newsletter->email_verified_at->format('F d, Y \a\t h:i A') }}
+                                    @else
+                                        <span class="text-muted">Not verified</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="detail-row">
+                                <div class="detail-label">
                                     <i class="bi bi-calendar-plus me-1"></i>Created At
                                 </div>
                                 <div class="detail-value">
@@ -363,6 +451,9 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="row">
                         <div class="col-md-6">
                             <div class="detail-row">
                                 <div class="detail-label">
@@ -379,13 +470,25 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="detail-row">
+                                <div class="detail-label">
+                                    <i class="bi bi-clock me-1"></i>Member Duration
+                                </div>
+                                <div class="detail-value">
+                                    <span class="badge bg-info">
+                                        {{ $newsletter->created_at->diffForHumans(null, true) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-12">
                             <div class="detail-row">
                                 <div class="detail-label">
-                                    <i class="bi bi-clock me-1"></i>Subscription Duration
+                                    <i class="bi bi-hourglass me-1"></i>Subscription Duration
                                 </div>
                                 <div class="detail-value">
                                     @if($newsletter->subscribed_at)
@@ -424,6 +527,18 @@
                 </div>
                 <div class="card-body">
                     @if(auth('admin')->user()->hasPermission('newsletters.update'))
+                        {{-- Verification Actions --}}
+                        @if(!$newsletter->email_verified)
+                            <button type="button" class="btn btn-info btn-action w-100 mb-2" id="verifyEmailBtn">
+                                <i class="bi bi-patch-check me-2"></i>Verify Email
+                            </button>
+                            <button type="button" class="btn btn-outline-info btn-action w-100 mb-2" id="resendVerificationBtn">
+                                <i class="bi bi-envelope me-2"></i>Resend Verification
+                            </button>
+                            <hr>
+                        @endif
+
+                        {{-- Subscription Actions --}}
                         @if($newsletter->is_subscribed)
                             <button type="button" class="btn btn-warning btn-action w-100 mb-2" id="unsubscribeBtn">
                                 <i class="bi bi-x-circle me-2"></i>Unsubscribe
@@ -433,6 +548,7 @@
                                 <i class="bi bi-check-circle me-2"></i>Subscribe
                             </button>
                         @endif
+
                         <a href="{{ route('admin.newsletters.edit', $newsletter->id) }}" class="btn btn-primary btn-action w-100 mb-2">
                             <i class="bi bi-pencil me-2"></i>Edit Details
                         </a>
@@ -461,11 +577,22 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <div class="d-flex justify-content-between mb-1">
-                            <span class="text-muted">Current Status:</span>
+                            <span class="text-muted">Subscription:</span>
                             @if($newsletter->is_subscribed)
                                 <span class="badge bg-success">Active</span>
                             @else
                                 <span class="badge bg-danger">Inactive</span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Email Status:</span>
+                            @if($newsletter->email_verified)
+                                <span class="badge bg-success">Verified</span>
+                            @else
+                                <span class="badge bg-warning">Unverified</span>
                             @endif
                         </div>
                     </div>
@@ -490,6 +617,13 @@
                         <small>Subscribed {{ $newsletter->subscribed_at->diffForHumans() }}</small>
                     </div>
                     @endif
+
+                    @if(!$newsletter->email_verified)
+                    <div class="warning-box mt-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <small>Email pending verification</small>
+                    </div>
+                    @endif
                 </div>
             </div>
 
@@ -510,7 +644,7 @@
                             <span class="text-muted">Created:</span>
                             <span>{{ $newsletter->created_at->format('M d, Y') }}</span>
                         </div>
-                        <div class="d-flex justify-content-between">
+                        <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted">Last Modified:</span>
                             <span>
                                 @if($newsletter->updated_at && !$newsletter->updated_at->eq($newsletter->created_at))
@@ -520,6 +654,12 @@
                                 @endif
                             </span>
                         </div>
+                        @if($newsletter->email_verified_at)
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Verified:</span>
+                            <span>{{ $newsletter->email_verified_at->format('M d, Y') }}</span>
+                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -533,6 +673,88 @@
 $(document).ready(function() {
     // Initialize tooltips
     $('[data-bs-toggle="tooltip"]').tooltip();
+
+    // Verify Email button
+    $('#verifyEmailBtn').on('click', function() {
+        Swal.fire({
+            title: 'Verify this email?',
+            text: 'This will manually mark the email as verified',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, verify!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '{{ route("admin.newsletters.verify-email", $newsletter->id) }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        Swal.fire({
+                            title: 'Verified!',
+                            text: response.message,
+                            icon: 'success',
+                            confirmButtonColor: '#5B914C'
+                        }).then(() => {
+                            location.reload();
+                        });
+                    },
+                    error: function(xhr) {
+                        const errorMessage = xhr.responseJSON?.message || 'An error occurred';
+                        Swal.fire({
+                            title: 'Error!',
+                            text: errorMessage,
+                            icon: 'error',
+                            confirmButtonColor: '#dc3545'
+                        });
+                    }
+                });
+            }
+        });
+    });
+
+    // Resend Verification button
+    $('#resendVerificationBtn').on('click', function() {
+        Swal.fire({
+            title: 'Resend verification email?',
+            text: 'A new verification email will be sent to this subscriber',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, resend!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '{{ route("admin.newsletters.resend-verification", $newsletter->id) }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        Swal.fire({
+                            title: 'Sent!',
+                            text: response.message,
+                            icon: 'success',
+                            confirmButtonColor: '#5B914C'
+                        });
+                    },
+                    error: function(xhr) {
+                        const errorMessage = xhr.responseJSON?.message || 'An error occurred';
+                        Swal.fire({
+                            title: 'Error!',
+                            text: errorMessage,
+                            icon: 'error',
+                            confirmButtonColor: '#dc3545'
+                        });
+                    }
+                });
+            }
+        });
+    });
 
     // Subscribe button
     $('#subscribeBtn').on('click', function() {

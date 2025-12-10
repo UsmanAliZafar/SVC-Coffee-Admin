@@ -3,12 +3,14 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
-
+use App\Http\Controllers\Web\NewsletterVerificationController;
 /*
 |--------------------------------------------------------------------------
 | Admin Routes - Main Entry Point
 |--------------------------------------------------------------------------
 */
+Route::get('/newsletter/verify/{token}', [NewsletterVerificationController::class, 'verify'])
+    ->name('newsletter.verify');
 
 Route::prefix('admin')->name('admin.')->group(function () {
 
