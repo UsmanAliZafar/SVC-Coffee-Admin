@@ -543,24 +543,66 @@
             <li class="section-divider">
                 <span class="section-title">System</span>
             </li>
-            {{-- Contact Us Management --}}
-            @if(auth('admin')->user()->hasPermission('contact_us.read'))
-                <li class="nav-item {{ request()->routeIs('admin.contact-us.*') ? 'active' : '' }}">
-                    <a class="nav-link {{ request()->routeIs('admin.contact-us.*') ? 'active' : '' }}"
-                    href="{{ route('admin.contact-us.index') }}"
-                    data-tooltip="Contact Us">
-                        <i class="bi bi-envelope-fill"></i>
-                        <span class="nav-text">Contact & Queries</span>
-                        @php
-                            $unreadCount = \App\Models\ContactUs::whereNull('read_at')->count();
-                        @endphp
-                        @if($unreadCount > 0)
-                            <span class="badge bg-danger rounded-pill ms-2">{{ $unreadCount }}</span>
-                        @endif
+            {{-- Communication Management --}}
+            @if(auth('admin')->user()->hasPermission('newsletters.read') || auth('admin')->user()->hasPermission('contact_us.read'))
+                <li class="nav-item has-dropdown {{ request()->routeIs('admin.newsletters.*') || request()->routeIs('admin.contact-us.*') ? 'open' : '' }}">
+                    <a class="nav-link {{ request()->routeIs('admin.newsletters.*') || request()->routeIs('admin.contact-us.*') ? 'active' : '' }}"
+                    href="#"
+                    data-tooltip="Communication">
+                        <i class="bi bi-chat-dots"></i>
+                        <span class="nav-text">Communication
+                            @php
+                                $totalBadges = 0;
+                                if(auth('admin')->user()->hasPermission('newsletters.read')) {
+                                    $totalBadges += \App\Models\Newsletter::where('is_subscribed', true)->count();
+                                }
+                                if(auth('admin')->user()->hasPermission('contact_us.read')) {
+                                    $totalBadges += \App\Models\ContactUs::whereNull('read_at')->count();
+                                }
+                            @endphp
+                            @if($totalBadges > 0)
+                                <span class="badge bg-danger ms-auto">{{ $totalBadges }}</span>
+                            @endif
+                        </span>
+                        <i class="bi bi-chevron-down dropdown-arrow"></i>
                     </a>
+                    <ul class="submenu">
+                        @if(auth('admin')->user()->hasPermission('contact_us.read'))
+                            <li class="nav-item {{ request()->routeIs('admin.contact-us.*') ? 'active' : '' }}">
+                                <a class="nav-link {{ request()->routeIs('admin.contact-us.index') ? 'active' : '' }}"
+                                href="{{ route('admin.contact-us.index') }}">
+                                    <i class="bi bi-envelope-fill"></i>
+                                    <span class="nav-text">Contact & Queries</span>
+                                    @php
+                                        $unreadCount = \App\Models\ContactUs::whereNull('read_at')->count();
+                                    @endphp
+                                    @if($unreadCount > 0)
+                                        <span class="badge bg-danger ms-auto">{{ $unreadCount }}</span>
+                                    @endif
+                                </a>
+                            </li>
+                        @endif
+                        @if(auth('admin')->user()->hasPermission('newsletters.read'))
+                            <li class="nav-item {{ request()->routeIs('admin.newsletters.*') ? 'active' : '' }}">
+                                <a class="nav-link {{ request()->routeIs('admin.newsletters.index') ? 'active' : '' }}"
+                                href="{{ route('admin.newsletters.index') }}">
+                                    <i class="bi bi-envelope-at"></i>
+                                    <span class="nav-text">Newsletter Subscriberes</span>
+                                    @php
+                                        $subscribedCount = \App\Models\Newsletter::where('is_subscribed', true)->count();
+                                    @endphp
+                                    @if($subscribedCount > 0)
+                                        <span class="badge bg-success ms-auto">{{ $subscribedCount }}</span>
+                                    @endif
+                                </a>
+                            </li>
+                        @endif
+
+
+                    </ul>
                 </li>
             @endif
-            {{-- End Contact Us Management --}}
+            {{-- End Communication Management --}}
 
             {{-- Notifications Management --}}
             @if(auth('admin')->user()->hasPermission('notifications.read'))
@@ -631,7 +673,7 @@
                     </ul>
                 </li>
             @endif
-            {{-- Content Management --}}
+            {{-- pages Management --}}
 
             {{-- Admin Users Management --}}
             @if(auth('admin')->user()->hasPermission('admin_users.read') || auth('admin')->user()->hasPermission('roles.read') || auth('admin')->user()->hasRole('super_admin'))

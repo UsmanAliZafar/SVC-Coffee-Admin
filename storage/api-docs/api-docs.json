@@ -3848,6 +3848,410 @@
                     }
                 }
             }
+        },
+        "/api/newsletter/subscribe": {
+            "post": {
+                "tags": [
+                    "Newsletter"
+                ],
+                "summary": "Subscribe to newsletter",
+                "description": "Subscribe an email address to receive newsletters. If email was previously unsubscribed, it will be reactivated. No authentication required.",
+                "operationId": "subscribeNewsletter",
+                "requestBody": {
+                    "description": "Newsletter subscription data",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "description": "Email address to subscribe",
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255,
+                                        "example": "john.doe@example.com"
+                                    },
+                                    "name": {
+                                        "description": "Subscriber name (optional)",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "John Doe",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successfully subscribed to newsletter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Thank you for subscribing! You will now receive our latest updates and newsletters."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "example": "9d4f5678-1234-5678-9abc-def123456789"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "john.doe@example.com"
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "John Doe",
+                                                    "nullable": true
+                                                },
+                                                "subscribed_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2025-12-10T14:30:00Z"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Successfully resubscribed (was previously unsubscribed)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Welcome back! You have been successfully resubscribed to our newsletter."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "john.doe@example.com"
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "John Doe",
+                                                    "nullable": true
+                                                },
+                                                "subscribed_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Email already subscribed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "This email is already subscribed to our newsletter."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "john.doe@example.com"
+                                                },
+                                                "subscribed_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "email": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The email field is required."
+                                                    }
+                                                },
+                                                "name": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The name must not be greater than 255 characters."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to subscribe. Please try again later."
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Database connection failed",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/newsletter/unsubscribe": {
+            "post": {
+                "tags": [
+                    "Newsletter"
+                ],
+                "summary": "Unsubscribe from newsletter",
+                "description": "Unsubscribe an email address from receiving newsletters. No authentication required.",
+                "operationId": "unsubscribeNewsletter",
+                "requestBody": {
+                    "description": "Newsletter unsubscription data",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "description": "Email address to unsubscribe",
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255,
+                                        "example": "john.doe@example.com"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successfully unsubscribed from newsletter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "You have been successfully unsubscribed from our newsletter. We're sorry to see you go!"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "john.doe@example.com"
+                                                },
+                                                "unsubscribed_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2025-12-10T14:30:00Z"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Email not found in newsletter list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Email address not found in our newsletter list."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Email already unsubscribed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "This email is already unsubscribed from our newsletter."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "john.doe@example.com"
+                                                },
+                                                "unsubscribed_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "email": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The email field is required."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to unsubscribe. Please try again later."
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Database connection failed",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -6261,6 +6665,303 @@
                     }
                 },
                 "type": "object"
+            },
+            "NewsletterSubscriber": {
+                "title": "Newsletter Subscriber",
+                "description": "Newsletter subscriber object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "9d4f5678-1234-5678-9abc-def123456789"
+                    },
+                    "email": {
+                        "description": "Subscriber email address",
+                        "type": "string",
+                        "format": "email",
+                        "example": "john.doe@example.com"
+                    },
+                    "name": {
+                        "description": "Subscriber name",
+                        "type": "string",
+                        "example": "John Doe",
+                        "nullable": true
+                    },
+                    "is_subscribed": {
+                        "description": "Active subscription status",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "subscribed_at": {
+                        "description": "Subscription date",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "unsubscribed_at": {
+                        "description": "Unsubscription date",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterSubscribeRequest": {
+                "title": "Newsletter Subscribe Request",
+                "description": "Request payload for newsletter subscription",
+                "required": [
+                    "email"
+                ],
+                "properties": {
+                    "email": {
+                        "description": "Email address to subscribe",
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255,
+                        "example": "john.doe@example.com"
+                    },
+                    "name": {
+                        "description": "Subscriber name (optional)",
+                        "type": "string",
+                        "maxLength": 255,
+                        "example": "John Doe",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterUnsubscribeRequest": {
+                "title": "Newsletter Unsubscribe Request",
+                "description": "Request payload for newsletter unsubscription",
+                "required": [
+                    "email"
+                ],
+                "properties": {
+                    "email": {
+                        "description": "Email address to unsubscribe",
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255,
+                        "example": "john.doe@example.com"
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterSubscribeResponse": {
+                "title": "Newsletter Subscribe Response",
+                "description": "Successful newsletter subscription response",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Thank you for subscribing! You will now receive our latest updates and newsletters."
+                    },
+                    "data": {
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "example": "9d4f5678-1234-5678-9abc-def123456789"
+                            },
+                            "email": {
+                                "type": "string",
+                                "example": "john.doe@example.com"
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "John Doe",
+                                "nullable": true
+                            },
+                            "subscribed_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterAlreadySubscribed": {
+                "title": "Newsletter Already Subscribed",
+                "description": "Response when email is already subscribed",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "This email is already subscribed to our newsletter."
+                    },
+                    "data": {
+                        "properties": {
+                            "email": {
+                                "type": "string",
+                                "example": "john.doe@example.com"
+                            },
+                            "subscribed_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterResubscribeResponse": {
+                "title": "Newsletter Resubscribe Response",
+                "description": "Response when previously unsubscribed email is resubscribed",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Welcome back! You have been successfully resubscribed to our newsletter."
+                    },
+                    "data": {
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "email": {
+                                "type": "string",
+                                "example": "john.doe@example.com"
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "John Doe",
+                                "nullable": true
+                            },
+                            "subscribed_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterUnsubscribeResponse": {
+                "title": "Newsletter Unsubscribe Response",
+                "description": "Successful newsletter unsubscription response",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "You have been successfully unsubscribed from our newsletter. We're sorry to see you go!"
+                    },
+                    "data": {
+                        "properties": {
+                            "email": {
+                                "type": "string",
+                                "example": "john.doe@example.com"
+                            },
+                            "unsubscribed_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterNotFound": {
+                "title": "Newsletter Email Not Found",
+                "description": "Error when email is not found in newsletter list",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Email address not found in our newsletter list."
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterAlreadyUnsubscribed": {
+                "title": "Newsletter Already Unsubscribed",
+                "description": "Response when email is already unsubscribed",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "This email is already unsubscribed from our newsletter."
+                    },
+                    "data": {
+                        "properties": {
+                            "email": {
+                                "type": "string",
+                                "example": "john.doe@example.com"
+                            },
+                            "unsubscribed_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "NewsletterValidationError": {
+                "title": "Newsletter Validation Error",
+                "description": "Validation error response for newsletter operations",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Validation failed"
+                    },
+                    "errors": {
+                        "properties": {
+                            "email": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "example": "The email field is required."
+                                }
+                            },
+                            "name": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "example": "The name must not be greater than 255 characters."
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
             }
         },
         "responses": {
@@ -6508,6 +7209,10 @@
         {
             "name": "Contact Us",
             "description": "Contact form submissions - Submit inquiries and messages to the store"
+        },
+        {
+            "name": "Newsletter",
+            "description": "Newsletter subscription management - Subscribe and unsubscribe from email newsletters"
         },
         {
             "name": "Pages",

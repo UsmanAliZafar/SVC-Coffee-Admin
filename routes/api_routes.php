@@ -55,5 +55,6 @@ Route::prefix('api')->name('api.')->group(function () {
         require __DIR__ . '/apis/settings_routes.php';
         require __DIR__ . '/apis/contact_routes.php';
         require __DIR__ . '/apis/page_routes.php';
+        require __DIR__ . '/apis/newsletters_routes.php';
     });
 });

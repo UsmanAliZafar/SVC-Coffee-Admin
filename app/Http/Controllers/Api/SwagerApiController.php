@@ -1674,4 +1674,251 @@ class SwagerApiController extends Controller
      * )
      */
     public function sitePages() {}
+
+    /**
+     * ============================================
+     * NEWSLETTER ENDPOINTS
+     * ============================================
+     */
+
+    /**
+     * @OA\Post(
+     *     path="/api/newsletter/subscribe",
+     *     operationId="subscribeNewsletter",
+     *     tags={"Newsletter"},
+     *     summary="Subscribe to newsletter",
+     *     description="Subscribe an email address to receive newsletters. If email was previously unsubscribed, it will be reactivated. No authentication required.",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Newsletter subscription data",
+     *         @OA\JsonContent(
+     *             required={"email"},
+     *             @OA\Property(
+     *                 property="email",
+     *                 type="string",
+     *                 format="email",
+     *                 maxLength=255,
+     *                 example="john.doe@example.com",
+     *                 description="Email address to subscribe"
+     *             ),
+     *             @OA\Property(
+     *                 property="name",
+     *                 type="string",
+     *                 maxLength=255,
+     *                 nullable=true,
+     *                 example="John Doe",
+     *                 description="Subscriber name (optional)"
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Successfully subscribed to newsletter",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="Thank you for subscribing! You will now receive our latest updates and newsletters."
+     *             ),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id", type="string", format="uuid", example="9d4f5678-1234-5678-9abc-def123456789"),
+     *                 @OA\Property(property="email", type="string", example="john.doe@example.com"),
+     *                 @OA\Property(property="name", type="string", nullable=true, example="John Doe"),
+     *                 @OA\Property(property="subscribed_at", type="string", format="date-time", example="2025-12-10T14:30:00Z")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successfully resubscribed (was previously unsubscribed)",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="Welcome back! You have been successfully resubscribed to our newsletter."
+     *             ),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id", type="string", format="uuid"),
+     *                 @OA\Property(property="email", type="string", example="john.doe@example.com"),
+     *                 @OA\Property(property="name", type="string", nullable=true, example="John Doe"),
+     *                 @OA\Property(property="subscribed_at", type="string", format="date-time")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=409,
+     *         description="Email already subscribed",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="This email is already subscribed to our newsletter."
+     *             ),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="email", type="string", example="john.doe@example.com"),
+     *                 @OA\Property(property="subscribed_at", type="string", format="date-time")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="email",
+     *                     type="array",
+     *                     @OA\Items(type="string", example="The email field is required.")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="name",
+     *                     type="array",
+     *                     @OA\Items(type="string", example="The name must not be greater than 255 characters.")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="Failed to subscribe. Please try again later."
+     *             ),
+     *             @OA\Property(
+     *                 property="error",
+     *                 type="string",
+     *                 nullable=true,
+     *                 example="Database connection failed"
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function subscribeNewsletter() {}
+
+    /**
+     * @OA\Post(
+     *     path="/api/newsletter/unsubscribe",
+     *     operationId="unsubscribeNewsletter",
+     *     tags={"Newsletter"},
+     *     summary="Unsubscribe from newsletter",
+     *     description="Unsubscribe an email address from receiving newsletters. No authentication required.",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Newsletter unsubscription data",
+     *         @OA\JsonContent(
+     *             required={"email"},
+     *             @OA\Property(
+     *                 property="email",
+     *                 type="string",
+     *                 format="email",
+     *                 maxLength=255,
+     *                 example="john.doe@example.com",
+     *                 description="Email address to unsubscribe"
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successfully unsubscribed from newsletter",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="You have been successfully unsubscribed from our newsletter. We're sorry to see you go!"
+     *             ),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="email", type="string", example="john.doe@example.com"),
+     *                 @OA\Property(property="unsubscribed_at", type="string", format="date-time", example="2025-12-10T14:30:00Z")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Email not found in newsletter list",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="Email address not found in our newsletter list."
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=409,
+     *         description="Email already unsubscribed",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="This email is already unsubscribed from our newsletter."
+     *             ),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="email", type="string", example="john.doe@example.com"),
+     *                 @OA\Property(property="unsubscribed_at", type="string", format="date-time")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation failed"),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="email",
+     *                     type="array",
+     *                     @OA\Items(type="string", example="The email field is required.")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="Failed to unsubscribe. Please try again later."
+     *             ),
+     *             @OA\Property(
+     *                 property="error",
+     *                 type="string",
+     *                 nullable=true,
+     *                 example="Database connection failed"
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function unsubscribeNewsletter() {}
 }

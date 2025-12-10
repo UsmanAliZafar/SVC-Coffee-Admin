@@ -85,6 +85,11 @@ namespace App\Http\Controllers\Api;
  *     description="Contact form submissions - Submit inquiries and messages to the store"
  * )
  *
+ *  @OA\Tag(
+ *     name="Newsletter",
+ *     description="Newsletter subscription management - Subscribe and unsubscribe from email newsletters"
+ * )
+ *
  *
  * @OA\Response(
  *     response="Success",
@@ -1064,7 +1069,197 @@ namespace App\Http\Controllers\Api;
  *     @OA\Property(property="success", type="boolean", example=false),
  *     @OA\Property(property="message", type="string", example="Cart is empty")
  * )
+ * @OA\Schema(
+ *     schema="NewsletterSubscriber",
+ *     type="object",
+ *     title="Newsletter Subscriber",
+ *     description="Newsletter subscriber object",
+ *     @OA\Property(property="id", type="string", format="uuid", example="9d4f5678-1234-5678-9abc-def123456789"),
+ *     @OA\Property(property="email", type="string", format="email", example="john.doe@example.com", description="Subscriber email address"),
+ *     @OA\Property(property="name", type="string", nullable=true, example="John Doe", description="Subscriber name"),
+ *     @OA\Property(property="is_subscribed", type="boolean", example=true, description="Active subscription status"),
+ *     @OA\Property(property="subscribed_at", type="string", format="date-time", description="Subscription date"),
+ *     @OA\Property(property="unsubscribed_at", type="string", format="date-time", nullable=true, description="Unsubscription date"),
+ *     @OA\Property(property="created_at", type="string", format="date-time"),
+ *     @OA\Property(property="updated_at", type="string", format="date-time")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterSubscribeRequest",
+ *     type="object",
+ *     title="Newsletter Subscribe Request",
+ *     description="Request payload for newsletter subscription",
+ *     required={"email"},
+ *     @OA\Property(
+ *         property="email",
+ *         type="string",
+ *         format="email",
+ *         maxLength=255,
+ *         example="john.doe@example.com",
+ *         description="Email address to subscribe"
+ *     ),
+ *     @OA\Property(
+ *         property="name",
+ *         type="string",
+ *         maxLength=255,
+ *         nullable=true,
+ *         example="John Doe",
+ *         description="Subscriber name (optional)"
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterUnsubscribeRequest",
+ *     type="object",
+ *     title="Newsletter Unsubscribe Request",
+ *     description="Request payload for newsletter unsubscription",
+ *     required={"email"},
+ *     @OA\Property(
+ *         property="email",
+ *         type="string",
+ *         format="email",
+ *         maxLength=255,
+ *         example="john.doe@example.com",
+ *         description="Email address to unsubscribe"
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterSubscribeResponse",
+ *     type="object",
+ *     title="Newsletter Subscribe Response",
+ *     description="Successful newsletter subscription response",
+ *     @OA\Property(property="success", type="boolean", example=true),
+ *     @OA\Property(
+ *         property="message",
+ *         type="string",
+ *         example="Thank you for subscribing! You will now receive our latest updates and newsletters."
+ *     ),
+ *     @OA\Property(
+ *         property="data",
+ *         type="object",
+ *         @OA\Property(property="id", type="string", format="uuid", example="9d4f5678-1234-5678-9abc-def123456789"),
+ *         @OA\Property(property="email", type="string", example="john.doe@example.com"),
+ *         @OA\Property(property="name", type="string", nullable=true, example="John Doe"),
+ *         @OA\Property(property="subscribed_at", type="string", format="date-time")
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterAlreadySubscribed",
+ *     type="object",
+ *     title="Newsletter Already Subscribed",
+ *     description="Response when email is already subscribed",
+ *     @OA\Property(property="success", type="boolean", example=false),
+ *     @OA\Property(
+ *         property="message",
+ *         type="string",
+ *         example="This email is already subscribed to our newsletter."
+ *     ),
+ *     @OA\Property(
+ *         property="data",
+ *         type="object",
+ *         @OA\Property(property="email", type="string", example="john.doe@example.com"),
+ *         @OA\Property(property="subscribed_at", type="string", format="date-time")
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterResubscribeResponse",
+ *     type="object",
+ *     title="Newsletter Resubscribe Response",
+ *     description="Response when previously unsubscribed email is resubscribed",
+ *     @OA\Property(property="success", type="boolean", example=true),
+ *     @OA\Property(
+ *         property="message",
+ *         type="string",
+ *         example="Welcome back! You have been successfully resubscribed to our newsletter."
+ *     ),
+ *     @OA\Property(
+ *         property="data",
+ *         type="object",
+ *         @OA\Property(property="id", type="string", format="uuid"),
+ *         @OA\Property(property="email", type="string", example="john.doe@example.com"),
+ *         @OA\Property(property="name", type="string", nullable=true, example="John Doe"),
+ *         @OA\Property(property="subscribed_at", type="string", format="date-time")
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterUnsubscribeResponse",
+ *     type="object",
+ *     title="Newsletter Unsubscribe Response",
+ *     description="Successful newsletter unsubscription response",
+ *     @OA\Property(property="success", type="boolean", example=true),
+ *     @OA\Property(
+ *         property="message",
+ *         type="string",
+ *         example="You have been successfully unsubscribed from our newsletter. We're sorry to see you go!"
+ *     ),
+ *     @OA\Property(
+ *         property="data",
+ *         type="object",
+ *         @OA\Property(property="email", type="string", example="john.doe@example.com"),
+ *         @OA\Property(property="unsubscribed_at", type="string", format="date-time")
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterNotFound",
+ *     type="object",
+ *     title="Newsletter Email Not Found",
+ *     description="Error when email is not found in newsletter list",
+ *     @OA\Property(property="success", type="boolean", example=false),
+ *     @OA\Property(
+ *         property="message",
+ *         type="string",
+ *         example="Email address not found in our newsletter list."
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterAlreadyUnsubscribed",
+ *     type="object",
+ *     title="Newsletter Already Unsubscribed",
+ *     description="Response when email is already unsubscribed",
+ *     @OA\Property(property="success", type="boolean", example=false),
+ *     @OA\Property(
+ *         property="message",
+ *         type="string",
+ *         example="This email is already unsubscribed from our newsletter."
+ *     ),
+ *     @OA\Property(
+ *         property="data",
+ *         type="object",
+ *         @OA\Property(property="email", type="string", example="john.doe@example.com"),
+ *         @OA\Property(property="unsubscribed_at", type="string", format="date-time")
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="NewsletterValidationError",
+ *     type="object",
+ *     title="Newsletter Validation Error",
+ *     description="Validation error response for newsletter operations",
+ *     @OA\Property(property="success", type="boolean", example=false),
+ *     @OA\Property(property="message", type="string", example="Validation failed"),
+ *     @OA\Property(
+ *         property="errors",
+ *         type="object",
+ *         @OA\Property(
+ *             property="email",
+ *             type="array",
+ *             @OA\Items(type="string", example="The email field is required.")
+ *         ),
+ *         @OA\Property(
+ *             property="name",
+ *             type="array",
+ *             @OA\Items(type="string", example="The name must not be greater than 255 characters.")
+ *         )
+ *     )
+ * )
  */
+
 class SwaggerAnnotations
 {
     // This class is just for Swagger annotations
