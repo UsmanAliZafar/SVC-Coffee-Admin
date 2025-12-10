@@ -80,13 +80,13 @@
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary active">
+            <button type="button" class="btn btn-sm btn-outline-secondary {{ $period === 'week' ? 'active' : '' }}">
                 <i class="bi bi-calendar-week"></i> This Week
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary">
+            <button type="button" class="btn btn-sm btn-outline-secondary {{ $period === 'month' ? 'active' : '' }}">
                 <i class="bi bi-calendar-month"></i> This Month
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary">
+            <button type="button" class="btn btn-sm btn-outline-secondary {{ $period === 'year' ? 'active' : '' }}">
                 <i class="bi bi-calendar-range"></i> This Year
             </button>
         </div>
@@ -775,6 +775,37 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+    // ============================================================
+    // DATE FILTER FUNCTIONALITY
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterButtons = document.querySelectorAll('.btn-group .btn-outline-secondary');
+
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+
+                // Add active class to clicked button
+                this.classList.add('active');
+
+                // Determine the filter period
+                let period = '';
+                if (this.textContent.includes('Week')) {
+                    period = 'week';
+                } else if (this.textContent.includes('Month')) {
+                    period = 'month';
+                } else if (this.textContent.includes('Year')) {
+                    period = 'year';
+                }
+
+                // Reload dashboard with filter
+                if (period) {
+                    window.location.href = '{{ route("admin.dashboard") }}?period=' + period;
+                }
+            });
+        });
+    });
     // Sales Chart
     const currencySymbol = '{{ store_currency_symbol() }}';
     const salesCtx = document.getElementById('salesChart').getContext('2d');

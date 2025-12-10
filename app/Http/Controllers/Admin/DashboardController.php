@@ -21,15 +21,16 @@ class DashboardController extends Controller
     /**
      * Display admin dashboard with comprehensive statistics
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = auth('admin')->user();
+        $period = $request->input('period', 'week'); // Default to week
 
-        // Get dashboard statistics
+        // Get dashboard statistics with period filter
         $stats = $this->getGeneralStats();
-        $orderStats = $this->getOrderStats();
+        $orderStats = $this->getOrderStats($period);
         $inventoryStats = $this->getInventoryStats();
-        $revenueStats = $this->getRevenueStats();
+        $revenueStats = $this->getRevenueStats($period);
 
         // Recent activities
         $recentOrders = $this->getRecentOrders();
@@ -37,9 +38,9 @@ class DashboardController extends Controller
         $stockAlerts = $this->getStockAlerts();
         $recentInventoryMovements = $this->getRecentInventoryMovements();
 
-        // Chart data
-        $salesChartData = $this->getSalesChartData();
-        $topProducts = $this->getTopProducts();
+        // Chart data with period
+        $salesChartData = $this->getSalesChartData($period);
+        $topProducts = $this->getTopProducts($period);
         $categoryBreakdown = $this->getCategoryBreakdown();
 
         return view('admin.dashboard', compact(
@@ -54,7 +55,8 @@ class DashboardController extends Controller
             'recentInventoryMovements',
             'salesChartData',
             'topProducts',
-            'categoryBreakdown'
+            'categoryBreakdown',
+            'period'
         ));
     }
 
@@ -76,11 +78,9 @@ class DashboardController extends Controller
     /**
      * Get order statistics
      */
-    private function getOrderStats(): array
+    private function getOrderStats(string $period = 'week'): array
     {
-        $today = Carbon::today();
-        $thisWeek = Carbon::now()->startOfWeek();
-        $thisMonth = Carbon::now()->startOfMonth();
+        $startDate = $this->getStartDate($period);
 
         return [
             'pending_orders' => Order::where('status_key_code', 'ORDER_PENDING')->count(),
@@ -88,9 +88,9 @@ class DashboardController extends Controller
             'shipped_orders' => Order::where('status_key_code', 'ORDER_SHIPPED')->count(),
             'delivered_orders' => Order::where('status_key_code', 'ORDER_DELIVERED')->count(),
             'cancelled_orders' => Order::where('status_key_code', 'ORDER_CANCELLED')->count(),
-            'today_orders' => Order::whereDate('created_at', $today)->count(),
-            'week_orders' => Order::where('created_at', '>=', $thisWeek)->count(),
-            'month_orders' => Order::where('created_at', '>=', $thisMonth)->count(),
+            'today_orders' => Order::whereDate('created_at', Carbon::today())->count(),
+            'week_orders' => Order::where('created_at', '>=', $startDate)->count(),
+            'month_orders' => Order::where('created_at', '>=', Carbon::now()->startOfMonth())->count(),
             'orders_require_action' => Order::whereIn('status_key_code', ['ORDER_PENDING', 'ORDER_CONFIRMED'])
                                             ->where('payment_status_key_code', 'PAYMENT_PAID')
                                             ->count(),
@@ -134,13 +134,16 @@ class DashboardController extends Controller
     /**
      * Get revenue statistics
      */
-    private function getRevenueStats(): array
+    private function getRevenueStats(string $period = 'week'): array
     {
         $today = Carbon::today();
         $thisWeek = Carbon::now()->startOfWeek();
         $thisMonth = Carbon::now()->startOfMonth();
         $thisYear = Carbon::now()->startOfYear();
-
+        $startDate = $this->getStartDate($period);
+        $periodRevenue = Order::where('created_at', '>=', $startDate)
+                         ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+                         ->sum('total_amount');
         // Today's revenue
         $todayRevenue = Order::whereDate('created_at', $today)
                             ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
@@ -190,6 +193,7 @@ class DashboardController extends Controller
             'total_refunded' => $totalRefunded,
             // Calculate percentage changes (compared to previous period)
             'revenue_change_percentage' => $this->calculateRevenueChange($monthRevenue),
+            'period_revenue' => $periodRevenue,
         ];
     }
 
@@ -244,9 +248,14 @@ class DashboardController extends Controller
     /**
      * Get sales chart data for the last 30 days
      */
-    private function getSalesChartData(): array
+    private function getSalesChartData(string $period = 'week'): array
     {
-        $days = 30;
+        $days = match($period) {
+            'week' => 7,
+            'month' => 30,
+            'year' => 365,
+            default => 7
+        };
         $startDate = Carbon::now()->subDays($days);
 
         $salesData = Order::select(
@@ -280,8 +289,15 @@ class DashboardController extends Controller
     /**
      * Get top selling products
      */
-    private function getTopProducts()
+    private function getTopProducts(string $period = 'week')
     {
+        $days = match($period) {
+            'week' => 7,
+            'month' => 30,
+            'year' => 365,
+            default => 7
+        };
+        //
         return Product::select(
                         'products.id',
                         'products.name',
@@ -295,7 +311,7 @@ class DashboardController extends Controller
                       ->join('order_items', 'products.id', '=', 'order_items.product_id')
                       ->join('orders', 'order_items.order_id', '=', 'orders.id')
                       ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED'])
-                      ->where('orders.created_at', '>=', Carbon::now()->subDays(30))
+                      ->where('orders.created_at', '>=', Carbon::now()->subDays($days))
                       ->groupBy(
                           'products.id',
                           'products.name',
@@ -380,5 +396,18 @@ class DashboardController extends Controller
                                    ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
                                    ->sum('total_amount'),
         ]);
+    }
+
+    /**
+     * Helper method to get start date based on period
+     */
+    private function getStartDate(string $period): Carbon
+    {
+        return match($period) {
+            'week' => Carbon::now()->startOfWeek(),
+            'month' => Carbon::now()->startOfMonth(),
+            'year' => Carbon::now()->startOfYear(),
+            default => Carbon::now()->startOfWeek()
+        };
     }
 }
