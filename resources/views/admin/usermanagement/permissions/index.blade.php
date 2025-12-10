@@ -26,6 +26,70 @@
                 </div>
             </div>
 
+             <!-- Quick Stats Cards -->
+            <div class="row mt-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h3 class="mb-0" id="totalPermissions">0</h3>
+                                    <p class="mb-0">Total Permissions</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-key" style="font-size: 2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h3 class="mb-0" id="totalModules">0</h3>
+                                    <p class="mb-0">Modules</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-folder" style="font-size: 2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h3 class="mb-0" id="totalActions">0</h3>
+                                    <p class="mb-0">Actions</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-lightning" style="font-size: 2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h3 class="mb-0" id="totalRoleAssignments">0</h3>
+                                    <p class="mb-0">Role Assignments</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-shield-check" style="font-size: 2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center" style="background-color: #5B914C; color: white;">
                     <h5 class="card-title mb-0">
@@ -100,69 +164,7 @@
                 </div>
             </div>
 
-            <!-- Quick Stats Cards -->
-            <div class="row mt-4">
-                <div class="col-md-3">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h3 class="mb-0" id="totalPermissions">0</h3>
-                                    <p class="mb-0">Total Permissions</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="bi bi-key" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h3 class="mb-0" id="totalModules">0</h3>
-                                    <p class="mb-0">Modules</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="bi bi-folder" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-secondary text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h3 class="mb-0" id="totalActions">0</h3>
-                                    <p class="mb-0">Actions</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="bi bi-lightning" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-success text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h3 class="mb-0" id="totalRoleAssignments">0</h3>
-                                    <p class="mb-0">Role Assignments</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="bi bi-shield-check" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
         </div>
     </div>
 </div>

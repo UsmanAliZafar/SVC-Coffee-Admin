@@ -21,7 +21,7 @@ class RoleController extends Controller
             abort(403, 'Unauthorized access');
         }
 
-        $query = Role::withCount('adminUsers');
+        $query = Role::withCount(['adminUsers', 'permissions']);
 
         // Search functionality
         if ($request->has('search') && !empty($request->search)) {
