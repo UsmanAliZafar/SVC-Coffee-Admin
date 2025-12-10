@@ -375,28 +375,26 @@ class CheckoutController extends Controller
                     ], 400);
                 }
 
+                // ✅ TRACK FULFILLMENT DETAILS
+                $fulfillmentDetails = [];
+                $remainingQuantity = $quantityNeeded;
+
                 // ✅ Reserve from warehouses until quantity is fulfilled
                 foreach ($warehouseStocks as $warehouseStock) {
-                    if ($quantityNeeded <= 0) {
+                    if ($remainingQuantity <= 0) {
                         break;
                     }
 
-                    $reserveQty = min($quantityNeeded, $warehouseStock->available_quantity);
+                    $reserveQty = min($remainingQuantity, $warehouseStock->available_quantity);
 
                     if ($warehouseStock->reserveStock($reserveQty)) {
-                        // Update order item with warehouse info
-                        $orderItem = OrderItem::where('order_id', $order->id)
-                            ->where('product_id', $product->id)
-                            ->where('product_variant_id', $variant ? $variant->id : null)
-                            ->first();
-
-                        if ($orderItem) {
-                            $orderItem->update([
-                                'stock_reserved' => true,
-                                'stock_reserved_at' => now(),
-                                'warehouse_id' => $warehouseStock->warehouse_id,
-                            ]);
-                        }
+                        // ✅ ADD TO FULFILLMENT DETAILS
+                        $fulfillmentDetails[] = [
+                            'warehouse_id' => $warehouseStock->warehouse_id,
+                            'warehouse_name' => $warehouseStock->warehouse_name,
+                            'quantity' => $reserveQty,
+                            'action' => 'RESERVED',
+                        ];
 
                         \Log::info('🔒 RESERVED (Web Order)', [
                             'order' => $order->order_number,
@@ -406,25 +404,46 @@ class CheckoutController extends Controller
                             'warehouse_id' => $warehouseStock->warehouse_id,
                         ]);
 
-                        $quantityNeeded -= $reserveQty;
+                        $remainingQuantity -= $reserveQty;
                     }
                 }
 
                 // ✅ Verify all quantity was reserved
-                if ($quantityNeeded > 0) {
+                if ($remainingQuantity > 0) {
                     DB::rollBack();
                     \Log::error('❌ Failed to reserve full quantity', [
                         'product' => $itemName,
                         'quantity_needed' => $item['quantity'],
-                        'quantity_remaining' => $quantityNeeded,
+                        'quantity_remaining' => $remainingQuantity,
                     ]);
                     return response()->json([
                         'success' => false,
                         'message' => "Failed to reserve stock for {$itemName}",
                     ], 400);
                 }
-            }
 
+                // ✅ UPDATE ORDER ITEM WITH FULFILLMENT DETAILS
+                $orderItem = OrderItem::where('order_id', $order->id)
+                    ->where('product_id', $product->id)
+                    ->where('product_variant_id', $variant ? $variant->id : null)
+                    ->first();
+
+                if ($orderItem) {
+                    $orderItem->update([
+                        'stock_reserved' => true,
+                        'stock_reserved_at' => now(),
+                        'warehouse_id' => $fulfillmentDetails[0]['warehouse_id'], // ← Primary warehouse
+                        'fulfillment_details' => $fulfillmentDetails, // ✅ STORE ALL WAREHOUSES
+                    ]);
+
+                    \Log::info('✅ Fulfillment details stored', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                        'warehouses_used' => count($fulfillmentDetails),
+                        'details' => $fulfillmentDetails,
+                    ]);
+                }
+            }
             // ============================================================
             // CREATE TRANSACTION
             // ============================================================
@@ -742,30 +761,6 @@ class CheckoutController extends Controller
             $product = $item->product;
             $variant = $item->variant;
             $quantity = $item->quantity;
-            $warehouseId = $item->warehouse_id;
-
-            if (!$warehouseId) {
-                $defaultWarehouse = \App\Models\Warehouse::where('is_default', true)->first();
-                if (!$defaultWarehouse) {
-                    \Log::error('❌ No warehouse', ['item' => $item->id]);
-                    continue;
-                }
-                $warehouseId = $defaultWarehouse->id;
-                $item->update(['warehouse_id' => $warehouseId]);
-            }
-
-            $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
-                ->where('variant_id', $variant ? $variant->id : null)
-                ->where('warehouse_id', $warehouseId)
-                ->first();
-
-            if (!$warehouseStock) {
-                \Log::error('❌ Warehouse stock not found', [
-                    'product' => $product->name,
-                ]);
-                continue;
-            }
-
             $itemName = $variant ? "{$product->name} ({$variant->getFullName()})" : $product->name;
 
             // ============================================================
@@ -773,58 +768,166 @@ class CheckoutController extends Controller
             // ============================================================
             if ($newStatus === 'ORDER_CONFIRMED' && $oldStatus === 'ORDER_PENDING') {
                 if ($item->stock_reserved && !$item->stock_deducted) {
-                    // Release reservation
-                    $warehouseStock->releaseStock($quantity);
+                    $fulfillmentDetails = $item->fulfillment_details; // ✅ Auto-decoded by model cast
 
-                    // Deduct actual stock
-                    $warehouseStock->reduceStock($quantity);
+                    // ✅ MULTI-WAREHOUSE DEDUCTION
+                    if (!empty($fulfillmentDetails) && is_array($fulfillmentDetails)) {
+                        foreach ($fulfillmentDetails as &$fulfillment) {
+                            $warehouseId = $fulfillment['warehouse_id'] ?? null;
+                            $warehouseQty = $fulfillment['quantity'] ?? 0;
 
-                    $item->update([
-                        'stock_reserved' => false,
-                        'stock_reserved_at' => null,
-                        'stock_deducted' => true,
-                        'stock_deducted_at' => now(),
-                    ]);
+                            if (!$warehouseId || $warehouseQty <= 0) {
+                                continue;
+                            }
 
-                    \Log::info('⚡ DEDUCTED (Web Order Confirmed)', [
-                        'order' => $order->order_number,
-                        'product' => $itemName,
-                        'quantity' => $quantity,
-                        'warehouse_qty' => $warehouseStock->fresh()->quantity,
-                    ]);
+                            $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                                ->where('variant_id', $variant ? $variant->id : null)
+                                ->where('warehouse_id', $warehouseId)
+                                ->first();
+
+                            if (!$warehouseStock) {
+                                continue;
+                            }
+
+                            // Release reservation
+                            $warehouseStock->releaseStock($warehouseQty);
+
+                            // Deduct actual stock
+                            $warehouseStock->reduceStock($warehouseQty);
+
+                            // ✅ UPDATE ACTION
+                            $fulfillment['action'] = 'DEDUCTED';
+
+                            \Log::info('⚡ DEDUCTED (Web Order Confirmed)', [
+                                'order' => $order->order_number,
+                                'product' => $itemName,
+                                'warehouse' => $fulfillment['warehouse_name'] ?? $warehouseId,
+                                'quantity' => $warehouseQty,
+                            ]);
+                        }
+
+                        // ✅ UPDATE ITEM WITH NEW FULFILLMENT DETAILS
+                        $item->update([
+                            'stock_reserved' => false,
+                            'stock_reserved_at' => null,
+                            'stock_deducted' => true,
+                            'stock_deducted_at' => now(),
+                            'fulfillment_details' => $fulfillmentDetails, // ✅ Save updated actions
+                        ]);
+                    }
                 }
             }
 
             // ============================================================
-            // ANY → CANCELLED: Restore stock
+            // ANY → CANCELLED: Restore stock to ALL warehouses
             // ============================================================
             elseif ($newStatus === 'ORDER_CANCELLED') {
-                if ($item->stock_deducted) {
-                    $warehouseStock->addStock($quantity);
+                $fulfillmentDetails = $item->fulfillment_details; // ✅ Auto-decoded
 
+                // ✅ MULTI-WAREHOUSE RESTORATION
+                if (!empty($fulfillmentDetails) && is_array($fulfillmentDetails)) {
+                    \Log::info('🔄 Restoring stock to multiple warehouses', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                        'warehouses_count' => count($fulfillmentDetails),
+                    ]);
+
+                    foreach ($fulfillmentDetails as $fulfillment) {
+                        $warehouseId = $fulfillment['warehouse_id'] ?? null;
+                        $warehouseQty = $fulfillment['quantity'] ?? 0;
+                        $action = $fulfillment['action'] ?? 'UNKNOWN';
+
+                        if (!$warehouseId || $warehouseQty <= 0) {
+                            continue;
+                        }
+
+                        $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                            ->where('variant_id', $variant ? $variant->id : null)
+                            ->where('warehouse_id', $warehouseId)
+                            ->first();
+
+                        if (!$warehouseStock) {
+                            \Log::error('❌ Warehouse stock not found during restoration', [
+                                'warehouse_id' => $warehouseId,
+                                'product' => $itemName,
+                            ]);
+                            continue;
+                        }
+
+                        // Restore based on original action
+                        if ($action === 'DEDUCTED' && $item->stock_deducted) {
+                            $warehouseStock->addStock($warehouseQty);
+
+                            \Log::info('✅ RESTORED to warehouse', [
+                                'order' => $order->order_number,
+                                'product' => $itemName,
+                                'warehouse' => $fulfillment['warehouse_name'] ?? $warehouseId,
+                                'quantity' => $warehouseQty,
+                            ]);
+
+                        } elseif ($action === 'RESERVED' && $item->stock_reserved) {
+                            $warehouseStock->releaseStock($warehouseQty);
+
+                            \Log::info('✅ RELEASED from warehouse', [
+                                'order' => $order->order_number,
+                                'product' => $itemName,
+                                'warehouse' => $fulfillment['warehouse_name'] ?? $warehouseId,
+                                'quantity' => $warehouseQty,
+                            ]);
+                        }
+                    }
+
+                    // Update item status
                     $item->update([
                         'stock_deducted' => false,
                         'stock_deducted_at' => null,
-                        'status_key_code' => 'ITEM_CANCELLED',
-                    ]);
-
-                    \Log::info('✅ RESTORED (Web Order Cancelled)', [
-                        'order' => $order->order_number,
-                        'product' => $itemName,
-                        'quantity' => $quantity,
-                    ]);
-                } elseif ($item->stock_reserved) {
-                    $warehouseStock->releaseStock($quantity);
-
-                    $item->update([
                         'stock_reserved' => false,
                         'stock_reserved_at' => null,
                         'status_key_code' => 'ITEM_CANCELLED',
                     ]);
+                }
+                // ✅ FALLBACK: Single warehouse restoration
+                else {
+                    $warehouseId = $item->warehouse_id;
 
-                    \Log::info('✅ RELEASED (Web Order Cancelled)', [
-                        'order' => $order->order_number,
-                        'product' => $itemName,
+                    if (!$warehouseId) {
+                        $defaultWarehouse = \App\Models\Warehouse::where('is_default', true)->first();
+                        if (!$defaultWarehouse) {
+                            continue;
+                        }
+                        $warehouseId = $defaultWarehouse->id;
+                    }
+
+                    $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                        ->where('variant_id', $variant ? $variant->id : null)
+                        ->where('warehouse_id', $warehouseId)
+                        ->first();
+
+                    if (!$warehouseStock) {
+                        continue;
+                    }
+
+                    if ($item->stock_deducted) {
+                        $warehouseStock->addStock($quantity);
+                        \Log::info('✅ RESTORED (single warehouse)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                            'quantity' => $quantity,
+                        ]);
+                    } elseif ($item->stock_reserved) {
+                        $warehouseStock->releaseStock($quantity);
+                        \Log::info('✅ RELEASED (single warehouse)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                        ]);
+                    }
+
+                    $item->update([
+                        'stock_deducted' => false,
+                        'stock_deducted_at' => null,
+                        'stock_reserved' => false,
+                        'stock_reserved_at' => null,
+                        'status_key_code' => 'ITEM_CANCELLED',
                     ]);
                 }
             }

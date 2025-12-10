@@ -886,7 +886,7 @@ class OrdersController extends Controller
                         'stock_reserved_at' => $shouldReserve ? now() : null,
                         'stock_deducted' => $shouldDeduct,
                         'stock_deducted_at' => $shouldDeduct ? now() : null,
-                        'fulfillment_details' => json_encode($fulfillmentDetails), // ✅ Store multi-warehouse info
+                        'fulfillment_details' => $fulfillmentDetails,
                     ]);
                 }
 
@@ -1227,126 +1227,126 @@ class OrdersController extends Controller
             // SCENARIO 3: ANY → CANCELLED/RETURNED (Restore Stock)
             // ============================================================
             elseif ($shouldRestore) {
-            $fulfillmentDetails = null;
-            if (!empty($item->fulfillment_details)) {
-                try {
-                    $fulfillmentDetails = is_string($item->fulfillment_details)
-                        ? json_decode($item->fulfillment_details, true)
-                        : $item->fulfillment_details;
-                } catch (\Exception $e) {
-                    \Log::warning('Failed to parse fulfillment_details', [
-                        'item_id' => $item->id,
-                        'error' => $e->getMessage()
+                $fulfillmentDetails = null;
+                if (!empty($item->fulfillment_details)) {
+                    try {
+                        $fulfillmentDetails = is_string($item->fulfillment_details)
+                            ? json_decode($item->fulfillment_details, true)
+                            : $item->fulfillment_details;
+                    } catch (\Exception $e) {
+                        \Log::warning('Failed to parse fulfillment_details', [
+                            'item_id' => $item->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+
+                // ============================================================
+                // MULTI-WAREHOUSE RESTORATION
+                // ============================================================
+                if (!empty($fulfillmentDetails) && is_array($fulfillmentDetails)) {
+                    \Log::info('🔄 Restoring stock to multiple warehouses', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                        'warehouses_count' => count($fulfillmentDetails),
                     ]);
-                }
-            }
 
-            // ============================================================
-            // MULTI-WAREHOUSE RESTORATION
-            // ============================================================
-            if (!empty($fulfillmentDetails) && is_array($fulfillmentDetails)) {
-                \Log::info('🔄 Restoring stock to multiple warehouses', [
-                    'order' => $order->order_number,
-                    'product' => $itemName,
-                    'warehouses_count' => count($fulfillmentDetails),
-                ]);
+                    foreach ($fulfillmentDetails as $fulfillment) {
+                        $warehouseId = $fulfillment['warehouse_id'] ?? null;
+                        $warehouseQty = $fulfillment['quantity'] ?? 0;
+                        $action = $fulfillment['action'] ?? 'UNKNOWN';
 
-                foreach ($fulfillmentDetails as $fulfillment) {
-                    $warehouseId = $fulfillment['warehouse_id'] ?? null;
-                    $warehouseQty = $fulfillment['quantity'] ?? 0;
-                    $action = $fulfillment['action'] ?? 'UNKNOWN';
+                        if (!$warehouseId || $warehouseQty <= 0) {
+                            continue;
+                        }
 
-                    if (!$warehouseId || $warehouseQty <= 0) {
-                        continue;
+                        $warehouseStock = ProductWarehouseStock::where('product_id', $product->id)
+                            ->where('variant_id', $variant ? $variant->id : null)
+                            ->where('warehouse_id', $warehouseId)
+                            ->first();
+
+                        if (!$warehouseStock) {
+                            \Log::error('❌ Warehouse stock not found during restoration', [
+                                'warehouse_id' => $warehouseId,
+                                'product' => $itemName,
+                            ]);
+                            continue;
+                        }
+
+                        // Restore based on original action
+                        if ($action === 'DEDUCTED' && $item->stock_deducted) {
+                            $warehouseStock->addStock($warehouseQty);
+
+                            \Log::info('✅ RESTORED to warehouse', [
+                                'order' => $order->order_number,
+                                'product' => $itemName,
+                                'warehouse' => $fulfillment['warehouse_name'] ?? $warehouseId,
+                                'quantity' => $warehouseQty,
+                                'new_stock' => $warehouseStock->fresh()->quantity,
+                            ]);
+
+                        } elseif ($action === 'RESERVED' && $item->stock_reserved) {
+                            $warehouseStock->releaseStock($warehouseQty);
+
+                            \Log::info('✅ RELEASED from warehouse', [
+                                'order' => $order->order_number,
+                                'product' => $itemName,
+                                'warehouse' => $fulfillment['warehouse_name'] ?? $warehouseId,
+                                'quantity' => $warehouseQty,
+                            ]);
+                        }
                     }
 
-                    $warehouseStock = ProductWarehouseStock::where('product_id', $product->id)
-                        ->where('variant_id', $variant ? $variant->id : null)
-                        ->where('warehouse_id', $warehouseId)
-                        ->first();
-
-                    if (!$warehouseStock) {
-                        \Log::error('❌ Warehouse stock not found during restoration', [
-                            'warehouse_id' => $warehouseId,
-                            'product' => $itemName,
-                        ]);
-                        continue;
-                    }
-
-                    // Restore based on original action
-                    if ($action === 'DEDUCTED' && $item->stock_deducted) {
-                        $warehouseStock->addStock($warehouseQty);
-
-                        \Log::info('✅ RESTORED to warehouse', [
-                            'order' => $order->order_number,
-                            'product' => $itemName,
-                            'warehouse' => $fulfillment['warehouse_name'] ?? $warehouseId,
-                            'quantity' => $warehouseQty,
-                            'new_stock' => $warehouseStock->fresh()->quantity,
-                        ]);
-
-                    } elseif ($action === 'RESERVED' && $item->stock_reserved) {
-                        $warehouseStock->releaseStock($warehouseQty);
-
-                        \Log::info('✅ RELEASED from warehouse', [
-                            'order' => $order->order_number,
-                            'product' => $itemName,
-                            'warehouse' => $fulfillment['warehouse_name'] ?? $warehouseId,
-                            'quantity' => $warehouseQty,
-                        ]);
-                    }
-                }
-
-                // Update item status
-                $item->update([
-                    'stock_deducted' => false,
-                    'stock_deducted_at' => null,
-                    'stock_reserved' => false,
-                    'stock_reserved_at' => null,
-                    'status_key_code' => $newStatus === 'ORDER_CANCELLED' ? 'ITEM_CANCELLED' : 'ITEM_RETURNED',
-                ]);
-
-            }
-            // ============================================================
-            // SINGLE WAREHOUSE RESTORATION (FALLBACK)
-            // ============================================================
-            else {
-                // If stock was deducted, add it back
-                if ($item->stock_deducted) {
-                    $warehouseStock->addStock($quantity);
-
+                    // Update item status
                     $item->update([
                         'stock_deducted' => false,
                         'stock_deducted_at' => null,
-                        'status_key_code' => $newStatus === 'ORDER_CANCELLED' ? 'ITEM_CANCELLED' : 'ITEM_RETURNED',
-                    ]);
-
-                    \Log::info('✅ RESTORED (single warehouse)', [
-                        'order' => $order->order_number,
-                        'product' => $itemName,
-                        'quantity' => $quantity,
-                        'new_stock' => $warehouseStock->fresh()->quantity,
-                        'reason' => $newStatus,
-                    ]);
-                }
-                // If stock was only reserved, release it
-                elseif ($item->stock_reserved) {
-                    $warehouseStock->releaseStock($quantity);
-
-                    $item->update([
                         'stock_reserved' => false,
                         'stock_reserved_at' => null,
                         'status_key_code' => $newStatus === 'ORDER_CANCELLED' ? 'ITEM_CANCELLED' : 'ITEM_RETURNED',
                     ]);
 
-                    \Log::info('✅ RELEASED (single warehouse)', [
-                        'order' => $order->order_number,
-                        'product' => $itemName,
-                        'reason' => $newStatus,
-                    ]);
+                }
+                // ============================================================
+                // SINGLE WAREHOUSE RESTORATION (FALLBACK)
+                // ============================================================
+                else {
+                    // If stock was deducted, add it back
+                    if ($item->stock_deducted) {
+                        $warehouseStock->addStock($quantity);
+
+                        $item->update([
+                            'stock_deducted' => false,
+                            'stock_deducted_at' => null,
+                            'status_key_code' => $newStatus === 'ORDER_CANCELLED' ? 'ITEM_CANCELLED' : 'ITEM_RETURNED',
+                        ]);
+
+                        \Log::info('✅ RESTORED (single warehouse)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                            'quantity' => $quantity,
+                            'new_stock' => $warehouseStock->fresh()->quantity,
+                            'reason' => $newStatus,
+                        ]);
+                    }
+                    // If stock was only reserved, release it
+                    elseif ($item->stock_reserved) {
+                        $warehouseStock->releaseStock($quantity);
+
+                        $item->update([
+                            'stock_reserved' => false,
+                            'stock_reserved_at' => null,
+                            'status_key_code' => $newStatus === 'ORDER_CANCELLED' ? 'ITEM_CANCELLED' : 'ITEM_RETURNED',
+                        ]);
+
+                        \Log::info('✅ RELEASED (single warehouse)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                            'reason' => $newStatus,
+                        ]);
+                    }
                 }
             }
-        }
 
             // ============================================================
             // SCENARIO 4: CANCELLED/RETURNED → Reactivation (Re-deduct if needed)
