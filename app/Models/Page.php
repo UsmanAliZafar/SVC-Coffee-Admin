@@ -365,7 +365,7 @@ class Page extends Model
         ];
     }
 
-    protected function getTranslationModule(): string
+    public function getTranslationModule(): string
     {
         return 'page';
     }

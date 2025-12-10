@@ -462,6 +462,9 @@ class PageController extends Controller
             'published_date' => $page->published_date,
             'created_at' => $page->created_at->toIso8601String(),
             'updated_at' => $page->updated_at->toIso8601String(),
+            // ========== MULTI-LANGUAGE TRANSLATIONS ==========
+                'translations' => $this->getPageTranslations($page),
+            // =================================================
         ];
     }
 
@@ -508,6 +511,9 @@ class PageController extends Controller
             'published_date' => $page->published_date,
             'created_at' => $page->created_at->toIso8601String(),
             'updated_at' => $page->updated_at->toIso8601String(),
+            // ========== MULTI-LANGUAGE TRANSLATIONS ==========
+            'translations' => $this->getPageTranslations($page),
+            // =================================================
         ];
     }
 
@@ -555,5 +561,160 @@ class PageController extends Controller
                 'slug' => $page->parent->slug,
             ] : null,
         ];
+    }
+
+    /**
+     * Get all translations for a page
+     *
+     * @param Page $page
+     * @param array|string|null $requestedLanguages
+     * @return array
+     */
+    private function getPageTranslations(Page $page, $requestedLanguages = null): array
+    {
+        // Parse requested languages
+        $languagesToInclude = null;
+        if ($requestedLanguages) {
+            $languagesToInclude = is_string($requestedLanguages)
+                ? explode(',', $requestedLanguages)
+                : $requestedLanguages;
+        }
+
+        // Get all available languages
+        $availableLanguages = get_available_languages(false); // Don't include English
+
+        // Filter languages if specific ones requested
+        if ($languagesToInclude) {
+            $availableLanguages = array_intersect_key(
+                $availableLanguages,
+                array_flip($languagesToInclude)
+            );
+        }
+
+        $translations = [
+            'available_languages' => array_keys($availableLanguages),
+            'has_translations' => false,
+            'translation_stats' => [],
+            'data' => []
+        ];
+
+        // English is the default, add it first
+        $translations['data']['en'] = [
+            'language_code' => 'en',
+            'language_name' => 'English',
+            'is_default' => true,
+            'completion' => 100,
+            'fields' => [
+                'title' => $page->title,
+                'excerpt' => $page->excerpt,
+                'content' => $page->content,
+                'meta_title' => $page->meta_title,
+                'meta_description' => $page->meta_description,
+                'meta_keywords' => $page->meta_keywords,
+                'featured_image_alt' => $page->featured_image_alt,
+                'menu_label' => $page->menu_label,
+            ]
+        ];
+
+        // Get all page translations grouped by language
+        if (method_exists($page, 'getTranslationsGroupedByLanguage')) {
+            $pageTranslations = $page->getTranslationsGroupedByLanguage();
+
+            // Use helper function to get translatable fields
+            $translatableFields = $page->getTranslatableFields();
+
+            foreach ($availableLanguages as $langCode => $langInfo) {
+                $langTranslations = $pageTranslations[$langCode] ?? [];
+
+                // Calculate completion
+                $translatedCount = count(array_filter($langTranslations, function($value) {
+                    return !empty($value) && trim($value) !== '';
+                }));
+                $completion = count($translatableFields) > 0
+                    ? round(($translatedCount / count($translatableFields)) * 100, 2)
+                    : 0;
+
+                // Only include languages that have at least some translations
+                if ($completion > 0) {
+                    $translations['has_translations'] = true;
+
+                    $translations['data'][$langCode] = [
+                        'language_code' => $langCode,
+                        'language_name' => $langInfo['name'],
+                        'native_name' => $langInfo['native_name'],
+                        'flag' => $langInfo['flag'],
+                        'direction' => $langInfo['direction'],
+                        'is_rtl' => $langInfo['direction'] === 'rtl',
+                        'is_default' => false,
+                        'completion' => $completion,
+                        'fields' => [
+                            'title' => $langTranslations['title'] ?? null,
+                            'excerpt' => $langTranslations['excerpt'] ?? null,
+                            'content' => $langTranslations['content'] ?? null,
+                            'meta_title' => $langTranslations['meta_title'] ?? null,
+                            'meta_description' => $langTranslations['meta_description'] ?? null,
+                            'meta_keywords' => $langTranslations['meta_keywords'] ?? null,
+                            'featured_image_alt' => $langTranslations['featured_image_alt'] ?? null,
+                            'menu_label' => $langTranslations['menu_label'] ?? null,
+                        ]
+                    ];
+
+                    // Add to stats
+                    $translations['translation_stats'][$langCode] = [
+                        'completion' => $completion,
+                        'translated_fields' => $translatedCount,
+                        'total_fields' => count($translatableFields),
+                        'missing_fields' => count($translatableFields) - $translatedCount,
+                    ];
+                }
+            }
+        }
+
+        return $translations;
+    }
+
+    public function testPageTranslations(string $slug)
+    {
+        $page = Page::where('slug', $slug)->firstOrFail();
+
+        // Direct query
+        $directTranslations = \DB::table('translations')
+            ->where('module', 'page')
+            ->where('item_id', $page->id)
+            ->get();
+
+        // Via relationship
+        $relationshipTranslations = $page->translations()->get();
+
+        // Via trait method
+        $groupedTranslations = $page->getTranslationsGroupedByLanguage();
+
+        return response()->json([
+            'page_id' => $page->id,
+            'module' => $page->getTranslationModule(),
+            'direct_count' => $directTranslations->count(),
+            'direct_data' => $directTranslations,
+            'relationship_count' => $relationshipTranslations->count(),
+            'relationship_data' => $relationshipTranslations,
+            'grouped_data' => $groupedTranslations,
+            'has_translations' => !empty($groupedTranslations),
+        ]);
+    }
+
+    public function testActualResponse(string $slug)
+    {
+        $page = Page::where('slug', $slug)->firstOrFail();
+
+        // Test the helper function
+        $availableLanguages = get_available_languages(false);
+
+        // Test the actual method
+        $translations = $this->getPageTranslations($page);
+
+        return response()->json([
+            'available_languages_helper' => $availableLanguages,
+            'grouped_translations' => $page->getTranslationsGroupedByLanguage(),
+            'final_translations_output' => $translations,
+        ]);
     }
 }
