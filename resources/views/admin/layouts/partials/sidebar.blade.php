@@ -587,7 +587,7 @@
                                 <a class="nav-link {{ request()->routeIs('admin.newsletters.index') ? 'active' : '' }}"
                                 href="{{ route('admin.newsletters.index') }}">
                                     <i class="bi bi-envelope-at"></i>
-                                    <span class="nav-text">Newsletter Subscriberes</span>
+                                    <span class="nav-text">Newsletter Subscribers</span>
                                     @php
                                         $subscribedCount = \App\Models\Newsletter::where('is_subscribed', true)->count();
                                     @endphp
