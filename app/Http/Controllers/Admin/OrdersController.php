@@ -677,6 +677,22 @@ class OrdersController extends Controller
             }
 
             // ============================================================
+                // ✅ CREATE TRANSACTION RECORD
+            // ============================================================
+            $transaction = $this->createTransaction($order, $request);
+            if (!$transaction) {
+                DB::rollBack();
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Failed to create transaction record');
+            }
+
+            \Log::info('💳 Transaction created for admin order', [
+                'order' => $order->order_number,
+                'transaction_id' => $transaction->id,
+                'transaction_number' => $transaction->transaction_number,
+            ]);
+            // ============================================================
             // STEP 5: HANDLE STOCK BASED ON ORDER STATUS (NO PAYMENT CHECKS)
             // ============================================================
             $orderStatus = $order->status_key_code;
@@ -1094,7 +1110,7 @@ class OrdersController extends Controller
         if ($oldStatus === $newStatus) {
             return;
         }
-
+        $this->updateTransactionStatus($order, $oldStatus, $newStatus);
         // ✅ Define valid transitions
         $validTransitions = [
             'ORDER_PENDING' => ['ORDER_CONFIRMED', 'ORDER_PROCESSING', 'ORDER_SHIPPED', 'ORDER_DELIVERED', 'ORDER_CANCELLED'],
@@ -1766,135 +1782,86 @@ class OrdersController extends Controller
         }
     }
 
-    /**
-     * Process refund
-     */
-    public function processRefund(Request $request, $id)
+    private function processRefund(Order $order, array $refundData, Request $request)
     {
-        $order = Order::with('items.product')->findOrFail($id);
-
-        $validated = $request->validate([
-            'refund_type' => 'required|in:full,partial',
-            'refund_amount' => 'required_if:refund_type,partial|numeric|min:0',
-            'refund_reason' => 'required|string',
-            'refund_items' => 'required_if:refund_type,partial|array',
-            'refund_items.*.item_id' => 'required_with:refund_items|uuid|exists:order_items,id',
-            'refund_items.*.quantity' => 'required_with:refund_items|integer|min:1',
-            'restore_stock' => 'boolean',
-        ]);
-
-        if (!$order->canBeRefunded()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Order cannot be refunded at this time.'
-            ], 400);
-        }
-
-        $this->notificationService->notify('order_refund_requested', [
-            'order_id' => $order->id,
-            'order_number' => $order->order_number,
-            'refund_type' => $validated['refund_type'],
-            'refund_amount' => $validated['refund_type'] === 'full'
-                ? $order->getFormattedTotal()
-                : $order->currency . ' ' . number_format($validated['refund_amount'], 2),
-            'reason' => $validated['refund_reason'],
-            'customer_name' => $order->getCustomerName(),
-            'customer_email' => $order->getCustomerEmail(),
-        ]);
-        DB::beginTransaction();
         try {
-            if ($validated['refund_type'] === 'full') {
-                // Full refund
-                $refundAmount = $order->total_amount - $order->refunded_amount;
+            DB::beginTransaction();
 
-                foreach ($order->items as $item) {
-                    $item->refund($item->getRemainingQuantity(), $validated['refund_reason']);
-                }
-
-                $order->update([
-                    'is_refunded' => true,
-                    'refunded_amount' => $order->total_amount,
-                    'refunded_at' => now(),
-                    'status_key_code' => 'ORDER_REFUNDED',
-                ]);
-
-                $this->notificationService->notifyCustomer('order_refunded', $order, [
-                    'refund_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
-                    'refund_type' => 'full',
-                    'reason' => $validated['refund_reason'],
-                ]);
-
-            } else {
-                // Partial refund
-                $refundAmount = 0;
-
-                foreach ($validated['refund_items'] as $refundItem) {
-                    $item = OrderItem::findOrFail($refundItem['item_id']);
-                    $quantity = $refundItem['quantity'];
-
-                    $itemRefundAmount = ($item->total / $item->quantity) * $quantity;
-                    $refundAmount += $itemRefundAmount;
-
-                    $item->refund($quantity, $validated['refund_reason']);
-                }
-
-                $order->update([
-                    'is_refunded' => true,
-                    'refunded_amount' => $order->refunded_amount + $refundAmount,
-                    'refunded_at' => now(),
-                    'payment_status_key_code' => 'PAYMENT_PARTIALLY_REFUNDED',
-                ]);
-
-                // ✅ TRIGGER: Order Partially Refunded
-                $this->notificationService->notify('order_partially_refunded', [
-                    'order_id' => $order->id,
-                    'order_number' => $order->order_number,
-                    'amount' => $order->currency . ' ' . number_format($refundAmount, 2),
-                ]);
-
-                $this->notificationService->notifyCustomer('order_refunded', $order, [
-                    'refund_amount' => $order->currency . ' ' . number_format($refundAmount, 2),
-                    'refund_type' => 'partial',
-                    'reason' => $validated['refund_reason'],
-                ]);
-            }
-
-            // Create refund transaction
-            $successfulTransaction = $order->transactions()
-                ->where('status_key_code', 'TRANSACTION_SUCCESS')
+            // Get original payment transaction
+            $originalTransaction = $order->transactions()
                 ->where('transaction_type', 'payment')
                 ->first();
 
-            if ($successfulTransaction) {
-                Transaction::create([
-                    'order_id' => $order->id,
-                    'customer_id' => $order->customer_id,
-                    'transaction_type' => $validated['refund_type'] === 'full' ? 'refund' : 'partial_refund',
-                    'payment_gateway' => $successfulTransaction->payment_gateway,
-                    'payment_method' => $successfulTransaction->payment_method,
-                    'amount' => $refundAmount,
-                    'currency' => $order->currency,
-                    'status_key_code' => 'TRANSACTION_SUCCESS',
-                    'refund_transaction_id' => $successfulTransaction->id,
-                    'refund_reason' => $validated['refund_reason'],
-                    'completed_at' => now(),
+            if (!$originalTransaction) {
+                throw new \Exception('Original payment transaction not found');
+            }
+
+            // Determine refund type
+            $isFullRefund = $refundData['refund_amount'] >= $order->total_amount;
+            $refundType = $isFullRefund ? 'refund' : 'partial_refund';
+
+            // ✅ CREATE REFUND TRANSACTION
+            $refundTransaction = Transaction::createRefund(
+                order: $order,
+                originalTransaction: $originalTransaction,
+                amount: $refundData['refund_amount'],
+                reason: $refundData['reason'] ?? 'Refund processed by admin',
+                refundMethod: $refundData['refund_method'] ?? $order->payment_method,
+                processedBy: auth()->id()
+            );
+
+            // Update original transaction
+            if ($isFullRefund) {
+                $originalTransaction->update([
+                    'status_key_code' => 'TRANSACTION_REFUNDED',
+                    'gateway_status' => 'refunded',
+                ]);
+            } else {
+                $originalTransaction->update([
+                    'status_key_code' => 'TRANSACTION_PARTIALLY_REFUNDED',
+                    'gateway_status' => 'partially_refunded',
                 ]);
             }
 
+            // Update order
+            $order->update([
+                'refund_amount' => $refundData['refund_amount'],
+                'refund_reason' => $refundData['reason'] ?? null,
+                'refund_processed_at' => now(),
+                'refund_processed_by' => auth()->id(),
+                'payment_status_key_code' => $isFullRefund ? 'PAYMENT_REFUNDED' : 'PAYMENT_PARTIALLY_REFUNDED',
+            ]);
+
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Refund processed successfully!',
-                'refund_amount' => number_format($refundAmount, 2)
+            \Log::info('✅ Refund transaction created', [
+                'order' => $order->order_number,
+                'refund_transaction' => $refundTransaction->transaction_number,
+                'amount' => $refundData['refund_amount'],
+                'type' => $refundType,
             ]);
+
+            // Send notifications
+            $this->notificationService->notify('refund_processed', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'refund_amount' => $order->currency . ' ' . number_format($refundData['refund_amount'], 2),
+                'refund_type' => $isFullRefund ? 'Full Refund' : 'Partial Refund',
+            ]);
+
+            $this->notificationService->notifyCustomer('refund_processed', $order);
+
+            return $refundTransaction;
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to process refund: ' . $e->getMessage()
-            ], 500);
+
+            \Log::error('❌ Refund processing failed', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
         }
     }
 
@@ -2793,6 +2760,196 @@ class OrdersController extends Controller
                 'message' => 'Failed to validate coupon',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Update transaction status based on order status change
+     *
+     * @param Order $order
+     * @param string $oldStatus
+     * @param string $newStatus
+     * @return void
+     */
+    private function updateTransactionStatus(Order $order, string $oldStatus, string $newStatus): void
+    {
+        try {
+            // Get the payment transaction
+            $transaction = $order->transactions()
+                ->where('transaction_type', 'payment')
+                ->first();
+
+            if (!$transaction) {
+                \Log::warning('⚠️ No payment transaction found for order', [
+                    'order' => $order->order_number,
+                ]);
+                return;
+            }
+
+            $transactionUpdates = [];
+
+            switch ($newStatus) {
+                case 'ORDER_CONFIRMED':
+                    // Order confirmed - mark transaction as processing
+                    $transactionUpdates = [
+                        'status_key_code' => 'TRANSACTION_PROCESSING',
+                        'gateway_status' => 'processing',
+                    ];
+                    break;
+
+                case 'ORDER_PROCESSING':
+                    // Order being processed
+                    $transactionUpdates = [
+                        'status_key_code' => 'TRANSACTION_PROCESSING',
+                        'gateway_status' => 'processing',
+                    ];
+                    break;
+
+                case 'ORDER_SHIPPED':
+                    // Order shipped - if COD, mark as authorized
+                    if ($order->payment_method === 'cod') {
+                        $transactionUpdates = [
+                            'status_key_code' => 'TRANSACTION_AUTHORIZED',
+                            'gateway_status' => 'authorized',
+                        ];
+                    }
+                    break;
+
+                case 'ORDER_DELIVERED':
+                    // Order delivered - mark transaction as successful
+                    $transactionUpdates = [
+                        'status_key_code' => 'TRANSACTION_SUCCESS',
+                        'gateway_status' => 'completed',
+                        'completed_at' => now(),
+                    ];
+
+                    // Also update order payment status
+                    $order->update([
+                        'payment_status_key_code' => 'PAYMENT_PAID',
+                    ]);
+                    break;
+
+                case 'ORDER_CANCELLED':
+                    // Order cancelled
+                    if ($transaction->status_key_code === 'TRANSACTION_PENDING') {
+                        $transactionUpdates = [
+                            'status_key_code' => 'TRANSACTION_CANCELLED',
+                            'gateway_status' => 'cancelled',
+                            'failed_at' => now(),
+                            'failure_reason' => 'Order cancelled by admin',
+                        ];
+                    }else if (in_array($transaction->status_key_code, ['TRANSACTION_PROCESSING', 'TRANSACTION_AUTHORIZED','TRANSACTION_SUCCESS'])) {
+                        $transactionUpdates = [
+                            'status_key_code' => 'TRANSACTION_REFUNDED',
+                            'gateway_status' => 'refunded',
+                            'refunded_at' => now(),
+                            'notes' => 'Order cancelled - transaction refunded',
+                        ];
+                    }
+                    break;
+
+                case 'ORDER_RETURNED':
+                    // Order returned - will be handled by refund process
+                    break;
+            }
+
+            if (!empty($transactionUpdates)) {
+                $transaction->update($transactionUpdates);
+
+                \Log::info('✅ Transaction status updated', [
+                    'order' => $order->order_number,
+                    'transaction' => $transaction->transaction_number,
+                    'new_status' => $transactionUpdates['status_key_code'] ?? null,
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('❌ Failed to update transaction status', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Create transaction record for order
+     *
+     * @param Order $order
+     * @param Request $request
+     * @return Transaction|null
+     */
+    private function createTransaction(Order $order, Request $request): ?Transaction
+    {
+        try {
+            $transactionData = [
+                'order_id' => $order->id,
+                'customer_id' => $order->customer_id,
+                'transaction_type' => 'payment',
+                'payment_method' => $order->payment_method ?? 'online_payment',
+                'amount' => $order->total_amount,
+                'currency' => $order->currency,
+                'fee' => 0,
+
+                // Billing information from order
+                'billing_name' => $order->billing_first_name . ' ' . $order->billing_last_name,
+                'billing_email' => $order->customer_id ? $order->customer->email : $order->guest_email,
+                'billing_phone' => $order->billing_phone ?? $order->shipping_phone,
+                'billing_address' => $order->billing_address_line1,
+                'billing_city' => $order->billing_city,
+                'billing_country' => $order->billing_country,
+                'billing_postal_code' => $order->billing_postal_code,
+
+                // Request metadata
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'device_type' => 'desktop', // Admin panel is typically desktop
+                'notes' => 'Order created by admin (user ID: ' . auth()->id() . ')',
+
+                // Timestamps
+                'initiated_at' => now(),
+            ];
+
+            // ✅ PAYMENT METHOD SPECIFIC HANDLING
+            if ($order->payment_method === 'cod') {
+                // COD Transaction
+                $transactionData['payment_gateway'] = 'manual';
+                $transactionData['status_key_code'] = 'TRANSACTION_PENDING';
+                $transactionData['gateway_status'] = 'pending_payment';
+                $transactionData['notes'] = 'Cash on Delivery - Payment will be collected upon delivery (Admin created)';
+
+            } elseif ($order->payment_method === 'bank_transfer') {
+                // Bank Transfer
+                $transactionData['payment_gateway'] = 'manual';
+                $transactionData['status_key_code'] = 'TRANSACTION_PENDING';
+                $transactionData['gateway_status'] = 'awaiting_bank_transfer';
+                $transactionData['notes'] = 'Bank Transfer - Awaiting payment confirmation (Admin created)';
+
+            } else {
+                // Online Payment Transaction
+                $transactionData['payment_gateway'] = $order->payment_gateway ?? 'stripe';
+                $transactionData['status_key_code'] = 'TRANSACTION_PENDING';
+                $transactionData['gateway_status'] = 'awaiting_payment';
+                $transactionData['notes'] = 'Online payment - Created by admin (Admin created)';
+            }
+
+            $transaction = Transaction::create($transactionData);
+
+            \Log::info('✅ Transaction created for admin order', [
+                'order' => $order->order_number,
+                'transaction' => $transaction->transaction_number,
+                'payment_method' => $order->payment_method,
+                'amount' => $order->total_amount,
+            ]);
+
+            return $transaction;
+
+        } catch (\Exception $e) {
+            \Log::error('❌ Failed to create transaction for admin order', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return null;
         }
     }
 }

@@ -95,7 +95,41 @@
         </button>
     </div>
 </div>
-
+<!-- Welcome Card -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-brand text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-person-circle"></i> Welcome back, {{ $user->name }}!
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="card-text">
+                            You have <strong>{{ $user->roles->count() }}</strong> role(s) assigned:
+                            <span class="text-brand fw-semibold">{{ $user->roles->pluck('display_name')->join(', ') }}</span>
+                        </p>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                Last login: {{ $user->last_login_at ? $user->last_login_at->format('F j, Y g:i A') : 'Never' }}
+                                @if($user->last_login_ip)
+                                    from {{ $user->last_login_ip }}
+                                @endif
+                            </small>
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <a href="{{ route('admin.profile.edit') }}" class="btn btn-outline-brand">
+                            <i class="bi bi-person"></i> View Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Key Stats Cards -->
 <div class="row mb-4">
     <!-- Total Products -->
@@ -234,7 +268,7 @@
 
 <!-- Secondary Stats Row -->
 <div class="row mb-4">
-    <!-- Inventory Overview -->
+    {{-- Inventory Overview --}}
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
@@ -254,17 +288,45 @@
                     <div class="text-warning fw-bold">{{ number_format($inventoryStats['reserved_stock']) }}</div>
                 </div>
                 <hr>
-                <div class="d-flex justify-content-between">
+
+                {{-- Low Stock --}}
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <small class="text-danger">
                         <i class="bi bi-exclamation-triangle"></i> Low Stock
                     </small>
-                    <span class="badge bg-danger">{{ $inventoryStats['low_stock_products'] }}</span>
+                    <span class="badge bg-danger">{{ $inventoryStats['low_stock_items'] }}</span>
                 </div>
-                <div class="d-flex justify-content-between mt-2">
+                <div class="ms-3 mb-2">
+                    <small class="text-muted d-flex justify-content-between">
+                        <span>Products:</span>
+                        <span class="badge bg-warning text-dark">{{ $inventoryStats['low_stock_products'] }}</span>
+                    </small>
+                </div>
+                <div class="ms-3 mb-2">
+                    <small class="text-muted d-flex justify-content-between">
+                        <span>Variants:</span>
+                        <span class="badge bg-warning text-dark">{{ $inventoryStats['low_stock_variants'] }}</span>
+                    </small>
+                </div>
+
+                {{-- Out of Stock --}}
+                <div class="d-flex justify-content-between align-items-center">
                     <small class="text-danger">
                         <i class="bi bi-x-circle"></i> Out of Stock
                     </small>
-                    <span class="badge bg-danger">{{ $inventoryStats['out_of_stock_products'] }}</span>
+                    <span class="badge bg-danger">{{ $inventoryStats['out_of_stock_items'] }}</span>
+                </div>
+                <div class="ms-3 mt-1">
+                    <small class="text-muted d-flex justify-content-between">
+                        <span>Products:</span>
+                        <span class="badge bg-danger">{{ $inventoryStats['out_of_stock_products'] }}</span>
+                    </small>
+                </div>
+                <div class="ms-3 mt-1">
+                    <small class="text-muted d-flex justify-content-between">
+                        <span>Variants:</span>
+                        <span class="badge bg-danger">{{ $inventoryStats['out_of_stock_variants'] }}</span>
+                    </small>
                 </div>
             </div>
         </div>
@@ -348,7 +410,7 @@
                     <span class="badge bg-brand">{{ $stats['total_warehouses'] }}</span>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
-                    <span class="text-muted"><i class="bi bi-person-gear"></i> Active Admins</span>
+                    <span class="text-muted"><i class="bi bi-person-gear"></i> System Admins/User</span>
                     <span class="badge bg-brand">{{ $stats['active_admins'] }}</span>
                 </div>
                 <hr>
@@ -369,41 +431,6 @@
     </div>
 </div>
 
-<!-- Welcome Card -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-brand text-white">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-person-circle"></i> Welcome back, {{ $user->name }}!
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-8">
-                        <p class="card-text">
-                            You have <strong>{{ $user->roles->count() }}</strong> role(s) assigned:
-                            <span class="text-brand fw-semibold">{{ $user->roles->pluck('display_name')->join(', ') }}</span>
-                        </p>
-                        <p class="card-text">
-                            <small class="text-muted">
-                                Last login: {{ $user->last_login_at ? $user->last_login_at->format('F j, Y g:i A') : 'Never' }}
-                                @if($user->last_login_ip)
-                                    from {{ $user->last_login_ip }}
-                                @endif
-                            </small>
-                        </p>
-                    </div>
-                    <div class="col-md-4 text-end">
-                        <a href="#" class="btn btn-outline-brand">
-                            <i class="bi bi-person"></i> View Profile
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Charts Row -->
 <div class="row mb-4">
@@ -450,7 +477,7 @@
                     <i class="bi bi-receipt text-brand"></i> Recent Orders
                 </h5>
                 @if(auth('admin')->user()->hasPermission('orders.read'))
-                <a href="#" class="btn btn-sm btn-outline-brand">
+                <a href="{{ route('admin.orders.index') }}" class="btn btn-sm btn-outline-brand">
                     View All <i class="bi bi-arrow-right"></i>
                 </a>
                 @endif
@@ -491,15 +518,15 @@
         </div>
     </div>
 
-    <!-- Low Stock Products -->
+    <!-- Low Stock Products & Variants -->
     <div class="col-xl-6 mb-4">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
-                    <i class="bi bi-exclamation-triangle text-danger"></i> Low Stock Products
+                    <i class="bi bi-exclamation-triangle text-danger"></i> Low Stock Items
                 </h5>
                 @if(auth('admin')->user()->hasPermission('inventory.read'))
-                <a href="#" class="btn btn-sm btn-outline-danger">
+                <a href="{{ route('admin.inventory.index') }}" class="btn btn-sm btn-outline-danger">
                     View All <i class="bi bi-arrow-right"></i>
                 </a>
                 @endif
@@ -507,23 +534,37 @@
             <div class="card-body p-0">
                 @if($lowStockProducts->count() > 0)
                 <div class="list-group list-group-flush">
-                    @foreach($lowStockProducts as $product)
+                    @foreach($lowStockProducts as $item)
                     <div class="list-group-item activity-item">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="flex-grow-1">
-                                <h6 class="mb-1">{{ $product->name }}</h6>
-                                <small class="text-muted">
-                                    SKU: {{ $product->sku }}
-                                    <span class="mx-2">•</span>
-                                    {{ $product->category ? $product->category->name : 'Uncategorized' }}
-                                </small>
+                                @if($item instanceof \App\Models\ProductVariant)
+                                    {{-- Variant --}}
+                                    <h6 class="mb-1">
+                                        {{ $item->product->name }}
+                                        <span class="badge bg-info badge-sm">{{ $item->getFullName() }}</span>
+                                    </h6>
+                                    <small class="text-muted">
+                                        SKU: {{ $item->sku }}
+                                        <span class="mx-2">•</span>
+                                        {{ $item->product->category ? $item->product->category->name : 'Uncategorized' }}
+                                    </small>
+                                @else
+                                    {{-- Simple Product --}}
+                                    <h6 class="mb-1">{{ $item->name }}</h6>
+                                    <small class="text-muted">
+                                        SKU: {{ $item->sku }}
+                                        <span class="mx-2">•</span>
+                                        {{ $item->category ? $item->category->name : 'Uncategorized' }}
+                                    </small>
+                                @endif
                             </div>
                             <div class="text-end">
                                 <div class="badge bg-danger mb-1">
-                                    {{ $product->stock_quantity }} units
+                                    {{ $item->stock_quantity }} units
                                 </div>
                                 <div>
-                                    <small class="text-muted">Threshold: {{ $product->low_stock_threshold }}</small>
+                                    <small class="text-muted">Threshold: {{ $item->low_stock_threshold }}</small>
                                 </div>
                             </div>
                         </div>
@@ -533,7 +574,7 @@
                 @else
                 <div class="text-center py-5">
                     <i class="bi bi-check-circle display-4 text-success"></i>
-                    <p class="text-muted mt-2">All products have sufficient stock</p>
+                    <p class="text-muted mt-2">All items have sufficient stock</p>
                 </div>
                 @endif
             </div>
@@ -551,7 +592,7 @@
                     <i class="bi bi-bell text-warning"></i> Stock Alerts
                 </h5>
                 @if(auth('admin')->user()->hasPermission('inventory.read'))
-                <a href="#" class="btn btn-sm btn-outline-warning">
+                <a href="{{ route('admin.inventory.index') }}" class="btn btn-sm btn-outline-warning">
                     View All <i class="bi bi-arrow-right"></i>
                 </a>
                 @endif
@@ -602,7 +643,7 @@
                     <i class="bi bi-arrow-left-right text-info"></i> Recent Inventory Movements
                 </h5>
                 @if(auth('admin')->user()->hasPermission('inventory.read'))
-                <a href="#" class="btn btn-sm btn-outline-info">
+                <a href="{{ route('admin.inventory.movement') }}" class="btn btn-sm btn-outline-info">
                     View All <i class="bi bi-arrow-right"></i>
                 </a>
                 @endif

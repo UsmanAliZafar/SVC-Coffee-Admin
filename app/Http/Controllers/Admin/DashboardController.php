@@ -11,6 +11,7 @@ use App\Models\Warehouse;
 use App\Models\ProductWarehouseStock;
 use App\Models\StockAlert;
 use App\Models\Transaction;
+use App\Models\ProductVariant;
 use App\Models\InventoryMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -106,25 +107,46 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get inventory statistics
+     * Get inventory statistics (including variants)
      */
     private function getInventoryStats(): array
     {
+        // Total stock from warehouse (includes both products and variants)
         $totalStock = ProductWarehouseStock::sum('quantity');
         $reservedStock = ProductWarehouseStock::sum('reserved_quantity');
         $availableStock = ProductWarehouseStock::sum('available_quantity');
 
-        $lowStockCount = Product::whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                                ->where('stock_quantity', '>', 0)
-                                ->where('track_inventory', true)
-                                ->count();
+        // Low stock products (simple products without variants)
+        $lowStockProducts = Product::whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                                    ->where('stock_quantity', '>', 0)
+                                    ->where('track_inventory', true)
+                                    ->where('has_variants', false) // Only simple products
+                                    ->count();
 
-        $outOfStockCount = Product::where('stock_quantity', '<=', 0)
-                                  ->where('track_inventory', true)
-                                  ->count();
+        // Low stock variants
+        $lowStockVariants = ProductVariant::whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+                                        ->where('stock_quantity', '>', 0)
+                                        ->count();
 
+        // Total low stock items (products + variants)
+        $lowStockCount = $lowStockProducts + $lowStockVariants;
+
+        // Out of stock products (simple products without variants)
+        $outOfStockProducts = Product::where('stock_quantity', '<=', 0)
+                                    ->where('track_inventory', true)
+                                    ->where('has_variants', false) // Only simple products
+                                    ->count();
+
+        // Out of stock variants
+        $outOfStockVariants = ProductVariant::where('stock_quantity', '<=', 0)->count();
+
+        // Total out of stock items (products + variants)
+        $outOfStockCount = $outOfStockProducts + $outOfStockVariants;
+
+        // Active stock alerts
         $activeAlerts = StockAlert::where('is_resolved', false)->count();
 
+        // Today's inventory movements
         $todayMovements = InventoryMovement::whereDate('created_at', Carbon::today())->count();
 
         return [
@@ -132,8 +154,17 @@ class DashboardController extends Controller
             'total_stock_units' => $totalStock,
             'reserved_stock' => $reservedStock,
             'available_stock' => $availableStock,
-            'low_stock_products' => $lowStockCount,
-            'out_of_stock_products' => $outOfStockCount,
+
+            // Combined counts
+            'low_stock_items' => $lowStockCount,
+            'out_of_stock_items' => $outOfStockCount,
+
+            // Breakdown
+            'low_stock_products' => $lowStockProducts,
+            'low_stock_variants' => $lowStockVariants,
+            'out_of_stock_products' => $outOfStockProducts,
+            'out_of_stock_variants' => $outOfStockVariants,
+
             'active_stock_alerts' => $activeAlerts,
             'today_movements' => $todayMovements,
         ];
@@ -370,13 +401,23 @@ class DashboardController extends Controller
     }
 
     /**
-     * Calculate total stock value
+     * Calculate total stock value (including variants)
      */
     private function getTotalStockValue(): float
     {
-        return ProductWarehouseStock::join('products', 'product_warehouse_stock.product_id', '=', 'products.id')
-                                    ->selectRaw('SUM(product_warehouse_stock.quantity * products.price) as total_value')
-                                    ->value('total_value') ?? 0;
+        // Simple products value (without variants)
+        $productsValue = ProductWarehouseStock::whereNull('variant_id')
+                            ->join('products', 'product_warehouse_stock.product_id', '=', 'products.id')
+                            ->selectRaw('SUM(product_warehouse_stock.quantity * products.price) as total_value')
+                            ->value('total_value') ?? 0;
+
+        // Variants value
+        $variantsValue = ProductWarehouseStock::whereNotNull('variant_id')
+                            ->join('product_variants', 'product_warehouse_stock.variant_id', '=', 'product_variants.id')
+                            ->selectRaw('SUM(product_warehouse_stock.quantity * product_variants.price) as total_value')
+                            ->value('total_value') ?? 0;
+
+        return $productsValue + $variantsValue;
     }
 
    /**

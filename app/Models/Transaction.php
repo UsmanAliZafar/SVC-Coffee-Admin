@@ -826,39 +826,43 @@ class Transaction extends Model
     }
 
     /**
-     * Create refund transaction
+     * Create a refund transaction
      */
-    public function createRefund(float $amount, string $reason = null): ?Transaction
+    public static function createRefund(
+        Order $order,
+        Transaction $originalTransaction,
+        float $amount,
+        string $reason,
+        string $refundMethod,
+        ?int $processedBy = null
+    ): Transaction
     {
-        if (!$this->isSuccessful() || !$this->isPayment()) {
-            return null;
-        }
-
-        if ($amount > $this->amount) {
-            return null;
-        }
-
-        DB::beginTransaction();
-        try {
-            $refund = static::create([
-                'order_id' => $this->order_id,
-                'customer_id' => $this->customer_id,
-                'transaction_type' => $amount < $this->amount ? 'partial_refund' : 'refund',
-                'payment_gateway' => $this->payment_gateway,
-                'payment_method' => $this->payment_method,
-                'amount' => $amount,
-                'currency' => $this->currency,
-                'refund_transaction_id' => $this->id,
-                'refund_reason' => $reason,
-                'status_key_code' => 'TRANSACTION_PENDING',
-            ]);
-
-            DB::commit();
-            return $refund;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return null;
-        }
+        return self::create([
+            'order_id' => $order->id,
+            'customer_id' => $order->customer_id,
+            'parent_transaction_id' => $originalTransaction->id,
+            'transaction_type' => $amount >= $order->total_amount ? 'refund' : 'partial_refund',
+            'payment_method' => $refundMethod,
+            'payment_gateway' => $originalTransaction->payment_gateway,
+            'amount' => $amount,
+            'currency' => $order->currency,
+            'status_key_code' => 'TRANSACTION_SUCCESS',
+            'gateway_status' => 'refunded',
+            'notes' => $reason,
+            'billing_name' => $originalTransaction->billing_name,
+            'billing_email' => $originalTransaction->billing_email,
+            'billing_phone' => $originalTransaction->billing_phone,
+            'billing_address' => $originalTransaction->billing_address,
+            'billing_city' => $originalTransaction->billing_city,
+            'billing_country' => $originalTransaction->billing_country,
+            'billing_postal_code' => $originalTransaction->billing_postal_code,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'device_type' => 'desktop',
+            'initiated_at' => now(),
+            'completed_at' => now(),
+            'processed_by' => $processedBy,
+        ]);
     }
 
     /**
@@ -893,4 +897,6 @@ class Transaction extends Model
         $refunded = $this->getTotalRefundedAmount();
         return $refunded > 0 && $refunded < $this->amount;
     }
+
+
 }
