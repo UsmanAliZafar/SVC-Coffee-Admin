@@ -517,7 +517,6 @@
             </div>
         </div>
     </div>
-
     <!-- Low Stock Products & Variants -->
     <div class="col-xl-6 mb-4">
         <div class="card border-0 shadow-sm">
