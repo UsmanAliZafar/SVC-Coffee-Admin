@@ -204,7 +204,7 @@
                         @php
                             $icons = [
                                 'percentage' => 'bi-percent',
-                                'fixed_amount' => 'bi-currency-dollar',
+                                'fixed_amount' => store_currency_symbol(),
                                 'free_shipping' => 'bi-truck',
                                 'buy_x_get_y' => 'bi-gift',
                             ];
@@ -432,7 +432,7 @@
                                     <th><i class="bi bi-calendar"></i> Date</th>
                                     <th><i class="bi bi-person"></i> Customer</th>
                                     <th><i class="bi bi-receipt"></i> Order ID</th>
-                                    <th><i class="bi bi-currency-dollar"></i> Discount</th>
+                                    <th>{{ store_currency_symbol() }} Discount</th>
                                     <th><i class="bi bi-cart"></i> Order Total</th>
                                 </tr>
                             </thead>

@@ -85,7 +85,7 @@ class CouponController extends Controller
             ->addColumn('discount_badge', function ($coupon) {
                 $icons = [
                     'percentage' => 'bi-percent',
-                    'fixed_amount' => 'bi-currency-dollar',
+                    'fixed_amount' => store_currency_symbol(),
                     'free_shipping' => 'bi-truck',
                     'buy_x_get_y' => 'bi-gift',
                 ];
