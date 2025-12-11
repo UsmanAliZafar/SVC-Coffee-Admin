@@ -1030,7 +1030,31 @@ class OrdersController extends Controller
         try {
             $oldStatus = $order->status_key_code;
             $newStatus = $validated['status_key_code'];
+            // ============================================================
+            // STATUS TRANSITION VALIDATION
+            // ============================================================
+            $allowedTransitions = [
+                'ORDER_PENDING' => ['ORDER_CONFIRMED', 'ORDER_CANCELLED'],
+                'ORDER_CONFIRMED' => ['ORDER_PROCESSING', 'ORDER_CANCELLED'],
+                'ORDER_PROCESSING' => ['ORDER_SHIPPED', 'ORDER_CANCELLED'],
+                'ORDER_SHIPPED' => ['ORDER_DELIVERED', 'ORDER_CANCELLED'],
+                'ORDER_DELIVERED' => ['ORDER_RETURNED'], // ✅ Allow return from delivered
+                'ORDER_CANCELLED' => [],
+                'ORDER_RETURNED' => [],
+            ];
 
+            // Validate status transition
+            if ($oldStatus !== $newStatus) {
+                $allowed = $allowedTransitions[$oldStatus] ?? [];
+
+                if (!in_array($newStatus, $allowed)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Cannot change status from {$oldStatus} to {$newStatus}"
+                    ], 400);
+                }
+            }
             // Handle status change and stock management
             $this->handleStatusChange($order, $oldStatus, $newStatus);
 
@@ -1413,23 +1437,91 @@ class OrdersController extends Controller
                 ]);
             }
 
-            // ✅ SEND CUSTOMER NOTIFICATIONS BASED ON NEW STATUS
-            switch ($newStatus) {
-                case 'ORDER_PACKED':
-                    $this->notificationService->notifyCustomer('order_packed', $order);
-                    break;
+            // ============================================================
+            // DELIVERED → RETURNED: Restore stock (same as cancellation)
+            // ============================================================
+            elseif ($newStatus === 'ORDER_RETURNED') {
+                $fulfillmentDetails = $item->fulfillment_details;
 
-                case 'ORDER_SHIPPED':
-                    $this->notificationService->notifyCustomer('order_shipped', $order, [
-                        'tracking_number' => $order->shipping_tracking_number,
-                        'carrier' => $order->shipping_carrier,
+                if (!empty($fulfillmentDetails) && is_array($fulfillmentDetails)) {
+                    \Log::info('🔄 Restoring stock for returned order', [
+                        'order' => $order->order_number,
+                        'product' => $itemName,
+                        'warehouses_count' => count($fulfillmentDetails),
                     ]);
-                    break;
 
-                case 'ORDER_DELIVERED':
-                    $this->notificationService->notifyCustomer('order_delivered', $order);
-                    break;
+                    foreach ($fulfillmentDetails as $fulfillment) {
+                        $warehouseId = $fulfillment['warehouse_id'] ?? null;
+                        $warehouseQty = $fulfillment['quantity'] ?? 0;
+                        $action = $fulfillment['action'] ?? 'UNKNOWN';
+
+                        if (!$warehouseId || $warehouseQty <= 0) {
+                            continue;
+                        }
+
+                        $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                            ->where('variant_id', $variant ? $variant->id : null)
+                            ->where('warehouse_id', $warehouseId)
+                            ->first();
+
+                        if (!$warehouseStock) {
+                            \Log::error('❌ Warehouse stock not found during return', [
+                                'warehouse_id' => $warehouseId,
+                                'product' => $itemName,
+                            ]);
+                            continue;
+                        }
+
+                        if ($action === 'DEDUCTED' && $item->stock_deducted) {
+                            $warehouseStock->addStock($warehouseQty);
+
+                            \Log::info('✅ RESTORED to warehouse (Return)', [
+                                'order' => $order->order_number,
+                                'product' => $itemName,
+                                'warehouse' => $fulfillment['warehouse_name'] ?? $warehouseId,
+                                'quantity' => $warehouseQty,
+                            ]);
+                        }
+                    }
+
+                    $item->update([
+                        'stock_deducted' => false,
+                        'stock_deducted_at' => null,
+                        'status_key_code' => 'ITEM_RETURNED',
+                    ]);
+                }
+                // Fallback for old orders
+                else {
+                    $warehouseId = $item->warehouse_id;
+
+                    if (!$warehouseId) {
+                        $defaultWarehouse = \App\Models\Warehouse::where('is_default', true)->first();
+                        if (!$defaultWarehouse) continue;
+                        $warehouseId = $defaultWarehouse->id;
+                    }
+
+                    $warehouseStock = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
+                        ->where('variant_id', $variant ? $variant->id : null)
+                        ->where('warehouse_id', $warehouseId)
+                        ->first();
+
+                    if ($warehouseStock && $item->stock_deducted) {
+                        $warehouseStock->addStock($quantity);
+                        \Log::info('✅ RESTORED (single warehouse - Return)', [
+                            'order' => $order->order_number,
+                            'product' => $itemName,
+                            'quantity' => $quantity,
+                        ]);
+                    }
+
+                    $item->update([
+                        'stock_deducted' => false,
+                        'stock_deducted_at' => null,
+                        'status_key_code' => 'ITEM_RETURNED',
+                    ]);
+                }
             }
+
         }
 
         \Log::info('✅ Status transition completed', [
@@ -2873,7 +2965,13 @@ class OrdersController extends Controller
                     break;
 
                 case 'ORDER_RETURNED':
-                    // Order returned - will be handled by refund process
+                    // ✅ ADD THIS CASE
+                    // Mark transaction as returned (refund will be processed separately)
+                    $transactionUpdates = [
+                        'status_key_code' => 'TRANSACTION_AUTHORIZED', // Ready for refund
+                        'gateway_status' => 'returned',
+                        'notes' => 'Order returned - pending refund processing',
+                    ];
                     break;
             }
 

@@ -45,6 +45,7 @@ Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/stock-levels', [ReportsController::class, 'inventoryStockLevels'])->name('stock-levels');
             Route::get('/movement', [ReportsController::class, 'inventoryMovement'])->name('movement');
             Route::get('/valuation', [ReportsController::class, 'inventoryValuation'])->name('valuation');
+            Route::get('/alerts', [ReportsController::class, 'inventoryAlerts'])->name('alerts');
         });
 
         // Customer Analytics

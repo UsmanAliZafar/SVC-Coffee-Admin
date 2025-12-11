@@ -495,7 +495,7 @@
         @endforeach
         @endif
 
-        @if($critical_alerts->count() > 5 || $low_stock_alerts->count() > 5)
+        @if($critical_alerts->count() > 3 || $low_stock_alerts->count() > 5)
         <div class="text-center mt-3">
             <a href="{{ route('admin.reports.inventory.alerts') }}" class="btn btn-outline-brand">
                 View All {{ $critical_alerts->count() + $low_stock_alerts->count() }} Alerts

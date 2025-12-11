@@ -1029,6 +1029,182 @@ class ReportsController extends Controller
         ));
     }
 
+    /**
+     * Inventory Alerts - Comprehensive alert view
+     */
+    public function inventoryAlerts(Request $request)
+    {
+        // Get filter parameters
+        $alert_type = $request->input('alert_type', 'all'); // all, critical, low_stock, overstock
+        $category_id = $request->input('category_id');
+        $search = $request->input('search');
+        $sort = $request->input('sort', 'severity_desc');
+
+        // Get critical alerts (out of stock)
+        $critical_alerts_query = Product::with('category')
+            ->where('track_inventory', true)
+            ->where('stock_quantity', '<=', 0);
+
+        // Get low stock alerts
+        $low_stock_alerts_query = Product::with('category')
+            ->where('track_inventory', true)
+            ->whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold');
+
+        // Get overstock alerts (optional - stock > threshold * 5)
+        $overstock_alerts_query = Product::with('category')
+            ->where('track_inventory', true)
+            ->whereRaw('stock_quantity > (low_stock_threshold * 5)');
+
+        // Apply filters
+        if ($category_id) {
+            $critical_alerts_query->where('category_id', $category_id);
+            $low_stock_alerts_query->where('category_id', $category_id);
+            $overstock_alerts_query->where('category_id', $category_id);
+        }
+
+        if ($search) {
+            $searchClosure = function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%");
+            };
+
+            $critical_alerts_query->where($searchClosure);
+            $low_stock_alerts_query->where($searchClosure);
+            $overstock_alerts_query->where($searchClosure);
+        }
+
+        // Get alerts based on filter
+        $alerts = collect();
+
+        if ($alert_type === 'all' || $alert_type === 'critical') {
+            $critical = $critical_alerts_query->get()->map(function($product) {
+                return [
+                    'product' => $product,
+                    'type' => 'critical',
+                    'severity' => 3,
+                    'message' => 'Out of Stock',
+                    'icon' => 'bi-x-circle-fill',
+                    'color' => 'danger'
+                ];
+            });
+            $alerts = $alerts->merge($critical);
+        }
+
+        if ($alert_type === 'all' || $alert_type === 'low_stock') {
+            $low_stock = $low_stock_alerts_query->get()->map(function($product) {
+                $percentage = ($product->stock_quantity / $product->low_stock_threshold) * 100;
+
+                return [
+                    'product' => $product,
+                    'type' => 'low_stock',
+                    'severity' => 2,
+                    'message' => "Low Stock ({$product->stock_quantity} remaining)",
+                    'percentage' => $percentage,
+                    'icon' => 'bi-exclamation-triangle-fill',
+                    'color' => 'warning'
+                ];
+            });
+            $alerts = $alerts->merge($low_stock);
+        }
+
+        if ($alert_type === 'all' || $alert_type === 'overstock') {
+            $overstock = $overstock_alerts_query->get()->map(function($product) {
+                $threshold = $product->low_stock_threshold * 5;
+
+                return [
+                    'product' => $product,
+                    'type' => 'overstock',
+                    'severity' => 1,
+                    'message' => "Possible Overstock ({$product->stock_quantity} units)",
+                    'threshold' => $threshold,
+                    'icon' => 'bi-info-circle-fill',
+                    'color' => 'info'
+                ];
+            });
+            $alerts = $alerts->merge($overstock);
+        }
+
+        // Apply sorting
+        switch ($sort) {
+            case 'severity_desc':
+                $alerts = $alerts->sortByDesc('severity');
+                break;
+            case 'severity_asc':
+                $alerts = $alerts->sortBy('severity');
+                break;
+            case 'stock_asc':
+                $alerts = $alerts->sortBy(fn($a) => $a['product']->stock_quantity);
+                break;
+            case 'stock_desc':
+                $alerts = $alerts->sortByDesc(fn($a) => $a['product']->stock_quantity);
+                break;
+            case 'name_asc':
+                $alerts = $alerts->sortBy(fn($a) => $a['product']->name);
+                break;
+        }
+
+        // Get categories for filter
+        $categories = ProductsCategories::orderBy('title')->get();
+
+        // Calculate summary statistics
+        $total_alerts = $alerts->count();
+        $critical_count = $alerts->where('type', 'critical')->count();
+        $low_stock_count = $alerts->where('type', 'low_stock')->count();
+        $overstock_count = $alerts->where('type', 'overstock')->count();
+
+        // Calculate value at risk (critical + low stock)
+        $value_at_risk = $alerts->filter(function($alert) {
+            return in_array($alert['type'], ['critical', 'low_stock']);
+        })->sum(fn($alert) => $alert['product']->price * $alert['product']->stock_quantity);
+
+        // Get recent alert history (last 30 days)
+        $alert_history = $this->getAlertHistory();
+
+        return view('admin.reports.inventory.alerts', compact(
+            'alerts',
+            'categories',
+            'total_alerts',
+            'critical_count',
+            'low_stock_count',
+            'overstock_count',
+            'value_at_risk',
+            'alert_history',
+            'alert_type',
+            'category_id',
+            'search',
+            'sort'
+        ));
+    }
+
+    /**
+     * Get alert history for trend analysis
+     */
+    private function getAlertHistory(): array
+    {
+        $history = [];
+
+        for ($i = 29; $i >= 0; $i--) {
+            $date = now()->subDays($i);
+
+            $critical = Product::where('track_inventory', true)
+                ->where('stock_quantity', '<=', 0)
+                ->count();
+
+            $low_stock = Product::where('track_inventory', true)
+                ->whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold')
+                ->count();
+
+            $history[] = [
+                'date' => $date->format('M d'),
+                'critical' => $critical,
+                'low_stock' => $low_stock,
+                'total' => $critical + $low_stock
+            ];
+        }
+
+        return $history;
+    }
+
     // ==================== CUSTOMER REPORTS ====================
 
     /**
