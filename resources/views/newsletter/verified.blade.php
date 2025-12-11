@@ -209,7 +209,7 @@
                 {{-- <a href="{{ route('newsletter.resend') }}" class="button">
                     📧 Resend Verification Email
                 </a> --}}
-                <a href="{{ url('/') }}" class="button secondary">
+                <a href="{{ config('app.front_url') }}" class="button secondary">
                     🏠 Back to Home
                 </a>
             </div>
