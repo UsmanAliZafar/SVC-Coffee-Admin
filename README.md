@@ -106,4 +106,19 @@ http://127.0.0.1:8000/api/documentation
  * - customers-index
  * - customers-new-vs-returning
  * - customers-lifetime-value
+
  */
+
+    Route::post('/cron/cleanup-notifications', function (Request $request) {
+       $token = $request->header('X-Cron-Token');
+       if ($token !== config('app.cron_token')) {
+           return response()->json(['error' => 'Unauthorized'], 401);
+       }
+       CleanupOldNotifications::dispatch();
+       return response()->json(['success' => true]);
+   });
+```
+
+3. **Add to `.env`**:
+```
+   CRON_TOKEN=your-secret-random-token-here
