@@ -35,7 +35,7 @@ return [
             'color' => 'primary',
             'default_email' => false,
             'priority' => 'normal',
-            'send_to_customer' => true,
+            'send_to_customer' => false,
         ],
         // 'order_packed' => [
         //     'label' => 'Order Packed',

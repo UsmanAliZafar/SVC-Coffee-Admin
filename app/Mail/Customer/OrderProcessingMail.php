@@ -46,7 +46,7 @@ class OrderProcessingMail extends Mailable
                 'estimatedShipDate' => now()->addDays(2)->format('F d, Y'),
                 'items' => $this->order->items,
                 'totalAmount' => $this->order->getFormattedTotal(),
-                'trackingUrl' => $this->order->getTrackingUrl(),
+                'trackingUrl' =>'N/A',
             ],
         );
     }

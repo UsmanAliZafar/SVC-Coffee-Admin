@@ -186,18 +186,38 @@ class NotificationService
     private function getRecipientsForEmail($recipients, $notificationType)
     {
         if (is_null($recipients)) {
-            // ONLY get admins who explicitly configured email for this notification
+            // ✅ NEW: Get notification config to check default_email
+            $config = config("notifications.types.{$notificationType}");
+            $defaultEmailEnabled = $config['default_email'] ?? false;
+
+            // ✅ FIXED: Removed email_address requirement
+            // Now includes admins who enabled email even without custom email
             $adminIdsWithSettings = NotificationSetting::where('notification_type', $notificationType)
                 ->where('send_email', true)
-                ->whereNotNull('email_address')
-                ->where('email_address', '!=', '')
                 ->pluck('admin_user_id');
 
-            if ($adminIdsWithSettings->isEmpty()) {
-                return collect([]);
+            // ✅ NEW: If no settings exist AND default_email=true, send to all admins
+            if ($adminIdsWithSettings->isEmpty() && $defaultEmailEnabled) {
+                Log::info("Using default email setting for {$notificationType}", [
+                    'default_email' => $defaultEmailEnabled,
+                ]);
+
+                return AdminUser::active()
+                    ->whereNotNull('email')
+                    ->where('email', '!=', '')
+                    ->get();
             }
 
-            return AdminUser::whereIn('id', $adminIdsWithSettings)->active()->get();
+            // ✅ NEW: Ensure admins have valid email addresses
+            if ($adminIdsWithSettings->isNotEmpty()) {
+                return AdminUser::whereIn('id', $adminIdsWithSettings)
+                    ->active()
+                    ->whereNotNull('email')
+                    ->where('email', '!=', '')
+                    ->get();
+            }
+
+            return collect([]);
         }
 
         if (is_array($recipients)) {

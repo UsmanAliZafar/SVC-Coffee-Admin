@@ -50,7 +50,7 @@ class OrderShippedMail extends Mailable
                 'estimatedDelivery' => $this->order->expected_delivery_date
                     ? $this->order->expected_delivery_date->format('F d, Y')
                     : 'Within 3-5 business days',
-                'trackingUrl' => $this->order->getTrackingUrl(),
+                'trackingUrl' => 'N/A',
                 'items' => $this->order->items,
             ],
         );

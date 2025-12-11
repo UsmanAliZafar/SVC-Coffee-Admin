@@ -920,7 +920,9 @@ class OrdersController extends Controller
             ]);
 
             DB::commit();
-
+            // Notify customer
+            $this->notificationService->notifyCustomer('order_created', $order);
+            //
             return response()->json([
                 'success' => true,
                 'message' => "Order #{$order->order_number} created successfully!",
@@ -1410,6 +1412,24 @@ class OrdersController extends Controller
                     'product' => $itemName,
                 ]);
             }
+
+            // ✅ SEND CUSTOMER NOTIFICATIONS BASED ON NEW STATUS
+            switch ($newStatus) {
+                case 'ORDER_PACKED':
+                    $this->notificationService->notifyCustomer('order_packed', $order);
+                    break;
+
+                case 'ORDER_SHIPPED':
+                    $this->notificationService->notifyCustomer('order_shipped', $order, [
+                        'tracking_number' => $order->shipping_tracking_number,
+                        'carrier' => $order->shipping_carrier,
+                    ]);
+                    break;
+
+                case 'ORDER_DELIVERED':
+                    $this->notificationService->notifyCustomer('order_delivered', $order);
+                    break;
+            }
         }
 
         \Log::info('✅ Status transition completed', [
@@ -1682,8 +1702,10 @@ class OrdersController extends Controller
                     'order_number' => $order->order_number,
                     'tracking_number' => $order->shipping_tracking_number,
                 ]);
+
                 $this->notificationService->notifyCustomer('order_shipped', $order, [
                     'tracking_number' => $order->shipping_tracking_number,
+                    'carrier' => $order->shipping_carrier,
                 ]);
             }
 
@@ -1693,6 +1715,7 @@ class OrdersController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                 ]);
+                // Notify customer
                 $this->notificationService->notifyCustomer('order_delivered', $order);
             }
 
@@ -1702,6 +1725,7 @@ class OrdersController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                 ]);
+                // Notify customer
                 $this->notificationService->notifyCustomer('order_cancelled', $order, [
                     'reason' => $validated['notes'] ?? 'Cancelled by admin',
                 ]);
