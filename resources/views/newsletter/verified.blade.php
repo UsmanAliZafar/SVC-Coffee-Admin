@@ -206,9 +206,9 @@
             </div>
 
             <div>
-                <a href="{{ route('newsletter.resend') }}" class="button">
+                {{-- <a href="{{ route('newsletter.resend') }}" class="button">
                     📧 Resend Verification Email
-                </a>
+                </a> --}}
                 <a href="{{ url('/') }}" class="button secondary">
                     🏠 Back to Home
                 </a>
