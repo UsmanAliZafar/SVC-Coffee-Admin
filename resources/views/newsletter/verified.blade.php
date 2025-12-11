@@ -125,6 +125,22 @@
             color: #999;
             font-size: 14px;
         }
+        .countdown-timer {
+            display: inline-block;
+            background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 20px;
+            animation: pulse 1s ease-in-out infinite;
+            box-shadow: 0 4px 15px rgba(91, 145, 76, 0.3);
+        }
+        .countdown-timer.error {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+        }
         @keyframes scaleIn {
             0% {
                 transform: scale(0);
@@ -147,6 +163,14 @@
             }
             20%, 40%, 60%, 80% {
                 transform: translateX(10px);
+            }
+        }
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
             }
         }
     </style>
@@ -179,9 +203,14 @@
             </div>
             @endif
 
+            {{-- Countdown Timer for Success --}}
+            <div class="countdown-timer">
+                <span id="countdown-text">Redirecting to home in <span id="countdown">5</span> seconds...</span>
+            </div>
+
             <div>
-                <a href="{{ url('/') }}" class="button">
-                    🏠 Back to Home
+                <a href="{{ config('app.front_url') }}" class="button">
+                    🏠 Back to Home Now
                 </a>
                 <a href="{{ url('/blog') }}" class="button secondary">
                     📰 Browse Articles
@@ -205,12 +234,17 @@
                 </ul>
             </div>
 
+            {{-- Countdown Timer for Error --}}
+            <div class="countdown-timer error">
+                <span id="countdown-text">Redirecting to home in <span id="countdown">10</span> seconds...</span>
+            </div>
+
             <div>
                 {{-- <a href="{{ route('newsletter.resend') }}" class="button">
                     📧 Resend Verification Email
                 </a> --}}
                 <a href="{{ config('app.front_url') }}" class="button secondary">
-                    🏠 Back to Home
+                    🏠 Back to Home Now
                 </a>
             </div>
         @endif
@@ -222,5 +256,38 @@
             </p>
         </div>
     </div>
+
+    <script>
+        // Auto-redirect with countdown
+        (function() {
+            const isSuccess = {{ $success ? 'true' : 'false' }};
+            const redirectTime = isSuccess ? 5 : 10; // 5 seconds for success, 10 for error
+            const redirectUrl = "{{ config('app.front_url') }}";
+
+            let timeLeft = redirectTime;
+            const countdownElement = document.getElementById('countdown');
+            const countdownTextElement = document.getElementById('countdown-text');
+
+            // Update countdown every second
+            const countdownInterval = setInterval(function() {
+                timeLeft--;
+                countdownElement.textContent = timeLeft;
+
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    countdownTextElement.textContent = 'Redirecting now...';
+                    window.location.href = redirectUrl;
+                }
+            }, 1000);
+
+            // Optional: Cancel redirect if user clicks a button
+            const buttons = document.querySelectorAll('.button');
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    clearInterval(countdownInterval);
+                });
+            });
+        })();
+    </script>
 </body>
 </html>
