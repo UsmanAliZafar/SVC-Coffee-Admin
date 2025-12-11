@@ -15,7 +15,7 @@ return [
             'color' => 'success',
             'default_email' => true,
             'priority' => 'high',
-            'send_to_customer' => false,
+            'send_to_customer' => true,
         ],
         'order_confirmed' => [
             'label' => 'Order Confirmed',

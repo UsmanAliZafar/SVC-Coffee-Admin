@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Received</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%); color: #ffffff; padding: 40px 20px; text-align: center;">
+            <div style="font-size: 50px; margin-bottom: 10px;">🎉</div>
+            <h1 style="margin: 0; font-size: 28px; font-weight: 700;">Thank You For Your Order!</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">We've received your order</p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 40px 30px;">
+
+            <!-- Greeting -->
+            <p style="font-size: 18px; color: #333; margin-bottom: 20px;">
+                Hi <strong>{{ $customerName }}</strong>,
+            </p>
+
+            <p style="font-size: 16px; color: #666; line-height: 1.8; margin-bottom: 25px;">
+                Thank you for your order! We've received it and are getting things ready. We'll send you another email once your order has been confirmed and is being prepared for shipment.
+            </p>
+
+            <!-- Order Summary Card -->
+            <div style="background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%); border-radius: 8px; padding: 20px; margin-bottom: 30px; color: #ffffff; text-align: center;">
+                <p style="margin: 0 0 5px 0; font-size: 14px; opacity: 0.9;">Order Number</p>
+                <h2 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 1px;">#{{ $orderNumber }}</h2>
+                <div style="height: 1px; background-color: rgba(255,255,255,0.3); margin: 15px 0;"></div>
+                <p style="margin: 0 0 5px 0; font-size: 14px; opacity: 0.9;">Order Total</p>
+                <p style="margin: 0; font-size: 28px; font-weight: 700;">{{ $totalAmount }}</p>
+            </div>
+
+            <!-- Order Details -->
+            <div style="background-color: #f8f9fa; border-radius: 6px; padding: 20px; margin-bottom: 25px;">
+                <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333; border-bottom: 2px solid #5B914C; padding-bottom: 10px;">
+                    Order Details
+                </h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px 0; color: #666; font-size: 14px;">Order Date:</td>
+                        <td style="padding: 8px 0; color: #333; text-align: right; font-weight: 600;">{{ $orderDate }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #666; font-size: 14px;">Payment Method:</td>
+                        <td style="padding: 8px 0; color: #333; text-align: right; font-weight: 600;">{{ $paymentMethod }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #666; font-size: 14px;">Order Status:</td>
+                        <td style="padding: 8px 0; text-align: right;">
+                            <span style="display: inline-block; padding: 4px 12px; background-color: #ffc107; color: #000; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                PENDING
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Order Items -->
+            <div style="margin-bottom: 30px;">
+                <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333; border-bottom: 2px solid #5B914C; padding-bottom: 10px;">
+                    Items in Your Order
+                </h3>
+
+                @foreach($items as $item)
+                <div style="display: table; width: 100%; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #e9ecef;">
+                    <div style="display: table-cell; vertical-align: top; width: 70%;">
+                        <p style="margin: 0 0 5px 0; font-weight: 600; color: #333; font-size: 15px;">{{ $item->product_name }}</p>
+                        @if($item->product_sku)
+                        <p style="margin: 0 0 5px 0; color: #999; font-size: 13px;">SKU: {{ $item->product_sku }}</p>
+                        @endif
+                        <p style="margin: 0; color: #666; font-size: 14px;">Quantity: {{ $item->quantity }}</p>
+                    </div>
+                    <div style="display: table-cell; vertical-align: top; text-align: right; width: 30%;">
+                        <p style="margin: 0; font-weight: 700; color: #5B914C; font-size: 16px;">
+                            {{ store_currency_symbol() }} {{ number_format($item->total, 2) }}
+                        </p>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+
+            <!-- Shipping Address -->
+            <div style="background-color: #f8f9fa; border-radius: 6px; padding: 20px; margin-bottom: 25px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">
+                    📦 Shipping Address
+                </h3>
+                <p style="margin: 0; color: #666; line-height: 1.6; font-size: 14px;">
+                    {{ $shippingAddress }}
+                </p>
+            </div>
+
+            <!-- What's Next -->
+            @if($paymentMethod === 'Cod')
+            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #856404;">
+                    💵 Cash on Delivery
+                </h3>
+                <p style="margin: 0; color: #856404; line-height: 1.8;">
+                    Your order will be confirmed shortly. Please keep the exact amount ready for payment upon delivery.
+                </p>
+            </div>
+            @else
+            <div style="background-color: #e7f3ff; border-left: 4px solid #0066cc; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #004085;">
+                    💳 Payment Pending
+                </h3>
+                <p style="margin: 0; color: #004085; line-height: 1.8;">
+                    Please complete your payment to confirm your order. Once payment is received, we'll start processing your order immediately.
+                </p>
+            </div>
+            @endif
+
+            <div style="background-color: #e7f3ff; border-left: 4px solid #0066cc; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #004085;">
+                    📋 What Happens Next?
+                </h3>
+                <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #004085; line-height: 1.8;">
+                    <li>We'll review and confirm your order</li>
+                    <li>You'll receive a confirmation email once approved</li>
+                    <li>Your order will be prepared for shipment</li>
+                    <li>You'll get tracking details when shipped</li>
+                </ul>
+            </div>
+
+            <!-- Track Order Button -->
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{ $trackingUrl }}" style="display: inline-block; padding: 16px 40px; background-color: #5B914C; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 16px;">
+                    View Order Status →
+                </a>
+            </div>
+
+            <div style="height: 1px; background-color: #e9ecef; margin: 30px 0;"></div>
+
+            <!-- Help Section -->
+            <div style="text-align: center; margin-top: 30px;">
+                <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                    Questions about your order?
+                </p>
+                <p style="margin: 0;">
+                    <a href="mailto:{{ config('mail.from.address') }}" style="color: #5B914C; text-decoration: none; font-weight: 600;">
+                        Contact Support
+                    </a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f8f9fa; padding: 30px 20px; text-align: center; border-top: 1px solid #e9ecef;">
+            <p style="margin: 0 0 10px 0; font-weight: 600; color: #333; font-size: 16px;">{{ config('app.name') }}</p>
+            <p style="margin: 0 0 15px 0; color: #666; font-size: 14px;">
+                Premium Coffee Machines, Beans & Parts
+            </p>
+            <p style="margin: 0; font-size: 12px; color: #999;">
+                © {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

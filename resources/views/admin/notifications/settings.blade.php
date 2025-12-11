@@ -21,9 +21,71 @@
 .card-header h5 {
     margin-bottom: 0;
 }
-</style>
 
+.config-badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    margin-left: 0.5rem;
+}
+
+.notification-type-cell {
+    position: relative;
+}
+
+.config-indicators {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.indicator-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.default-email-indicator {
+    background-color: #e7f3ff;
+    color: #004085;
+    border: 1px solid #b8daff;
+}
+
+.customer-email-indicator {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.priority-indicator {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.priority-urgent {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.priority-high {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.priority-normal {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.priority-low {
+    background-color: #e2e3e5;
+    color: #383d41;
+}
+</style>
 @endpush
+
 @section('content')
 <div class="container-fluid">
     <!-- Page Header -->
@@ -43,7 +105,41 @@
     <div class="alert alert-info d-flex align-items-center mb-4">
         <i class="bi bi-info-circle fs-4 me-3"></i>
         <div>
-            <strong>How it works:</strong> In-app notifications are always created. You can optionally enable email notifications for specific types below.
+            <strong>How it works:</strong>
+            <ul class="mb-0 mt-2">
+                <li><strong>In-App Toggle:</strong> Enable/disable in-app notifications (shown in admin panel)</li>
+                <li><strong>Email Toggle:</strong> Enable/disable email notifications to your inbox</li>
+                <li><strong>Config Indicators:</strong> Show default settings and customer notification status</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-info-circle"></i> Badge Legend</h6>
+        </div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-3">
+                <span class="indicator-badge default-email-indicator">
+                    <i class="bi bi-envelope"></i> Default Email: On
+                </span>
+                <span class="indicator-badge customer-email-indicator">
+                    <i class="bi bi-person-check"></i> Customer Email: On
+                </span>
+                <span class="indicator-badge priority-urgent">
+                    <i class="bi bi-exclamation-triangle"></i> Urgent
+                </span>
+                <span class="indicator-badge priority-high">
+                    <i class="bi bi-exclamation-circle"></i> High
+                </span>
+                <span class="indicator-badge priority-normal">
+                    <i class="bi bi-info-circle"></i> Normal
+                </span>
+                <span class="indicator-badge priority-low">
+                    <i class="bi bi-dash-circle"></i> Low
+                </span>
+            </div>
         </div>
     </div>
 
@@ -61,26 +157,68 @@
                         <i class="{{ $category['icon'] }} me-2"></i>
                         {{ $category['label'] }}
                     </h5>
+                    <div class="float-end" style="margin-top: -1.5rem;">
+                        <small>
+                            <a href="#" class="text-white text-decoration-none toggle-all-app" data-category="{{ $categoryKey }}">
+                                <i class="bi bi-toggle-on"></i> Toggle All In-App
+                            </a>
+                            <span class="mx-2">|</span>
+                            <a href="#" class="text-white text-decoration-none toggle-all-email" data-category="{{ $categoryKey }}">
+                                <i class="bi bi-envelope"></i> Toggle All Email
+                            </a>
+                        </small>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th style="width: 40%">Notification Type</th>
-                                    <th style="width: 20%" class="text-center">In-App</th>
-                                    <th style="width: 20%" class="text-center">Email</th>
-                                    <th style="width: 20%">Actions</th>
+                                    <th style="width: 35%">Notification Type</th>
+                                    <th style="width: 15%" class="text-center">In-App</th>
+                                    <th style="width: 15%" class="text-center">Email</th>
+                                    <th style="width: 20%">Config Info</th>
+                                    <th style="width: 15%">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($settings as $setting)
-                                    <tr data-notification-type="{{ $setting->notification_type }}">
-                                        <td>
+                                    @php
+                                        $config = $setting->getConfig();
+                                        $defaultEmail = $config['default_email'] ?? false;
+                                        $sendToCustomer = $config['send_to_customer'] ?? false;
+                                        $priority = $config['priority'] ?? 'normal';
+                                    @endphp
+                                    <tr data-notification-type="{{ $setting->notification_type }}" data-category="{{ $categoryKey }}">
+                                        <td class="notification-type-cell">
                                             <div>
                                                 <strong>{{ $setting->getLabel() }}</strong>
                                                 <br>
                                                 <small class="text-muted">{{ $setting->getDescription() }}</small>
+                                                <div class="config-indicators">
+                                                    @if($defaultEmail)
+                                                        <span class="indicator-badge default-email-indicator" title="Default email notification is enabled in config">
+                                                            <i class="bi bi-envelope"></i> Default Email
+                                                        </span>
+                                                    @endif
+                                                    @if($sendToCustomer)
+                                                        <span class="indicator-badge customer-email-indicator" title="This notification is sent to customers">
+                                                            <i class="bi bi-person-check"></i> Customer Email
+                                                        </span>
+                                                    @endif
+                                                    <span class="indicator-badge priority-{{ $priority }}" title="Priority: {{ ucfirst($priority) }}">
+                                                        @if($priority === 'urgent')
+                                                            <i class="bi bi-exclamation-triangle"></i>
+                                                        @elseif($priority === 'high')
+                                                            <i class="bi bi-exclamation-circle"></i>
+                                                        @elseif($priority === 'normal')
+                                                            <i class="bi bi-info-circle"></i>
+                                                        @else
+                                                            <i class="bi bi-dash-circle"></i>
+                                                        @endif
+                                                        {{ ucfirst($priority) }}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td class="text-center">
@@ -107,6 +245,13 @@
                                             </div>
                                         </td>
                                         <td>
+                                            <small class="text-muted">
+                                                <div><strong>Default Email:</strong> {{ $defaultEmail ? 'Yes' : 'No' }}</div>
+                                                <div><strong>Customer Email:</strong> {{ $sendToCustomer ? 'Yes' : 'No' }}</div>
+                                                <div><strong>Priority:</strong> {{ ucfirst($priority) }}</div>
+                                            </small>
+                                        </td>
+                                        <td>
                                             <button type="button"
                                                     class="btn btn-sm btn-outline-secondary advanced-btn"
                                                     data-bs-toggle="collapse"
@@ -117,31 +262,56 @@
                                     </tr>
                                     <!-- Advanced Settings Row -->
                                     <tr class="collapse" id="advanced-{{ $setting->notification_type }}">
-                                        <td colspan="4" class="bg-light">
+                                        <td colspan="5" class="bg-light">
                                             <div class="p-3">
+                                                <h6 class="mb-3">
+                                                    <i class="bi bi-gear"></i> Advanced Settings for {{ $setting->getLabel() }}
+                                                </h6>
                                                 <div class="row g-3">
                                                     <div class="col-md-6">
-                                                        <label class="form-label">Custom Email Address</label>
+                                                        <label class="form-label">
+                                                            <i class="bi bi-envelope"></i> Custom Email Address
+                                                        </label>
                                                         <input type="email"
                                                                class="form-control form-control-sm"
                                                                name="settings[{{ $loop->parent->index }}_{{ $loop->index }}][email_address]"
                                                                value="{{ $setting->email_address }}"
                                                                placeholder="Leave empty to use default">
-                                                        <small class="text-muted">Default: {{ auth('admin')->user()->email }}</small>
+                                                        <small class="text-muted">
+                                                            <i class="bi bi-info-circle"></i> Default: {{ auth('admin')->user()->email }}
+                                                        </small>
                                                     </div>
 
                                                     @if(in_array($setting->notification_type, ['stock_low', 'stock_critical', 'stock_out']))
                                                         <div class="col-md-6">
-                                                            <label class="form-label">Stock Threshold</label>
+                                                            <label class="form-label">
+                                                                <i class="bi bi-box-seam"></i> Stock Threshold
+                                                            </label>
                                                             <input type="number"
                                                                    class="form-control form-control-sm"
                                                                    name="settings[{{ $loop->parent->index }}_{{ $loop->index }}][threshold_value]"
                                                                    value="{{ $setting->threshold_value }}"
                                                                    placeholder="Custom threshold"
                                                                    min="0">
-                                                            <small class="text-muted">Override default product threshold</small>
+                                                            <small class="text-muted">
+                                                                <i class="bi bi-info-circle"></i> Override default product threshold
+                                                            </small>
                                                         </div>
                                                     @endif
+
+                                                    <div class="col-12">
+                                                        <div class="alert alert-info mb-0">
+                                                            <strong><i class="bi bi-info-circle"></i> Config Information:</strong>
+                                                            <ul class="mb-0 mt-2">
+                                                                <li><strong>Category:</strong> {{ $config['category'] ?? 'N/A' }}</li>
+                                                                <li><strong>Icon:</strong> <i class="{{ $config['icon'] ?? 'bi-bell' }}"></i> {{ $config['icon'] ?? 'N/A' }}</li>
+                                                                <li><strong>Color:</strong> <span class="badge bg-{{ $config['color'] ?? 'secondary' }}">{{ $config['color'] ?? 'N/A' }}</span></li>
+                                                                <li><strong>Default Email Enabled:</strong> {{ $defaultEmail ? '✅ Yes' : '❌ No' }}</li>
+                                                                <li><strong>Send to Customer:</strong> {{ $sendToCustomer ? '✅ Yes (Customer will receive this notification)' : '❌ No (Admin only)' }}</li>
+                                                                <li><strong>Priority Level:</strong> {{ ucfirst($priority) }}</li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -207,6 +377,10 @@ $(document).ready(function() {
         e.preventDefault();
 
         const formData = $(this).serialize();
+        const btn = $(this).find('button[type="submit"]');
+        const originalText = btn.html();
+
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Saving...');
 
         $.ajax({
             url: '{{ route("admin.notifications.settings.update") }}',
@@ -219,15 +393,22 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 toastr.error('Failed to save settings');
+            },
+            complete: function() {
+                btn.prop('disabled', false).html(originalText);
             }
         });
     });
 
     // Reset to defaults
     $('#resetDefaultsBtn').on('click', function() {
-        if (!confirm('Are you sure you want to reset all settings to default values?')) {
+        if (!confirm('Are you sure you want to reset all settings to default values?\n\nThis will:\n- Enable/disable notifications based on config defaults\n- Clear custom email addresses\n- Reset all thresholds')) {
             return;
         }
+
+        const btn = $(this);
+        const originalText = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Resetting...');
 
         $.ajax({
             url: '{{ route("admin.notifications.settings.reset") }}',
@@ -243,6 +424,7 @@ $(document).ready(function() {
             },
             error: function() {
                 toastr.error('Failed to reset settings');
+                btn.prop('disabled', false).html(originalText);
             }
         });
     });
@@ -272,39 +454,26 @@ $(document).ready(function() {
         });
     });
 
-    // Toggle all in category
-    $('.card').each(function() {
-        const card = $(this);
-        const header = card.find('.card-header');
-
-        // Add toggle all buttons
-        header.append(`
-            <div class="float-end">
-                <small class="me-3">
-                    <a href="#" class="text-white toggle-all-app">Toggle All In-App</a> |
-                    <a href="#" class="text-white toggle-all-email">Toggle All Email</a>
-                </small>
-            </div>
-        `);
-    });
-
-    // Toggle all in-app
+    // Toggle all in-app for category
     $('.toggle-all-app').on('click', function(e) {
         e.preventDefault();
-        const card = $(this).closest('.card');
-        const switches = card.find('.in-app-toggle');
+        const category = $(this).data('category');
+        const switches = $(`tr[data-category="${category}"] .in-app-toggle`);
         const allChecked = switches.filter(':checked').length === switches.length;
         switches.prop('checked', !allChecked);
     });
 
-    // Toggle all email
+    // Toggle all email for category
     $('.toggle-all-email').on('click', function(e) {
         e.preventDefault();
-        const card = $(this).closest('.card');
-        const switches = card.find('.email-toggle');
+        const category = $(this).data('category');
+        const switches = $(`tr[data-category="${category}"] .email-toggle`);
         const allChecked = switches.filter(':checked').length === switches.length;
         switches.prop('checked', !allChecked);
     });
+
+    // Add tooltips
+    $('[title]').tooltip();
 });
 </script>
 @endpush

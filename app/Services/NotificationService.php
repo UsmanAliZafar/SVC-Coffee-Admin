@@ -402,6 +402,7 @@ class NotificationService
     private function getCustomerMailClass(string $notificationType): ?string
     {
         return match($notificationType) {
+            'order_created' => \App\Mail\Customer\OrderCreatedMail::class,
             'order_confirmed' => \App\Mail\Customer\OrderConfirmedMail::class,
             'order_shipped' => \App\Mail\Customer\OrderShippedMail::class,
             'order_delivered' => \App\Mail\Customer\OrderDeliveredMail::class,
