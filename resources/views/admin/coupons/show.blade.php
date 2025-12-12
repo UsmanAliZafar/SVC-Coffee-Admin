@@ -327,7 +327,7 @@
                     </span>
                 </div>
 
-                <div class="detail-row">
+                <div class="detail-row d-none">
                     <span class="detail-label"><i class="bi bi-tag"></i> Applies to Sale Items:</span>
                     <span class="detail-value">
                         @if($coupon->applies_to_sale_items)
@@ -338,7 +338,7 @@
                     </span>
                 </div>
 
-                <div class="detail-row">
+                <div class="detail-row d-none">
                     <span class="detail-label"><i class="bi bi-star"></i> First Order Only:</span>
                     <span class="detail-value">
                         @if($coupon->first_order_only)

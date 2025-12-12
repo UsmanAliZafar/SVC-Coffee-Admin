@@ -380,7 +380,7 @@
                 <div class="form-section">
                     <h3 class="form-section-title"><i class="bi bi-gear"></i> Applicability Rules</h3>
 
-                    <div class="form-check form-switch mb-3">
+                    <div class="form-check form-switch mb-3 d-none">
                         <input class="form-check-input" type="checkbox" id="applies_to_sale_items"
                             name="applies_to_sale_items" value="1" checked>
                         <label class="form-check-label" for="applies_to_sale_items">
@@ -389,7 +389,7 @@
                         <small class="d-block text-muted">Can be used on products already on sale</small>
                     </div>
 
-                    <div class="form-check form-switch mb-3">
+                    <div class="form-check form-switch mb-3 d-none">
                         <input class="form-check-input" type="checkbox" id="first_order_only"
                             name="first_order_only" value="1">
                         <label class="form-check-label" for="first_order_only">
