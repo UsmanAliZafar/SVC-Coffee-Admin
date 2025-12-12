@@ -2188,19 +2188,90 @@ class ReportsController extends Controller
     }
 
     /**
-     * Get inventory summary
+     *Get inventory summary - Includes products AND variants
      */
     private function getInventorySummary(): array
     {
+        // 1. COUNT SIMPLE PRODUCTS (no variants)
+        $simpleProductsTotal = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->count();
+
+        // 2. COUNT ACTIVE VARIANTS
+        $variantsTotal = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->count();
+
+        $totalProducts = $simpleProductsTotal + $variantsTotal;
+
+        // 3. IN STOCK: Products/variants with stock > 0
+        $inStockSimple = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->where(function($q) {
+                $q->whereHas('warehouseStock', function($wq) {
+                    $wq->where('quantity', '>', 0);
+                })->orWhere('stock_quantity', '>', 0);
+            })->count();
+
+        $inStockVariants = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->where(function($q) {
+                $q->whereHas('warehouseStock', function($wq) {
+                    $wq->where('quantity', '>', 0);
+                })->orWhere('stock_quantity', '>', 0);
+            })->count();
+
+        $productsInStock = $inStockSimple + $inStockVariants;
+
+        // 4. LOW STOCK: Stock <= threshold AND > 0
+        $lowStockSimple = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0)
+            ->count();
+
+        $lowStockVariants = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0)
+            ->count();
+
+        $productsLowStock = $lowStockSimple + $lowStockVariants;
+
+        // 5. OUT OF STOCK: Stock <= 0 everywhere
+        $outOfStockSimple = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->where('stock_quantity', '<=', 0)
+            ->whereDoesntHave('warehouseStock', function($q) {
+                $q->where('quantity', '>', 0);
+            })->count();
+
+        $outOfStockVariants = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->where('stock_quantity', '<=', 0)
+            ->whereDoesntHave('warehouseStock', function($q) {
+                $q->where('quantity', '>', 0);
+            })->count();
+
+        $productsOutOfStock = $outOfStockSimple + $outOfStockVariants;
+
+        // 6. CALCULATE TOTAL STOCK VALUE
+        $totalStockValue = $this->calculateTotalStockValue();
+
         return [
-            'total_products' => Product::count(),
-            'products_in_stock' => Product::where('stock_quantity', '>', 0)->where('track_inventory', true)->count(),
-            'products_low_stock' => Product::whereColumn('stock_quantity', '<=', 'low_stock_threshold')
-                                          ->where('stock_quantity', '>', 0)
-                                          ->where('track_inventory', true)
-                                          ->count(),
-            'products_out_of_stock' => Product::where('stock_quantity', '<=', 0)->where('track_inventory', true)->count(),
-            'total_stock_value' => $this->calculateTotalStockValue(),
+            'total_products' => $totalProducts,
+            'products_in_stock' => $productsInStock,
+            'products_low_stock' => $productsLowStock,
+            'products_out_of_stock' => $productsOutOfStock,
+            'total_stock_value' => $totalStockValue,
         ];
     }
 
@@ -2837,12 +2908,50 @@ class ReportsController extends Controller
     /**
      * Calculate total stock value
      */
+   /**
+     *Calculate total stock value - Better performance
+     */
     private function calculateTotalStockValue(): float
     {
-        return Product::where('track_inventory', true)
-                     ->where('stock_quantity', '>', 0)
-                     ->selectRaw('SUM(stock_quantity * price) as total_value')
-                     ->value('total_value') ?? 0;
+        // 1. Simple Products Value (using raw SQL for better performance)
+        $simpleProductsValue = DB::table('products')
+            ->where('track_inventory', true)
+            ->where('has_variants', false)
+            ->selectRaw('SUM(stock_quantity * price) as total_value')
+            ->value('total_value') ?? 0;
+
+        // Add warehouse stock for simple products
+        $warehouseSimpleValue = DB::table('product_warehouse_stock')
+            ->join('products', 'product_warehouse_stock.product_id', '=', 'products.id')
+            ->where('products.track_inventory', true)
+            ->where('products.has_variants', false)
+            ->whereNull('product_warehouse_stock.variant_id')
+            ->selectRaw('SUM(product_warehouse_stock.quantity * products.price) as total_value')
+            ->value('total_value') ?? 0;
+
+        // 2. Variants Value
+        $variantsValue = DB::table('product_variants')
+            ->join('products', 'product_variants.product_id', '=', 'products.id')
+            ->where('products.track_inventory', true)
+            ->where('product_variants.status_key_code', 'VARIANT_ACTIVE')
+            ->selectRaw('SUM(product_variants.stock_quantity * product_variants.price) as total_value')
+            ->value('total_value') ?? 0;
+
+        // Add warehouse stock for variants
+        $warehouseVariantsValue = DB::table('product_warehouse_stock')
+            ->join('product_variants', 'product_warehouse_stock.variant_id', '=', 'product_variants.id')
+            ->join('products', 'product_variants.product_id', '=', 'products.id')
+            ->where('products.track_inventory', true)
+            ->where('product_variants.status_key_code', 'VARIANT_ACTIVE')
+            ->whereNotNull('product_warehouse_stock.variant_id')
+            ->selectRaw('SUM(product_warehouse_stock.quantity * product_variants.price) as total_value')
+            ->value('total_value') ?? 0;
+
+        // Use warehouse value if available, otherwise use product/variant value
+        $totalSimpleValue = $warehouseSimpleValue > 0 ? $warehouseSimpleValue : $simpleProductsValue;
+        $totalVariantsValue = $warehouseVariantsValue > 0 ? $warehouseVariantsValue : $variantsValue;
+
+        return round($totalSimpleValue + $totalVariantsValue, 2);
     }
 
     /**

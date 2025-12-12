@@ -269,7 +269,7 @@
         </div>
     </div>
 
-    <!-- Inventory Status -->
+    <!-- ✅ UPDATED: Inventory Status Card -->
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card stat-card border-0 shadow-sm h-100">
             <div class="card-body">
@@ -281,11 +281,15 @@
                         <h3 class="mb-0">{{ store_currency_symbol() }}{{ number_format($inventory_summary['total_stock_value'], 2) }}</h3>
                         @if($inventory_summary['products_low_stock'] > 0)
                         <small class="text-warning">
-                            <i class="bi bi-exclamation-triangle"></i> {{ number_format($inventory_summary['products_low_stock']) }} Low Stock
+                            <i class="bi bi-exclamation-triangle"></i> {{ number_format($inventory_summary['products_low_stock']) }} Low Stock Items
+                        </small>
+                        @elseif($inventory_summary['products_out_of_stock'] > 0)
+                        <small class="text-danger">
+                            <i class="bi bi-x-circle"></i> {{ number_format($inventory_summary['products_out_of_stock']) }} Out of Stock
                         </small>
                         @else
                         <small class="text-success">
-                            <i class="bi bi-check-circle"></i> All Good
+                            <i class="bi bi-check-circle"></i> All Items In Stock
                         </small>
                         @endif
                     </div>
@@ -361,7 +365,6 @@
         </div>
     </div>
 
-    <!-- Inventory Summary -->
     <div class="col-xl-4 mb-4">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white border-0">
@@ -372,8 +375,9 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
                     <div>
-                        <div class="text-muted small">Total Products</div>
+                        <div class="text-muted small">Total Items</div>
                         <h4 class="mb-0">{{ number_format($inventory_summary['total_products']) }}</h4>
+                        <small class="text-muted">Products + Variants</small>
                     </div>
                     <i class="bi bi-boxes fs-2 text-muted"></i>
                 </div>
@@ -384,7 +388,7 @@
                         <span class="badge bg-success">{{ number_format($inventory_summary['products_in_stock']) }}</span>
                     </div>
                     <div class="progress" style="height: 8px;">
-                        <div class="progress-bar bg-success" style="width: {{ $inventory_summary['total_products'] > 0 ? ($inventory_summary['products_in_stock'] / $inventory_summary['total_products']) * 100 : 0 }}%"></div>
+                        <div class="progress-bar bg-success" style="width: {{ $inventory_summary['total_products'] > 0 ? round(($inventory_summary['products_in_stock'] / $inventory_summary['total_products']) * 100, 1) : 0 }}%"></div>
                     </div>
                 </div>
 
@@ -394,7 +398,7 @@
                         <span class="badge bg-warning">{{ number_format($inventory_summary['products_low_stock']) }}</span>
                     </div>
                     <div class="progress" style="height: 8px;">
-                        <div class="progress-bar bg-warning" style="width: {{ $inventory_summary['total_products'] > 0 ? ($inventory_summary['products_low_stock'] / $inventory_summary['total_products']) * 100 : 0 }}%"></div>
+                        <div class="progress-bar bg-warning" style="width: {{ $inventory_summary['total_products'] > 0 ? round(($inventory_summary['products_low_stock'] / $inventory_summary['total_products']) * 100, 1) : 0 }}%"></div>
                     </div>
                 </div>
 
@@ -404,12 +408,12 @@
                         <span class="badge bg-danger">{{ number_format($inventory_summary['products_out_of_stock']) }}</span>
                     </div>
                     <div class="progress" style="height: 8px;">
-                        <div class="progress-bar bg-danger" style="width: {{ $inventory_summary['total_products'] > 0 ? ($inventory_summary['products_out_of_stock'] / $inventory_summary['total_products']) * 100 : 0 }}%"></div>
+                        <div class="progress-bar bg-danger" style="width: {{ $inventory_summary['total_products'] > 0 ? round(($inventory_summary['products_out_of_stock'] / $inventory_summary['total_products']) * 100, 1) : 0 }}%"></div>
                     </div>
                 </div>
 
                 <a href="{{ route('admin.reports.inventory.index') }}" class="btn btn-outline-brand btn-sm w-100 mt-3">
-                    View Inventory Reports
+                    <i class="bi bi-bar-chart-line"></i> View Inventory Reports
                 </a>
             </div>
         </div>
