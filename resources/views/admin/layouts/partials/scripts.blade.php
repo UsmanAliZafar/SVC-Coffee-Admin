@@ -20,6 +20,66 @@
 <!-- Select2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+$(document).ready(function() {
+    // Global AJAX error handler for session expiry
+    $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
+        if (jqxhr.status === 401) {
+            let response = jqxhr.responseJSON;
+
+            // Show alert message
+            let message = (response && response.message)
+                ? response.message
+                : 'Your session has expired. Please login again.';
+            alert(message);
+
+            // Redirect to login
+            let redirectUrl = (response && response.redirect)
+                ? response.redirect
+                : '{{ route("admin.login") }}';
+            window.location.href = redirectUrl;
+        }
+    });
+
+    // DataTables specific error handler
+    if ($.fn.dataTable) {
+        $.fn.dataTable.ext.errMode = function(settings, helpPage, message) {
+            if (settings.jqXHR && settings.jqXHR.status === 401) {
+                let response = settings.jqXHR.responseJSON;
+                let alertMessage = (response && response.message)
+                    ? response.message
+                    : 'Session expired. Please login again.';
+                alert(alertMessage);
+
+                let redirectUrl = (response && response.redirect)
+                    ? response.redirect
+                    : '{{ route("admin.login") }}';
+                window.location.href = redirectUrl;
+            } else {
+                // Log other DataTable errors to console
+                console.error('DataTable error:', message);
+            }
+        };
+    }
+});
+
+// Axios interceptor (if you're using Axios)
+if (typeof axios !== 'undefined') {
+    axios.interceptors.response.use(
+        response => response,
+        error => {
+            if (error.response && error.response.status === 401) {
+                let message = error.response.data.message || 'Session expired. Please login again.';
+                alert(message);
+
+                let redirectUrl = error.response.data.redirect || '{{ route("admin.login") }}';
+                window.location.href = redirectUrl;
+            }
+            return Promise.reject(error);
+        }
+    );
+}
+</script>
+<script>
     // Sidebar Toggle Function
     function toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
@@ -277,4 +337,5 @@
         });
     });
 </script>
+
 @stack('scripts')

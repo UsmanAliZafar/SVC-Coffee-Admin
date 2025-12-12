@@ -306,11 +306,11 @@
                     </div>
 
                     <!-- Forgot Password Link -->
-                    <div class="text-center forgot-password-link">
+                    {{-- <div class="text-center forgot-password-link">
                         <a href="{{ route('admin.forgot-password') }}" class="text-brand">
                             <i class="bi bi-question-circle me-1"></i>Forgot your password?
                         </a>
-                    </div>
+                    </div> --}}
                 </form>
 
                 <!-- Default Login Credentials (Remove in production) -->

@@ -38,8 +38,11 @@ class AuthController extends Controller
 
             RateLimiter::clear($this->throttleKey($request));
 
-            return redirect()->intended(route('admin.dashboard'))
-                           ->with('success', 'Welcome back, ' . $user->name . '!');
+            // Get the intended URL from session or default to dashboard
+            $intendedUrl = session()->pull('url.intended', route('admin.dashboard'));
+
+            return redirect($intendedUrl)
+                        ->with('success', 'Welcome back, ' . $user->name . '!');
         }
 
         RateLimiter::hit($this->throttleKey($request));
