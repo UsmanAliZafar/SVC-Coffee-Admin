@@ -624,9 +624,8 @@
                                             <i class="bi bi-three-dots"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end">
-                                            <li><a class="dropdown-item" href="#"><i class="bi bi-eye"></i> View Profile</a></li>
-                                            <li><a class="dropdown-item" href="#"><i class="bi bi-cart"></i> View Orders</a></li>
-                                            <li><a class="dropdown-item" href="#"><i class="bi bi-envelope"></i> Send Email</a></li>
+                                            <li><a class="dropdown-item" target="_blank" href="{{ route('admin.customers.show', $customer->id) }}"><i class="bi bi-eye"></i> View Profile</a></li>
+                                            <li><a class="dropdown-item" target="_blank" href="{{ route('admin.customers.show', $customer->id) }}"><i class="bi bi-cart"></i> View Orders</a></li>
                                         </ul>
                                     </div>
                                 </td>

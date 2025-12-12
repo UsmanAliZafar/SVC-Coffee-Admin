@@ -393,24 +393,48 @@ class ReportsController extends Controller
         // Get date range based on period
         $date_range = $this->getDateRangeForPeriod($period, $date->format('Y-m-d'));
 
-        // Get top selling products
-        $top_products = Product::select(
+        // ✅ FIX: Get top selling products with accurate revenue
+        $top_products = DB::table('order_items')
+            ->select(
                 'products.id',
                 'products.name',
                 'products.sku',
                 'products.main_image',
-                'products.price',
+                'products.price as current_price', // Current catalog price
                 'products_categories.title as category_name',
+
+                // ✅ Sales metrics
                 DB::raw('SUM(order_items.quantity) as total_sold'),
-                DB::raw('SUM(order_items.total) as total_revenue'),
+
+                // ✅ FIXED: Revenue calculation
+                // Use order_items.total which includes item-level discounts and taxes
+                DB::raw('SUM(order_items.total) as total_item_revenue'),
+
+                // ✅ Add tax attributed to this product
+                DB::raw('SUM(order_items.tax_amount) as total_tax'),
+
+                // ✅ Add discount attributed to this product
+                DB::raw('SUM(order_items.discount_amount) as total_discount'),
+
+                // ✅ Subtotal before discounts
+                DB::raw('SUM(order_items.subtotal) as total_subtotal'),
+
+                // ✅ Average selling price (actual price customers paid)
                 DB::raw('AVG(order_items.unit_price) as avg_price'),
-                DB::raw('COUNT(DISTINCT order_items.order_id) as order_count')
+
+                // ✅ Order metrics
+                DB::raw('COUNT(DISTINCT order_items.order_id) as order_count'),
+
+                // ✅ Variant tracking
+                DB::raw('COUNT(DISTINCT order_items.product_variant_id) as variant_count'),
+                DB::raw('SUM(CASE WHEN order_items.product_variant_id IS NOT NULL THEN order_items.quantity ELSE 0 END) as variant_sales'),
+                DB::raw('SUM(CASE WHEN order_items.product_variant_id IS NULL THEN order_items.quantity ELSE 0 END) as simple_sales')
             )
+            ->join('products', 'order_items.product_id', '=', 'products.id')
             ->leftJoin('products_categories', 'products.category_id', '=', 'products_categories.id')
-            ->join('order_items', 'products.id', '=', 'order_items.product_id')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->whereBetween('orders.created_at', [$date_range['start'], $date_range['end']])
-            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING'])
+            ->whereIn('orders.status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING', 'ORDER_COMPLETED'])
             ->groupBy(
                 'products.id',
                 'products.name',
@@ -419,7 +443,7 @@ class ReportsController extends Controller
                 'products.price',
                 'products_categories.title'
             )
-            ->orderBy('total_sold', 'desc')
+            ->orderByDesc('total_sold')
             ->limit($limit)
             ->get()
             ->map(function($product) {
@@ -428,19 +452,70 @@ class ReportsController extends Controller
                     'name' => $product->name,
                     'sku' => $product->sku,
                     'main_image' => $product->main_image,
-                    'price' => (float) $product->price,
+                    'current_price' => (float) $product->current_price,
                     'category_name' => $product->category_name,
+
+                    // ✅ Sales data
                     'total_sold' => (int) $product->total_sold,
-                    'total_revenue' => (float) $product->total_revenue,
-                    'avg_price' => (float) $product->avg_price,
                     'order_count' => (int) $product->order_count,
+
+                    // ✅ FIXED: Revenue breakdown
+                    'total_revenue' => (float) $product->total_item_revenue, // This is what customer paid
+                    'total_subtotal' => (float) $product->total_subtotal,    // Before discounts
+                    'total_discount' => (float) $product->total_discount,    // Discounts applied
+                    'total_tax' => (float) $product->total_tax,              // Tax collected
+
+                    // ✅ Average metrics
+                    'avg_price' => (float) $product->avg_price, // Actual selling price
+                    'avg_order_value' => $product->order_count > 0
+                        ? (float) $product->total_item_revenue / $product->order_count
+                        : 0,
+
+                    // ✅ Variant info
+                    'variant_count' => (int) $product->variant_count,
+                    'variant_sales' => (int) $product->variant_sales,
+                    'simple_sales' => (int) $product->simple_sales,
+                    'has_variants' => (int) $product->variant_count > 0,
+
+                    // ✅ Performance metrics
+                    'discount_rate' => $product->total_subtotal > 0
+                        ? round(($product->total_discount / $product->total_subtotal) * 100, 2)
+                        : 0,
+                    'revenue_per_unit' => $product->total_sold > 0
+                        ? (float) $product->total_item_revenue / $product->total_sold
+                        : 0,
                 ];
             });
 
-        // Calculate totals
+        // ✅ FIXED: Calculate totals - now matches index dashboard
         $total_units_sold = $top_products->sum('total_sold');
         $total_revenue = $top_products->sum('total_revenue');
+        $total_subtotal = $top_products->sum('total_subtotal');
+        $total_discount = $top_products->sum('total_discount');
+        $total_tax = $top_products->sum('total_tax');
         $order_count = $top_products->sum('order_count');
+
+        // ✅ Calculate additional metrics
+        $avg_discount_rate = $total_subtotal > 0
+            ? round(($total_discount / $total_subtotal) * 100, 2)
+            : 0;
+
+        $avg_revenue_per_order = $order_count > 0
+            ? $total_revenue / $order_count
+            : 0;
+
+        // ✅ VERIFY: Get actual order totals for comparison
+        $verification = Order::whereBetween('created_at', [$date_range['start'], $date_range['end']])
+            ->whereIn('status_key_code', ['ORDER_DELIVERED', 'ORDER_SHIPPED', 'ORDER_PROCESSING', 'ORDER_COMPLETED'])
+            ->selectRaw('
+                COUNT(*) as order_count,
+                SUM(total_amount) as total_order_amount,
+                SUM(subtotal) as total_order_subtotal,
+                SUM(discount_amount) as total_order_discount,
+                SUM(tax_amount) as total_order_tax,
+                SUM(shipping_amount) as total_order_shipping
+            ')
+            ->first();
 
         return view('admin.reports.products.top-selling', compact(
             'period',
@@ -450,7 +525,13 @@ class ReportsController extends Controller
             'top_products',
             'total_units_sold',
             'total_revenue',
-            'order_count'
+            'total_subtotal',
+            'total_discount',
+            'total_tax',
+            'order_count',
+            'avg_discount_rate',
+            'avg_revenue_per_order',
+            'verification' // ✅ NEW: For debugging/comparison
         ));
     }
 

@@ -658,13 +658,13 @@
                                     <i class="bi bi-three-dots"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item" href="#"><i class="bi bi-eye"></i> View Details</a></li>
-                                    <li><a class="dropdown-item" href="#"><i class="bi bi-pencil"></i> Edit Product</a></li>
-                                    <li><a class="dropdown-item" href="#"><i class="bi bi-clock-history"></i> View History</a></li>
+                                    <li><a class="dropdown-item" target="_blank" href="{{ route('admin.products.show', $product->id) }}"><i class="bi bi-eye"></i> View Details</a></li>
+                                    <li><a class="dropdown-item" target="_blank" href="{{ route('admin.products.edit', $product->id) }}"><i class="bi bi-pencil"></i> Edit Product</a></li>
+                                    {{-- <li><a class="dropdown-item" href="#"><i class="bi bi-clock-history"></i> View History</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     @if($status == 'low_stock' || $status == 'out_of_stock')
                                     <li><a class="dropdown-item text-brand" href="#"><i class="bi bi-plus-circle"></i> Restock</a></li>
-                                    @endif
+                                    @endif --}}
                                 </ul>
                             </div>
                         </td>

@@ -494,7 +494,18 @@
                     <i class="bi bi-cash-stack"></i>
                 </div>
                 <div class="value">{{ store_currency_symbol() }}{{ number_format($total_revenue, 2) }}</div>
-                <div class="label">Total Revenue</div>
+                <div class="label">Total Revenue (Products)</div>
+                <small class="text-muted d-block mt-1">Excludes shipping</small>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="summary-card">
+                <div class="icon bg-danger bg-opacity-10 text-danger">
+                    <i class="bi bi-percent"></i>
+                </div>
+                <div class="value">{{ store_currency_symbol() }}{{ number_format($total_discount, 2) }}</div>
+                <div class="label">Total Discounts</div>
+                <small class="text-muted d-block mt-1">{{ $avg_discount_rate }}% avg rate</small>
             </div>
         </div>
         <div class="col-xl-3 col-md-6 mb-3">
@@ -504,18 +515,42 @@
                 </div>
                 <div class="value">{{ number_format($order_count) }}</div>
                 <div class="label">Total Orders</div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="summary-card">
-                <div class="icon bg-warning bg-opacity-10 text-warning">
-                    <i class="bi bi-graph-up"></i>
-                </div>
-                <div class="value">{{ store_currency_symbol() }}{{ $total_units_sold > 0 ? number_format($total_revenue / $total_units_sold, 2) : '0.00' }}</div>
-                <div class="label">Avg Price/Unit</div>
+                <small class="text-muted d-block mt-1">{{ store_currency_symbol() }}{{ number_format($avg_revenue_per_order, 2) }} avg</small>
             </div>
         </div>
     </div>
+    <!-- Revenue Reconciliation -->
+    @if(isset($verification))
+    <div class="alert alert-info border-info mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h6 class="alert-heading mb-2">
+                    <i class="bi bi-info-circle-fill"></i> Revenue Breakdown
+                </h6>
+                <div class="row small">
+                    <div class="col-md-4">
+                        <strong>Product Revenue:</strong><br>
+                        <span class="text-success fs-5">{{ store_currency_symbol() }}{{ number_format($total_revenue, 2) }}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Shipping Revenue:</strong><br>
+                        <span class="text-primary fs-5">{{ store_currency_symbol() }}{{ number_format($verification->total_order_shipping, 2) }}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Total Order Revenue:</strong><br>
+                        <span class="text-brand fs-5">{{ store_currency_symbol() }}{{ number_format($verification->total_order_amount, 2) }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <small class="text-muted">
+                    <i class="bi bi-calculator"></i>
+                    Product Revenue + Shipping = Total Revenue
+                </small>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- Winner's Podium (Top 3) -->
     @if(count($top_products) >= 3)
@@ -619,7 +654,7 @@
                             <span class="label">Orders</span>
                         </div>
                         <div class="performance-item">
-                            <span class="value">{{ store_currency_symbol() }}{{ $product->total_sold > 0 ? number_format($product->total_revenue / $product->total_sold, 2) : '0.00' }}</span>
+                            <span class="value">{{ store_currency_symbol() }}{{ number_format($product->revenue_per_unit, 2) }}</span>
                             <span class="label">Per Unit</span>
                         </div>
                         <div class="performance-item">
@@ -627,9 +662,21 @@
                             <span class="label">Of Total</span>
                         </div>
                         <div class="performance-item">
-                            <span class="value">{{ $product->avg_price ? store_currency_symbol() . number_format($product->avg_price, 2) : 'N/A' }}</span>
+                            <span class="value">{{ store_currency_symbol() }}{{ number_format($product->avg_price, 2) }}</span>
                             <span class="label">Avg Price</span>
                         </div>
+                        @if($product->has_variants)
+                        <div class="performance-item" style="grid-column: span 2;">
+                            <span class="badge bg-info">{{ $product->variant_count }} Variants</span>
+                            <span class="label">V: {{ number_format($product->variant_sales) }} | S: {{ number_format($product->simple_sales) }}</span>
+                        </div>
+                        @endif
+                        @if($product->discount_rate > 0)
+                        <div class="performance-item" style="grid-column: span 2;">
+                            <span class="value text-danger">-{{ store_currency_symbol() }}{{ number_format($product->total_discount, 2) }}</span>
+                            <span class="label">Discount ({{ $product->discount_rate }}%)</span>
+                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -668,6 +715,9 @@
                     <th>Category</th>
                     <th class="text-center">Units Sold</th>
                     <th class="text-end">Revenue</th>
+                    <th class="text-end">Subtotal</th>
+                    <th class="text-end">Discount</th>
+                    <th class="text-end">Tax</th>
                     <th class="text-center">% of Total</th>
                     <th class="text-center">Orders</th>
                     <th class="text-end">Avg Price</th>
@@ -686,12 +736,18 @@
                         <div class="d-flex align-items-center">
                             @if($product->main_image)
                             <img src="{{ asset('storage/' . $product->main_image) }}"
-                                 alt="{{ $product->name }}"
-                                 class="rounded me-2"
-                                 style="width: 40px; height: 40px; object-fit: cover;"
-                                 onerror="this.src='{{ asset('images/placeholders/not_availble.jpg') }}'">
+                                alt="{{ $product->name }}"
+                                class="rounded me-2"
+                                style="width: 40px; height: 40px; object-fit: cover;"
+                                onerror="this.src='{{ asset('images/placeholders/not_availble.jpg') }}'">
                             @endif
-                            <strong>{{ $product->name }}</strong>
+                            <div>
+                                <strong>{{ $product->name }}</strong>
+                                @if($product->has_variants)
+                                <br>
+                                <span class="badge bg-info badge-sm">{{ $product->variant_count }} variants</span>
+                                @endif
+                            </div>
                         </div>
                     </td>
                     <td><code>{{ $product->sku }}</code></td>
@@ -704,9 +760,30 @@
                     </td>
                     <td class="text-center">
                         <span class="badge bg-success fs-6">{{ number_format($product->total_sold) }}</span>
+                        @if($product->has_variants)
+                        <br>
+                        <small class="text-muted">V:{{ number_format($product->variant_sales) }} S:{{ number_format($product->simple_sales) }}</small>
+                        @endif
                     </td>
                     <td class="text-end">
                         <strong class="text-brand">{{ store_currency_symbol() }}{{ number_format($product->total_revenue, 2) }}</strong>
+                    </td>
+                    <td class="text-end">
+                        <span class="text-muted">{{ store_currency_symbol() }}{{ number_format($product->total_subtotal, 2) }}</span>
+                    </td>
+                    <td class="text-end">
+                        @if($product->total_discount > 0)
+                        <span class="text-danger">
+                            -{{ store_currency_symbol() }}{{ number_format($product->total_discount, 2) }}
+                        </span>
+                        <br>
+                        <small class="text-muted">({{ $product->discount_rate }}%)</small>
+                        @else
+                        <span class="text-muted">—</span>
+                        @endif
+                    </td>
+                    <td class="text-end">
+                        <span class="text-muted">{{ store_currency_symbol() }}{{ number_format($product->total_tax, 2) }}</span>
                     </td>
                     <td class="text-center">
                         <span class="badge bg-primary">
@@ -715,9 +792,11 @@
                     </td>
                     <td class="text-center">
                         <span class="badge bg-info">{{ number_format($product->order_count) }}</span>
+                        <br>
+                        <small class="text-muted">{{ store_currency_symbol() }}{{ number_format($product->avg_order_value, 2) }} AOV</small>
                     </td>
                     <td class="text-end">
-                        {{ $product->avg_price ? store_currency_symbol() . number_format($product->avg_price, 2) : 'N/A' }}
+                        {{ store_currency_symbol() }}{{ number_format($product->avg_price, 2) }}
                     </td>
                 </tr>
                 @endforeach
@@ -728,6 +807,15 @@
                     <th class="text-center">{{ number_format($total_units_sold) }}</th>
                     <th class="text-end">
                         <strong class="text-brand">{{ store_currency_symbol() }}{{ number_format($total_revenue, 2) }}</strong>
+                    </th>
+                    <th class="text-end">
+                        <strong>{{ store_currency_symbol() }}{{ number_format($total_subtotal, 2) }}</strong>
+                    </th>
+                    <th class="text-end">
+                        <strong class="text-danger">-{{ store_currency_symbol() }}{{ number_format($total_discount, 2) }}</strong>
+                    </th>
+                    <th class="text-end">
+                        <strong>{{ store_currency_symbol() }}{{ number_format($total_tax, 2) }}</strong>
                     </th>
                     <th class="text-center">100%</th>
                     <th class="text-center">{{ number_format($order_count) }}</th>
@@ -780,31 +868,48 @@ document.addEventListener('DOMContentLoaded', function() {
             type: 'bar',
             data: {
                 labels: products.map(p => p.name.length > 25 ? p.name.substring(0, 25) + '...' : p.name),
-                datasets: [{
-                    label: 'Units Sold',
-                    data: products.map(p => p.total_sold),
-                    backgroundColor: products.map((_, index) => {
-                        if (index === 0) return '#ffd700';
-                        if (index === 1) return '#c0c0c0';
-                        if (index === 2) return '#cd7f32';
-                        return '#5B914C';
-                    }),
-                    borderColor: products.map((_, index) => {
-                        if (index === 0) return '#daa520';
-                        if (index === 1) return '#a9a9a9';
-                        if (index === 2) return '#a0522d';
-                        return '#4a7a3d';
-                    }),
-                    borderWidth: 2,
-                    borderRadius: 8
-                }]
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: products.map(p => p.total_revenue),
+                        backgroundColor: products.map((_, index) => {
+                            if (index === 0) return 'rgba(255, 215, 0, 0.8)';
+                            if (index === 1) return 'rgba(192, 192, 192, 0.8)';
+                            if (index === 2) return 'rgba(205, 127, 50, 0.8)';
+                            return 'rgba(91, 145, 76, 0.8)';
+                        }),
+                        borderColor: products.map((_, index) => {
+                            if (index === 0) return '#daa520';
+                            if (index === 1) return '#a9a9a9';
+                            if (index === 2) return '#a0522d';
+                            return '#4a7a3d';
+                        }),
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Units Sold',
+                        data: products.map(p => p.total_sold),
+                        backgroundColor: 'rgba(13, 110, 253, 0.5)',
+                        borderColor: '#0d6efd',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        yAxisID: 'y1'
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
                 plugins: {
                     legend: {
-                        display: false
+                        display: true,
+                        position: 'top'
                     },
                     tooltip: {
                         backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -812,21 +917,52 @@ document.addEventListener('DOMContentLoaded', function() {
                         callbacks: {
                             label: function(context) {
                                 const product = products[context.dataIndex];
-                                return [
-                                    'Units Sold: ' + context.parsed.y.toLocaleString(),
-                                    'Revenue: {{ store_currency_symbol() }}' + product.total_revenue.toLocaleString('en-US', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    }),
-                                    'Orders: ' + product.order_count.toLocaleString()
-                                ];
+                                const label = context.dataset.label || '';
+
+                                if (label === 'Revenue') {
+                                    return [
+                                        'Revenue: {{ store_currency_symbol() }}' + product.total_revenue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+                                        'Subtotal: {{ store_currency_symbol() }}' + product.total_subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+                                        'Discount: -{{ store_currency_symbol() }}' + product.total_discount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+                                        'Tax: {{ store_currency_symbol() }}' + product.total_tax.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                                    ];
+                                } else {
+                                    return [
+                                        'Units Sold: ' + product.total_sold.toLocaleString(),
+                                        'Orders: ' + product.order_count.toLocaleString(),
+                                        'Avg Price: {{ store_currency_symbol() }}' + product.avg_price.toFixed(2)
+                                    ];
+                                }
                             }
                         }
                     }
                 },
                 scales: {
                     y: {
-                        beginAtZero: true,
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Revenue ({{ store_currency_symbol() }})'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '{{ store_currency_symbol() }}' + value.toLocaleString();
+                            }
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Units Sold'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
                         ticks: {
                             callback: function(value) {
                                 return value.toLocaleString();
