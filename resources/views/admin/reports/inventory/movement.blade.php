@@ -1,4 +1,4 @@
-{{-- resources/views/admin/reports/inventory/movements.blade.php --}}
+{{-- resources/views/admin/reports/inventory/movement.blade.php --}}
 @extends('admin.layouts.app')
 
 @section('title', 'Inventory Movements - Coffee Admin')
@@ -380,6 +380,16 @@
         .movement-timeline { padding-left: 30px; }
         .movement-details { grid-template-columns: 1fr; }
     }
+.variant-badge {
+        display: inline-block;
+        padding: 3px 8px;
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+        border-radius: 10px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-left: 5px;
+    }
 </style>
 @endpush
 
@@ -408,14 +418,14 @@
                 <i class="bi bi-download"></i> Export
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-pdf"></i> Export to PDF</a></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-excel"></i> Export to Excel</a></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-csv"></i> Export to CSV</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportMovements('pdf')"><i class="bi bi-file-pdf"></i> Export to PDF</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportMovements('excel')"><i class="bi bi-file-excel"></i> Export to Excel</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportMovements('csv')"><i class="bi bi-file-csv"></i> Export to CSV</a></li>
             </ul>
         </div>
     </div>
 
-    <!-- Movement Header Summary -->
+    <!-- ✅ UPDATED: Movement Header Summary with Live Stats -->
     <div class="movement-header">
         <div class="row">
             <div class="col-md-3 mb-3">
@@ -423,7 +433,7 @@
                     <div class="icon">
                         <i class="bi bi-clock-history"></i>
                     </div>
-                    <div class="value">{{ number_format($total_movements) }}</div>
+                    <div class="value" id="total_movements">0</div>
                     <div class="label">Total Movements</div>
                 </div>
             </div>
@@ -432,7 +442,7 @@
                     <div class="icon">
                         <i class="bi bi-arrow-up-circle"></i>
                     </div>
-                    <div class="value">{{ number_format($total_in) }}</div>
+                    <div class="value" id="stock_in_count">0</div>
                     <div class="label">Stock In</div>
                 </div>
             </div>
@@ -441,7 +451,7 @@
                     <div class="icon">
                         <i class="bi bi-arrow-down-circle"></i>
                     </div>
-                    <div class="value">{{ number_format($total_out) }}</div>
+                    <div class="value" id="stock_out_count">0</div>
                     <div class="label">Stock Out</div>
                 </div>
             </div>
@@ -450,257 +460,104 @@
                     <div class="icon">
                         <i class="bi bi-activity"></i>
                     </div>
-                    <div class="value">{{ number_format($net_change) }}</div>
+                    <div class="value" id="net_change">0</div>
                     <div class="label">Net Change</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Movement Statistics -->
-    <div class="movement-stats-grid">
-        <div class="stat-card in">
-            <div class="stat-icon">
-                <i class="bi bi-plus-circle"></i>
-            </div>
-            <div class="stat-value">{{ number_format($stock_in_quantity) }}</div>
-            <div class="stat-label">Units Added</div>
-        </div>
-        <div class="stat-card out">
-            <div class="stat-icon">
-                <i class="bi bi-dash-circle"></i>
-            </div>
-            <div class="stat-value">{{ number_format($stock_out_quantity) }}</div>
-            <div class="stat-label">Units Removed</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #fff3cd; color: #856404;">
-                <i class="bi bi-wrench"></i>
-            </div>
-            <div class="stat-value">{{ number_format($adjustments_count) }}</div>
-            <div class="stat-label">Adjustments Made</div>
-        </div>
-    </div>
-
-    <!-- Filter Panel -->
+    <!-- ✅ UPDATED: Filter Panel -->
     <div class="filter-panel no-print">
-        <form method="GET" action="{{ route('admin.reports.inventory.movement') }}">
-            <div class="row align-items-end">
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">
-                        <i class="bi bi-calendar-range"></i> Start Date
-                    </label>
-                    <input type="date" class="form-control" name="start_date"
-                           value="{{ $start_date->format('Y-m-d') }}" required>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">
-                        <i class="bi bi-calendar-range"></i> End Date
-                    </label>
-                    <input type="date" class="form-control" name="end_date"
-                           value="{{ $end_date->format('Y-m-d') }}" required>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">
-                        <i class="bi bi-tag"></i> Category
-                    </label>
-                    <select class="form-select" name="category">
-                        <option value="">All Categories</option>
-                        @if(isset($movement_categories))
-                        @foreach($movement_categories as $key => $label)
-                        <option value="{{ $key }}" {{ request('category') == $key ? 'selected' : '' }}>
-                            {{ $label }}
-                        </option>
-                        @endforeach
-                        @endif
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">
-                        <i class="bi bi-building"></i> Warehouse
-                    </label>
-                    <select class="form-select" name="warehouse_id">
-                        <option value="">All Warehouses</option>
-                        @if(isset($warehouses))
-                        @foreach($warehouses as $warehouse)
-                        <option value="{{ $warehouse->id }}" {{ request('warehouse_id') == $warehouse->id ? 'selected' : '' }}>
-                            {{ $warehouse->name }}
-                        </option>
-                        @endforeach
-                        @endif
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">
-                        <i class="bi bi-search"></i> Product
-                    </label>
-                    <input type="text" class="form-control" name="product"
-                           placeholder="Name or SKU..."
-                           value="{{ request('product') }}">
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-brand w-100">
-                        <i class="bi bi-funnel"></i> Filter
-                    </button>
-                </div>
+        <div class="row align-items-end mb-3">
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-calendar-range"></i> Start Date
+                </label>
+                <input type="date" class="form-control" id="date_from"
+                       value="{{ now()->subDays(30)->format('Y-m-d') }}">
             </div>
-            <div class="mt-3 text-muted small">
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-calendar-range"></i> End Date
+                </label>
+                <input type="date" class="form-control" id="date_to"
+                       value="{{ now()->format('Y-m-d') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-tag"></i> Type
+                </label>
+                <select class="form-select" id="type_filter">
+                    <option value="">All Types</option>
+                    <option value="adjustment">Adjustment</option>
+                    <option value="sale">Sale</option>
+                    <option value="purchase">Purchase</option>
+                    <option value="return">Return</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="damage">Damage</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-building"></i> Warehouse
+                </label>
+                <select class="form-select" id="warehouse_filter">
+                    <option value="">All Warehouses</option>
+                    @foreach($warehouses as $warehouse)
+                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-search"></i> Search
+                </label>
+                <input type="text" class="form-control" id="search_input"
+                       placeholder="Product, SKU, user...">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-brand w-100" onclick="applyFilters()">
+                    <i class="bi bi-funnel"></i> Apply
+                </button>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="text-muted small">
                 <i class="bi bi-info-circle"></i>
-                Showing movements from <strong>{{ $start_date->format('M d, Y') }}</strong>
-                to <strong>{{ $end_date->format('M d, Y') }}</strong>
-                @if(request('category'))
-                | Category: <strong class="text-capitalize">{{ request('category') }}</strong>
-                @endif
-                @if(request('warehouse_id') && isset($warehouses))
-                @php
-                    $selectedWarehouse = $warehouses->firstWhere('id', request('warehouse_id'));
-                @endphp
-                | Warehouse: <strong>{{ $selectedWarehouse->name ?? 'Unknown' }}</strong>
-                @endif
-                @if(request('product'))
-                | Search: <strong>"{{ request('product') }}"</strong>
-                @endif
+                Showing <strong id="record_count">0</strong> movements
             </div>
-        </form>
-    </div>
-
-    <!-- Movement Trends Chart -->
-    @if($movements->count() > 0)
-    <div class="chart-section">
-        <h5 class="mb-4">
-            <i class="bi bi-graph-up text-brand"></i> Movement Trends
-        </h5>
-        <div class="chart-container">
-            <canvas id="movementTrendsChart"></canvas>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                <i class="bi bi-x-circle"></i> Clear Filters
+            </button>
         </div>
     </div>
-    @endif
 
-    <!-- Movements Timeline -->
-    @if($movements->count() > 0)
-    <div class="timeline-container">
-        <h5 class="mb-4">
-            <i class="bi bi-clock-history text-brand"></i> Movement History
-            <span class="badge bg-brand ms-2">{{ $movements->count() }} Records</span>
-        </h5>
-
-        <div class="movement-timeline">
-            @foreach($movements as $movement)
-            @php
-                // Use model methods to determine type
-                $movementType = $movement->isIncrease() ? 'in' : ($movement->isDecrease() ? 'out' : 'adjustment');
-                $quantityClass = $movement->quantity >= 0 ? 'positive' : 'negative';
-            @endphp
-            <div class="movement-item">
-                <div class="movement-dot {{ $movementType }}"></div>
-
-                <div class="movement-card {{ $movementType }}">
-                    <!-- Movement Header -->
-                    <div class="movement-header-row">
-                        <div>
-                            {!! $movement->getTypeBadge() !!}
-                            <span class="date-badge ms-2">
-                                <i class="bi bi-calendar"></i> {{ $movement->created_at->format('M d, Y H:i') }}
-                            </span>
-                        </div>
-                        <div class="movement-quantity {{ $quantityClass }}">
-                            {{ $movement->getFormattedQuantity() }}
-                        </div>
-                    </div>
-
-                    <!-- Product Info -->
-                    <div class="product-info-inline">
-                        @if($movement->product && $movement->product->main_image)
-                        <img src="{{ asset('storage/' . $movement->product->main_image) }}"
-                             alt="{{ $movement->product->name }}"
-                             class="product-thumb"
-                             onerror="this.src='{{ asset('images/placeholders/not_availble.jpg') }}'">
-                        @else
-                        <div class="product-thumb bg-light d-flex align-items-center justify-content-center">
-                            <i class="bi {{ $movement->getTypeIcon() }} text-muted"></i>
-                        </div>
-                        @endif
-
-                        <div class="product-details">
-                            <div class="product-name-inline">{{ $movement->product->name ?? 'Unknown Product' }}</div>
-                            <div class="product-sku-inline">SKU: {{ $movement->product->sku ?? 'N/A' }}</div>
-                            @if($movement->warehouse)
-                            <small class="text-muted">
-                                <i class="bi bi-building"></i> {{ $movement->warehouse->name }}
-                            </small>
-                            @endif
-                        </div>
-                    </div>
-
-                    <!-- Movement Details -->
-                    <div class="movement-details">
-                        <div class="detail-item">
-                            <span class="detail-value">{{ number_format($movement->previous_quantity) }}</span>
-                            <span class="detail-label">Before</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-value">{{ number_format($movement->new_quantity) }}</span>
-                            <span class="detail-label">After</span>
-                        </div>
-                        @if($movement->reference_type && $movement->reference_id)
-                        <div class="detail-item">
-                            <span class="detail-value">
-                                <a href="#" class="reference-link">
-                                    #{{ $movement->reference_id }}
-                                </a>
-                            </span>
-                            <span class="detail-label">{{ ucfirst($movement->reference_type) }}</span>
-                        </div>
-                        @endif
-                        @if($movement->creator)
-                        <div class="detail-item">
-                            <span class="detail-value">{{ $movement->creator->name }}</span>
-                            <span class="detail-label">By User</span>
-                        </div>
-                        @endif
-                    </div>
-
-                    <!-- Transfer Information -->
-                    @if($movement->type == 'transfer' && $movement->fromWarehouse && $movement->toWarehouse)
-                    <div class="alert alert-info mt-3 mb-0 py-2">
-                        <small>
-                            <i class="bi bi-arrow-left-right"></i>
-                            <strong>Transfer:</strong>
-                            {{ $movement->fromWarehouse->name }}
-                            <i class="bi bi-arrow-right"></i>
-                            {{ $movement->toWarehouse->name }}
-                        </small>
-                    </div>
-                    @endif
-
-                    <!-- Reason -->
-                    @if($movement->reason)
-                    <div class="alert alert-secondary mt-3 mb-0 py-2">
-                        <small>
-                            <i class="bi bi-info-circle"></i>
-                            <strong>Reason:</strong> {{ $movement->reason }}
-                        </small>
-                    </div>
-                    @endif
-
-                    <!-- Notes -->
-                    @if($movement->notes)
-                    <div class="notes-box">
-                        <i class="bi bi-sticky"></i> <strong>Notes:</strong> {{ $movement->notes }}
-                    </div>
-                    @endif
-                </div>
+    <!-- ✅ NEW: DataTable View -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="movementsTable" class="table table-hover" style="width:100%">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Product</th>
+                            <th>Type</th>
+                            <th>Warehouse</th>
+                            <th class="text-center">Quantity</th>
+                            <th class="text-center">Before → After</th>
+                            <th>By User</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Populated by DataTables -->
+                    </tbody>
+                </table>
             </div>
-            @endforeach
         </div>
     </div>
-    @else
-    <div class="empty-state">
-        <i class="bi bi-inbox"></i>
-        <h5>No Movements Found</h5>
-        <p class="text-muted">No inventory movements recorded for the selected filters.</p>
-    </div>
-    @endif
 
     <!-- Info Footer -->
     <div class="alert alert-light border mt-4">
@@ -709,21 +566,21 @@
                 <i class="bi bi-clock-history text-primary fs-3 mb-2"></i>
                 <h6 class="fw-bold">Complete History</h6>
                 <p class="text-muted small mb-0">
-                    Every stock movement is tracked with timestamp, user, and reason.
+                    Every stock movement is tracked with timestamp, user, and reason including variants.
                 </p>
             </div>
             <div class="col-md-4 text-center border-start border-end">
                 <i class="bi bi-shield-check text-success fs-3 mb-2"></i>
                 <h6 class="fw-bold">Audit Trail</h6>
                 <p class="text-muted small mb-0">
-                    Maintain compliance with complete inventory audit trails.
+                    Maintain compliance with complete inventory audit trails for products and variants.
                 </p>
             </div>
             <div class="col-md-4 text-center">
-                <i class="bi bi-graph-up-arrow text-warning fs-3 mb-2"></i>
-                <h6 class="fw-bold">Trend Analysis</h6>
+                <i class="bi bi-layers text-info fs-3 mb-2"></i>
+                <h6 class="fw-bold">Variant Support</h6>
                 <p class="text-muted small mb-0">
-                    Identify patterns in stock movements to optimize inventory.
+                    Track movements for individual product variants separately.
                 </p>
             </div>
         </div>
@@ -732,87 +589,184 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const chartCtx = document.getElementById('movementTrendsChart');
-    if (chartCtx) {
-        // Sample data - would be populated from backend
-        const trendData = @json($movement_trends ?? []);
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 
-        new Chart(chartCtx, {
-            type: 'line',
-            data: {
-                labels: trendData.map(d => d.date),
-                datasets: [
-                    {
-                        label: 'Stock In',
-                        data: trendData.map(d => d.stock_in),
-                        borderColor: '#28a745',
-                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4
-                    },
-                    {
-                        label: 'Stock Out',
-                        data: trendData.map(d => d.stock_out),
-                        borderColor: '#dc3545',
-                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4
-                    },
-                    {
-                        label: 'Net Change',
-                        data: trendData.map(d => d.net_change),
-                        borderColor: '#5B914C',
-                        backgroundColor: 'rgba(91, 145, 76, 0.1)',
-                        borderWidth: 3,
-                        fill: false,
-                        tension: 0.4,
-                        borderDash: [5, 5]
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 20
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        padding: 12,
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': ' + context.parsed.y + ' units';
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return value + ' units';
-                            }
-                        }
-                    }
-                }
+<script>
+let movementsTable;
+
+$(document).ready(function() {
+    // ✅ Load initial statistics
+    loadStatistics();
+
+    // ✅ Initialize DataTable
+    movementsTable = $('#movementsTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: "{{ route('admin.reports.inventory.movement') }}",
+            data: function(d) {
+                d.date_from = $('#date_from').val();
+                d.date_to = $('#date_to').val();
+                d.type = $('#type_filter').val();
+                d.warehouse_id = $('#warehouse_filter').val();
+                d.search = $('#search_input').val();
             }
-        });
-    }
+        },
+        columns: [
+            {
+                data: 'created_info',
+                name: 'created_at',
+                width: '12%'
+            },
+            {
+                data: 'product_info',
+                name: 'product_info',
+                orderable: false,
+                searchable: false,
+                width: '25%'
+            },
+            {
+                data: 'type_badge',
+                name: 'type',
+                orderable: false,
+                width: '10%'
+            },
+            {
+                data: 'warehouse_info',
+                name: 'warehouse_info',
+                orderable: false,
+                width: '15%'
+            },
+            {
+                data: 'quantity_change',
+                name: 'quantity',
+                className: 'text-center',
+                width: '8%'
+            },
+            {
+                data: 'stock_levels',
+                name: 'stock_levels',
+                className: 'text-center',
+                orderable: false,
+                width: '12%'
+            },
+            {
+                data: 'created_info',
+                name: 'creator',
+                orderable: false,
+                render: function(data, type, row) {
+                    // Extract user name from created_info HTML
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = data;
+                    const userElement = tempDiv.querySelector('.text-muted');
+                    return userElement ? userElement.textContent : 'System';
+                },
+                width: '10%'
+            },
+            {
+                data: 'reason',
+                name: 'reason',
+                orderable: false,
+                render: function(data, type, row) {
+                    if (!data || data === 'null') return '<span class="text-muted">—</span>';
+                    return '<small>' + data + '</small>';
+                },
+                width: '15%'
+            }
+        ],
+        order: [[0, 'desc']], // Sort by date descending
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        language: {
+            emptyTable: "No movements found",
+            info: "Showing _START_ to _END_ of _TOTAL_ movements",
+            infoEmpty: "Showing 0 to 0 of 0 movements",
+            infoFiltered: "(filtered from _MAX_ total movements)",
+            lengthMenu: "Show _MENU_ movements",
+            loadingRecords: "Loading...",
+            processing: '<div class="spinner-border text-brand" role="status"><span class="visually-hidden">Loading...</span></div>',
+            search: "Search:",
+            zeroRecords: "No matching movements found"
+        },
+        drawCallback: function(settings) {
+            $('#record_count').text(settings._iRecordsDisplay);
+        }
+    });
+});
+
+// ✅ Load movement statistics
+function loadStatistics() {
+    const params = new URLSearchParams({
+        date_from: $('#date_from').val(),
+        date_to: $('#date_to').val(),
+        type: $('#type_filter').val() || '',
+        warehouse_id: $('#warehouse_filter').val() || ''
+    });
+
+    $.ajax({
+        url: "{{ route('admin.inventory.movement-statistics') }}?" + params.toString(),
+        method: 'GET',
+        success: function(response) {
+            $('#total_movements').text(response.total.toLocaleString());
+            $('#stock_in_count').text(response.added.toLocaleString());
+            $('#stock_out_count').text(response.removed.toLocaleString());
+
+            const netChange = response.net;
+            const netSign = netChange >= 0 ? '+' : '';
+            $('#net_change').text(netSign + netChange.toLocaleString());
+        },
+        error: function(xhr) {
+            console.error('Failed to load statistics:', xhr);
+        }
+    });
+}
+
+// ✅ Apply filters
+function applyFilters() {
+    movementsTable.ajax.reload();
+    loadStatistics();
+}
+
+// ✅ Clear all filters
+function clearFilters() {
+    $('#date_from').val("{{ now()->subDays(30)->format('Y-m-d') }}");
+    $('#date_to').val("{{ now()->format('Y-m-d') }}");
+    $('#type_filter').val('');
+    $('#warehouse_filter').val('');
+    $('#search_input').val('');
+
+    movementsTable.ajax.reload();
+    loadStatistics();
+}
+
+// ✅ Export movements
+function exportMovements(format) {
+    const params = new URLSearchParams({
+        export: format,
+        date_from: $('#date_from').val(),
+        date_to: $('#date_to').val(),
+        type: $('#type_filter').val() || '',
+        warehouse_id: $('#warehouse_filter').val() || '',
+        search: $('#search_input').val() || ''
+    });
+
+    window.open("{{ route('admin.inventory.export-movements') }}?" + params.toString(), '_blank');
+}
+
+// ✅ Search with debounce
+let searchTimeout;
+$('#search_input').on('keyup', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        movementsTable.ajax.reload();
+    }, 500);
+});
+
+// ✅ Filter change handlers
+$('#date_from, #date_to, #type_filter, #warehouse_filter').on('change', function() {
+    applyFilters();
 });
 </script>
 @endpush

@@ -402,7 +402,7 @@
         </div>
     </div>
 
-    <!-- Inventory Dashboard Summary -->
+    <!-- ✅ FIXED: Inventory Dashboard Summary -->
     <div class="inventory-dashboard">
         <div class="row">
             <div class="col-md-3 mb-3">
@@ -410,8 +410,11 @@
                     <div class="icon">
                         <i class="bi bi-boxes"></i>
                     </div>
-                    <div class="value">{{ number_format($total_products) }}</div>
+                    <div class="value">{{ number_format($stats['total_products']) }}</div>
                     <div class="label">Total Products</div>
+                    <small class="mt-2 d-block" style="opacity: 0.8;">
+                        Simple + Variants
+                    </small>
                 </div>
             </div>
             <div class="col-md-3 mb-3">
@@ -419,8 +422,23 @@
                     <div class="icon">
                         <i class="bi bi-stack"></i>
                     </div>
-                    <div class="value">{{ number_format($total_stock_value) }}</div>
+                    <div class="value">{{ number_format($stats['total_quantity']) }}</div>
                     <div class="label">Total Stock Units</div>
+                    <small class="mt-2 d-block" style="opacity: 0.8;">
+                        Across all warehouses
+                    </small>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="dashboard-card">
+                    <div class="icon">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="value">{{ number_format($stats['in_stock']) }}</div>
+                    <div class="label">In Stock Items</div>
+                    <small class="mt-2 d-block" style="opacity: 0.8;">
+                        {{ $stats['in_stock_percentage'] }}% of total
+                    </small>
                 </div>
             </div>
             <div class="col-md-3 mb-3">
@@ -428,54 +446,173 @@
                     <div class="icon">
                         <i class="bi bi-exclamation-triangle"></i>
                     </div>
-                    <div class="value">{{ number_format($low_stock_count) }}</div>
+                    <div class="value">{{ number_format($stats['low_stock']) }}</div>
                     <div class="label">Low Stock Items</div>
+                    <small class="mt-2 d-block" style="opacity: 0.8;">
+                        {{ $stats['low_stock_percentage'] }}% needs attention
+                    </small>
                 </div>
             </div>
+        </div>
+
+        <!-- ✅ NEW: Additional Statistics Row -->
+        <div class="row mt-3">
             <div class="col-md-3 mb-3">
                 <div class="dashboard-card">
                     <div class="icon">
                         <i class="bi bi-x-circle"></i>
                     </div>
-                    <div class="value">{{ number_format($out_of_stock_count) }}</div>
+                    <div class="value">{{ number_format($stats['out_of_stock']) }}</div>
                     <div class="label">Out of Stock</div>
+                    <small class="mt-2 d-block" style="opacity: 0.8;">
+                        {{ $stats['out_of_stock_percentage'] }}% unavailable
+                    </small>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="dashboard-card">
+                    <div class="icon">
+                        <i class="bi bi-currency-dollar"></i>
+                    </div>
+                    <div class="value">{{ store_currency_symbol() }}{{ number_format($stats['total_value'], 0) }}</div>
+                    <div class="label">Total Stock Value</div>
+                    <small class="mt-2 d-block" style="opacity: 0.8;">
+                        At current prices
+                    </small>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="dashboard-card">
+                    <div class="icon">
+                        <i class="bi bi-building"></i>
+                    </div>
+                    <div class="value">{{ number_format($stats['total_warehouses']) }}</div>
+                    <div class="label">Active Warehouses</div>
+                    <small class="mt-2 d-block" style="opacity: 0.8;">
+                        {{ number_format($stats['total_available']) }} units available
+                    </small>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="dashboard-card">
+                    <div class="icon">
+                        <i class="bi bi-lock"></i>
+                    </div>
+                    <div class="value">{{ number_format($stats['total_reserved']) }}</div>
+                    <div class="label">Reserved Stock</div>
+                    <small class="mt-2 d-block" style="opacity: 0.8;">
+                        Pending orders
+                    </small>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Critical Alerts -->
-    @if($critical_alerts->count() > 0 || $low_stock_alerts->count() > 0)
+    <!-- ✅ FIXED: Critical Alerts Section -->
+    @php
+        // Get critical alerts (out of stock)
+        $criticalProducts = \App\Models\Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->where('stock_quantity', '<=', 0)
+            ->whereDoesntHave('warehouseStock', function($q) {
+                $q->where('quantity', '>', 0);
+            })
+            ->with('category')
+            ->take(5)
+            ->get();
+
+        $criticalVariants = \App\Models\ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->where('stock_quantity', '<=', 0)
+            ->whereDoesntHave('warehouseStock', function($q) {
+                $q->where('quantity', '>', 0);
+            })
+            ->with('product.category')
+            ->take(5)
+            ->get();
+
+        // Get low stock alerts
+        $lowStockProducts = \App\Models\Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0)
+            ->with('category')
+            ->take(5)
+            ->get();
+
+        $lowStockVariants = \App\Models\ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0)
+            ->with('product.category')
+            ->take(5)
+            ->get();
+    @endphp
+
+    @if($criticalProducts->count() > 0 || $criticalVariants->count() > 0 || $lowStockProducts->count() > 0 || $lowStockVariants->count() > 0)
     <div class="alert-section">
         <h5 class="mb-4">
             <i class="bi bi-bell-fill text-danger"></i> Inventory Alerts
         </h5>
 
-        @if($critical_alerts->count() > 0)
+        @if($criticalProducts->count() > 0 || $criticalVariants->count() > 0)
         <h6 class="text-danger mb-3">
-            <i class="bi bi-exclamation-octagon-fill"></i> Critical - Out of Stock ({{ $critical_alerts->count() }})
+            <i class="bi bi-exclamation-octagon-fill"></i> Critical - Out of Stock ({{ $criticalProducts->count() + $criticalVariants->count() }})
         </h6>
-        @foreach($critical_alerts->take(5) as $product)
+
+        {{-- Critical Simple Products --}}
+        @foreach($criticalProducts as $product)
         <div class="alert-item critical">
             <div class="alert-icon critical">
                 <i class="bi bi-x-circle-fill"></i>
             </div>
             <div class="flex-grow-1">
                 <strong>{{ $product->name }}</strong>
-                <div class="text-muted small">SKU: {{ $product->sku }} | Stock: {{ $product->stock_quantity }}</div>
+                <div class="text-muted small">
+                    SKU: {{ $product->sku }} |
+                    Stock: {{ $product->stock_quantity }} |
+                    Category: {{ $product->category ? $product->category->title : 'N/A' }}
+                </div>
             </div>
-            <button class="quick-action-btn restock">
+            <a href="{{ route('admin.inventory.adjust') }}?product_id={{ $product->id }}" class="quick-action-btn restock">
                 <i class="bi bi-plus-circle"></i> Restock Now
-            </button>
+            </a>
+        </div>
+        @endforeach
+
+        {{-- Critical Variants --}}
+        @foreach($criticalVariants as $variant)
+        <div class="alert-item critical">
+            <div class="alert-icon critical">
+                <i class="bi bi-x-circle-fill"></i>
+            </div>
+            <div class="flex-grow-1">
+                <strong>{{ $variant->product->name }}</strong>
+                <span class="badge bg-info">{{ $variant->getFullName() }}</span>
+                <div class="text-muted small">
+                    SKU: {{ $variant->sku }} |
+                    Stock: {{ $variant->stock_quantity }} |
+                    Category: {{ $variant->product->category ? $variant->product->category->title : 'N/A' }}
+                </div>
+            </div>
+            <a href="{{ route('admin.inventory.adjust') }}?product_id={{ $variant->product_id }}&variant_id={{ $variant->id }}" class="quick-action-btn restock">
+                <i class="bi bi-plus-circle"></i> Restock Now
+            </a>
         </div>
         @endforeach
         @endif
 
-        @if($low_stock_alerts->count() > 0)
+        @if($lowStockProducts->count() > 0 || $lowStockVariants->count() > 0)
         <h6 class="text-warning mb-3 mt-4">
-            <i class="bi bi-exclamation-triangle-fill"></i> Warning - Low Stock ({{ $low_stock_alerts->count() }})
+            <i class="bi bi-exclamation-triangle-fill"></i> Warning - Low Stock ({{ $lowStockProducts->count() + $lowStockVariants->count() }})
         </h6>
-        @foreach($low_stock_alerts->take(5) as $product)
+
+        {{-- Low Stock Simple Products --}}
+        @foreach($lowStockProducts as $product)
         <div class="alert-item warning">
             <div class="alert-icon warning">
                 <i class="bi bi-exclamation-triangle-fill"></i>
@@ -488,21 +625,44 @@
                     Threshold: {{ $product->low_stock_threshold }}
                 </div>
             </div>
-            <button class="quick-action-btn restock">
+            <a href="{{ route('admin.inventory.adjust') }}?product_id={{ $product->id }}" class="quick-action-btn restock">
                 <i class="bi bi-plus-circle"></i> Restock
-            </button>
+            </a>
+        </div>
+        @endforeach
+
+        {{-- Low Stock Variants --}}
+        @foreach($lowStockVariants as $variant)
+        <div class="alert-item warning">
+            <div class="alert-icon warning">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div class="flex-grow-1">
+                <strong>{{ $variant->product->name }}</strong>
+                <span class="badge bg-info">{{ $variant->getFullName() }}</span>
+                <div class="text-muted small">
+                    SKU: {{ $variant->sku }} |
+                    Current: {{ $variant->stock_quantity }} |
+                    Threshold: {{ $variant->low_stock_threshold }}
+                </div>
+            </div>
+            <a href="{{ route('admin.inventory.adjust') }}?product_id={{ $variant->product_id }}&variant_id={{ $variant->id }}" class="quick-action-btn restock">
+                <i class="bi bi-plus-circle"></i> Restock
+            </a>
         </div>
         @endforeach
         @endif
 
-        @if($critical_alerts->count() > 5 || $low_stock_alerts->count() > 5)
-        <div class="text-center mt-3">
-            <a href="{{ route('admin.reports.inventory.alerts') }}" class="btn btn-outline-brand">
-                View All {{ $critical_alerts->count() + $low_stock_alerts->count() }} Alerts
+        <div class="text-center mt-3 d-none">
+            <a href="{{ route('admin.inventory.low-stock') }}" class="btn btn-outline-brand">
+                View All Low Stock Items
+                <i class="bi bi-arrow-right"></i>
+            </a>
+            <a href="{{ route('admin.inventory.out-of-stock') }}" class="btn btn-outline-danger ms-2">
+                View All Out of Stock Items
                 <i class="bi bi-arrow-right"></i>
             </a>
         </div>
-        @endif
     </div>
     @endif
 
@@ -511,8 +671,8 @@
         <button class="tab-btn active" data-tab="stock-levels">
             <i class="bi bi-bar-chart-line"></i> Stock Levels
         </button>
-        <button class="tab-btn" data-tab="by-category">
-            <i class="bi bi-grid-3x3-gap"></i> By Category
+        <button class="tab-btn" data-tab="by-warehouse">
+            <i class="bi bi-building"></i> By Warehouse
         </button>
         <button class="tab-btn" data-tab="movements">
             <i class="bi bi-arrow-left-right"></i> Recent Movements
@@ -521,214 +681,141 @@
 
     <!-- Tab: Stock Levels -->
     <div class="tab-content active" id="stock-levels">
-        <!-- Filter Section -->
-        <div class="filter-section">
-            <form method="GET" action="{{ route('admin.reports.inventory.index') }}">
-                <div class="row align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold">
-                            <i class="bi bi-funnel"></i> Stock Status
-                        </label>
-                        <select class="form-select" name="status">
-                            <option value="all" {{ request('status') == 'all' ? 'selected' : '' }}>All Products</option>
-                            <option value="in_stock" {{ request('status') == 'in_stock' ? 'selected' : '' }}>In Stock</option>
-                            <option value="low_stock" {{ request('status') == 'low_stock' ? 'selected' : '' }}>Low Stock</option>
-                            <option value="out_of_stock" {{ request('status') == 'out_of_stock' ? 'selected' : '' }}>Out of Stock</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold">
-                            <i class="bi bi-grid-3x3-gap"></i> Category
-                        </label>
-                        <select class="form-select" name="category_id">
-                            <option value="">All Categories</option>
-                            @foreach($categories as $category)
-                            <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
-                                {{ $category->title }}
-                            </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold">
-                            <i class="bi bi-search"></i> Search
-                        </label>
-                        <input type="text" class="form-control" name="search"
-                               placeholder="Product name or SKU..."
-                               value="{{ request('search') }}">
-                    </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-brand w-100">
-                            <i class="bi bi-funnel"></i> Apply Filter
-                        </button>
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            <strong>Note:</strong> This overview shows aggregated stock across all warehouses.
+            For detailed warehouse-specific inventory, visit
+            <a href="{{ route('admin.reports.inventory.stock-levels') }}" class="alert-link">Stock Levels Report</a> or
+            <a href="{{ route('admin.inventory.index') }}" class="alert-link">Inventory Management</a>.
+        </div>
+
+        <!-- ✅ NEW: Quick Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card border-success">
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                        <h3 class="mt-2">{{ number_format($stats['in_stock']) }}</h3>
+                        <p class="text-muted mb-0">In Stock Items</p>
+                        <small class="text-success">{{ $stats['in_stock_percentage'] }}% of inventory</small>
                     </div>
                 </div>
-            </form>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-warning">
+                    <div class="card-body text-center">
+                        <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
+                        <h3 class="mt-2">{{ number_format($stats['low_stock']) }}</h3>
+                        <p class="text-muted mb-0">Low Stock Alerts</p>
+                        <small class="text-warning">{{ $stats['low_stock_percentage'] }}% needs restock</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-danger">
+                    <div class="card-body text-center">
+                        <i class="bi bi-x-circle-fill text-danger fs-1"></i>
+                        <h3 class="mt-2">{{ number_format($stats['out_of_stock']) }}</h3>
+                        <p class="text-muted mb-0">Out of Stock</p>
+                        <small class="text-danger">{{ $stats['out_of_stock_percentage'] }}% unavailable</small>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Stock Levels Table -->
-        @if($products->count() > 0)
-        <div class="inventory-table">
-            <table class="table mb-0">
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th>SKU</th>
-                        <th>Category</th>
-                        <th class="text-center">Current Stock</th>
-                        <th class="text-center">Threshold</th>
-                        <th>Stock Level</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center no-print">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($products as $product)
-                    @php
-                        $stock_percentage = 100;
-                        if ($product->low_stock_threshold > 0) {
-                            $stock_percentage = ($product->stock_quantity / ($product->low_stock_threshold * 3)) * 100;
-                            $stock_percentage = min($stock_percentage, 100);
-                        }
-
-                        if ($product->stock_quantity <= 0) {
-                            $status = 'out_of_stock';
-                            $status_class = 'critical';
-                            $status_label = 'Out of Stock';
-                        } elseif ($product->stock_quantity <= $product->low_stock_threshold) {
-                            $status = 'low_stock';
-                            $status_class = 'low';
-                            $status_label = 'Low Stock';
-                        } elseif ($stock_percentage < 50) {
-                            $status = 'medium_stock';
-                            $status_class = 'medium';
-                            $status_label = 'In Stock';
-                        } else {
-                            $status = 'in_stock';
-                            $status_class = 'high';
-                            $status_label = 'In Stock';
-                        }
-                    @endphp
-                    <tr>
-                        <td>
-                            <div class="d-flex align-items-center">
-                                @if($product->main_image)
-                                <img src="{{ asset('storage/' . $product->main_image) }}"
-                                     alt="{{ $product->name }}"
-                                     class="product-thumbnail me-3"
-                                     onerror="this.src='{{ asset('images/placeholders/not_availble.jpg') }}'">
-                                @else
-                                <div class="product-thumbnail bg-light d-flex align-items-center justify-content-center me-3">
-                                    <i class="bi bi-box text-muted"></i>
-                                </div>
-                                @endif
-                                <strong>{{ Str::limit($product->name, 30) }}</strong>
-                            </div>
-                        </td>
-                        <td><code>{{ $product->sku }}</code></td>
-                        <td>
-                            @if($product->category)
-                            <span class="badge bg-light text-dark">{{ $product->category->title }}</span>
-                            @else
-                            <span class="text-muted">—</span>
-                            @endif
-                        </td>
-                        <td class="text-center">
-                            <strong class="fs-5">{{ number_format($product->stock_quantity) }}</strong>
-                        </td>
-                        <td class="text-center">
-                            <span class="text-muted">{{ number_format($product->low_stock_threshold) }}</span>
-                        </td>
-                        <td>
-                            <div class="stock-level-bar">
-                                <div class="stock-level-fill {{ $status_class }}"
-                                     style="width: {{ $stock_percentage }}%">
-                                    {{ round($stock_percentage) }}%
-                                </div>
-                            </div>
-                        </td>
-                        <td class="text-center">
-                            <span class="stock-badge {{ str_replace('_', '-', $status) }}">
-                                {{ $status_label }}
-                            </span>
-                        </td>
-                        <td class="text-center no-print">
-                            <div class="btn-group">
-                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                                    <i class="bi bi-three-dots"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item" target="_blank" href="{{ route('admin.products.show', $product->id) }}"><i class="bi bi-eye"></i> View Details</a></li>
-                                    <li><a class="dropdown-item" target="_blank" href="{{ route('admin.products.edit', $product->id) }}"><i class="bi bi-pencil"></i> Edit Product</a></li>
-                                    {{-- <li><a class="dropdown-item" href="#"><i class="bi bi-clock-history"></i> View History</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    @if($status == 'low_stock' || $status == 'out_of_stock')
-                                    <li><a class="dropdown-item text-brand" href="#"><i class="bi bi-plus-circle"></i> Restock</a></li>
-                                    @endif --}}
-                                </ul>
-                            </div>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+        <!-- Quick Links -->
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <a href="{{ route('admin.reports.inventory.stock-levels') }}" class="card text-decoration-none hover-shadow">
+                    <div class="card-body text-center">
+                        <i class="bi bi-bar-chart-line text-brand fs-1 mb-3"></i>
+                        <h5>View Detailed Stock Levels</h5>
+                        <p class="text-muted small mb-0">Complete inventory with warehouse breakdown</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4 mb-3 d-none">
+                <a href="{{ route('admin.inventory.low-stock') }}" class="card text-decoration-none hover-shadow">
+                    <div class="card-body text-center">
+                        <i class="bi bi-exclamation-triangle text-warning fs-1 mb-3"></i>
+                        <h5>Manage Low Stock</h5>
+                        <p class="text-muted small mb-0">Items that need restocking soon</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4 mb-3">
+                <a href="{{ route('admin.inventory.adjust') }}" class="card text-decoration-none hover-shadow">
+                    <div class="card-body text-center">
+                        <i class="bi bi-plus-circle text-success fs-1 mb-3"></i>
+                        <h5>Adjust Stock</h5>
+                        <p class="text-muted small mb-0">Add, reduce, or set stock quantities</p>
+                    </div>
+                </a>
+            </div>
         </div>
-        @else
-        <div class="alert alert-info text-center py-5">
-            <i class="bi bi-inbox fs-1 mb-3"></i>
-            <h5>No Products Found</h5>
-            <p class="mb-0">No products match your current filters.</p>
-        </div>
-        @endif
     </div>
 
-    <!-- Tab: By Category -->
-    <div class="tab-content" id="by-category">
+    <!-- Tab: By Warehouse -->
+    <div class="tab-content" id="by-warehouse">
         <div class="row">
-            @foreach($categories as $index => $category)
+            @foreach($warehouses as $warehouse)
             @php
-                $categoryProducts = $products->where('category_id', $category->id);
-                $categoryStock = $categoryProducts->sum('stock_quantity');
-                $categoryLowStock = $categoryProducts->filter(function($p) {
-                    return $p->stock_quantity <= $p->low_stock_threshold;
-                })->count();
+                $warehouseStock = \App\Models\ProductWarehouseStock::where('warehouse_id', $warehouse->id)->sum('quantity');
+                $warehouseProducts = \App\Models\ProductWarehouseStock::where('warehouse_id', $warehouse->id)
+                    ->where(function($q) {
+                        $q->whereNotNull('variant_id')
+                          ->orWhereHas('product', function($pq) {
+                              $pq->where('has_variants', false);
+                          });
+                    })
+                    ->count();
+                $warehouseLowStock = \App\Models\ProductWarehouseStock::where('warehouse_id', $warehouse->id)
+                    ->where('quantity', '>', 0)
+                    ->where(function($q) {
+                        $q->whereHas('product', function($pq) {
+                            $pq->whereColumn('product_warehouse_stock.quantity', '<=', 'products.low_stock_threshold');
+                        })->orWhereHas('variant', function($vq) {
+                            $vq->whereColumn('product_warehouse_stock.quantity', '<=', 'product_variants.low_stock_threshold');
+                        });
+                    })
+                    ->count();
             @endphp
             <div class="col-md-6 mb-4">
                 <div class="category-breakdown">
                     <div class="d-flex align-items-center mb-3">
                         <div class="category-icon">
-                            @php
-                                $icons = ['cup-hot', 'box-seam', 'gear-fill', 'trophy', 'star-fill'];
-                            @endphp
-                            <i class="bi bi-{{ $icons[$index % count($icons)] }}"></i>
+                            <i class="bi bi-building"></i>
                         </div>
                         <div class="flex-grow-1">
-                            <h5 class="mb-0">{{ $category->title }}</h5>
-                            <small class="text-muted">{{ $categoryProducts->count() }} Products</small>
+                            <h5 class="mb-0">{{ $warehouse->name }}</h5>
+                            <small class="text-muted">
+                                {{ $warehouse->city }}, {{ $warehouse->state }}
+                            </small>
                         </div>
+                        @if($warehouse->is_default)
+                        <span class="badge bg-brand">Default</span>
+                        @endif
                     </div>
 
                     <div class="row text-center mb-3">
                         <div class="col-4">
-                            <div class="fw-bold text-brand fs-4">{{ number_format($categoryStock) }}</div>
+                            <div class="fw-bold text-brand fs-4">{{ number_format($warehouseStock) }}</div>
                             <small class="text-muted">Total Units</small>
                         </div>
                         <div class="col-4">
-                            <div class="fw-bold text-success fs-4">{{ $categoryProducts->count() - $categoryLowStock }}</div>
-                            <small class="text-muted">In Stock</small>
+                            <div class="fw-bold text-success fs-4">{{ number_format($warehouseProducts) }}</div>
+                            <small class="text-muted">Products</small>
                         </div>
                         <div class="col-4">
-                            <div class="fw-bold text-warning fs-4">{{ $categoryLowStock }}</div>
+                            <div class="fw-bold text-warning fs-4">{{ $warehouseLowStock }}</div>
                             <small class="text-muted">Low Stock</small>
                         </div>
                     </div>
 
-                    @if($categoryLowStock > 0)
-                    <div class="alert alert-warning mb-0">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <strong>{{ $categoryLowStock }}</strong> item(s) need restocking
-                    </div>
-                    @endif
+                    <a href="{{ route('admin.inventory.index') }}?warehouse_id={{ $warehouse->id }}"
+                       class="btn btn-outline-brand btn-sm w-100">
+                        <i class="bi bi-eye"></i> View Warehouse Details
+                    </a>
                 </div>
             </div>
             @endforeach
@@ -788,21 +875,20 @@
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', function() {
-        // Remove active class from all tabs
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-        // Add active class to clicked tab
         this.classList.add('active');
         const tabId = this.dataset.tab;
         document.getElementById(tabId).classList.add('active');
     });
 });
 
-// Movement Trends Chart (placeholder data)
+// Movement Trends Chart
 document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('movementTrendsChart');
     if (ctx) {
+        // TODO: Replace with actual data from controller
         new Chart(ctx, {
             type: 'line',
             data: {
@@ -832,9 +918,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        position: 'top',
-                    },
+                    legend: { position: 'top' },
                     tooltip: {
                         backgroundColor: 'rgba(0, 0, 0, 0.8)',
                         padding: 12

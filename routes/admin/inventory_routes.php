@@ -31,6 +31,8 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/movement/statistics', [InventoryController::class, 'getMovementStatistics'])->name('movement.statistics');
         Route::get('/movement/export', [InventoryController::class, 'exportMovements'])->name('movement.export');
         Route::get('/movement/{id}', [InventoryController::class, 'showMovement'])->name('movement.show');
+        Route::get('/export-movements', [InventoryController::class, 'exportMovements'])->name('export-movements');
+        Route::get('/movement-statistics', [InventoryController::class, 'getMovementStatistics'])->name('movement-statistics');
 
         // Low stock products
         Route::get('/low-stock', [InventoryController::class, 'lowStock'])->name('low-stock');

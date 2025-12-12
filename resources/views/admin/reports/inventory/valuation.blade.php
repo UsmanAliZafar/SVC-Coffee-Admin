@@ -354,6 +354,27 @@
         .total-value-display .amount { font-size: 2.5rem; }
         .breakdown-grid { grid-template-columns: 1fr; }
     }
+.variant-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    .warehouse-filter-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        background: #e3f2fd;
+        color: #1976d2;
+        border-radius: 15px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-left: 10px;
+    }
 </style>
 @endpush
 
@@ -382,25 +403,37 @@
                 <i class="bi bi-download"></i> Export
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-pdf"></i> Export to PDF</a></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-excel"></i> Export to Excel</a></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-csv"></i> Export to CSV</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportValuation('pdf')"><i class="bi bi-file-pdf"></i> Export to PDF</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportValuation('excel')"><i class="bi bi-file-excel"></i> Export to Excel</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportValuation('csv')"><i class="bi bi-file-csv"></i> Export to CSV</a></li>
             </ul>
         </div>
     </div>
 
-    <!-- Total Valuation Header -->
+    <!-- ✅ UPDATED: Total Valuation Header -->
     <div class="valuation-header">
         <div class="total-value-display">
             <div class="currency-icon">
-                <i class="bi bi-currency-dollar"></i>
+                {{ store_currency_symbol() }}
             </div>
             <div class="amount">
-                {{ store_currency_symbol() }}{{ number_format($total_valuation, 2) }}
+                {{ store_currency_symbol() }}{{ number_format($valuation['total_value'], 2) }}
             </div>
-            <div class="label">Total Inventory Value</div>
+            <div class="label">
+                Total Inventory Value
+                @if(request('warehouse_id'))
+                    @php
+                        $selectedWarehouse = $warehouses->firstWhere('id', request('warehouse_id'));
+                    @endphp
+                    <span class="warehouse-filter-badge">
+                        <i class="bi bi-building"></i> {{ $selectedWarehouse->name ?? 'Warehouse' }}
+                    </span>
+                @endif
+            </div>
             <small class="d-block mt-2" style="opacity: 0.8;">
-                As of {{ now()->format('F d, Y') }}
+                As of {{ now()->format('F d, Y') }} •
+                {{ number_format($valuation['total_items']) }} Items •
+                {{ number_format($valuation['total_quantity']) }} Units
             </small>
         </div>
     </div>
@@ -409,51 +442,71 @@
     <div class="info-box">
         <i class="bi bi-info-circle-fill"></i>
         <strong>Valuation Method:</strong>
-        This report uses the <strong>Average Cost Method</strong> to calculate inventory value.
-        Value = Current Stock Quantity × Average Unit Cost
+        This report uses the <strong>Current Price Method</strong> to calculate inventory value.
+        Value = Stock Quantity × Current Unit Price
+        <br><small class="mt-2 d-block">
+            <i class="bi bi-layers"></i> Includes both simple products and product variants tracked separately.
+        </small>
     </div>
 
-    <!-- Summary Cards -->
+    <!-- ✅ UPDATED: Summary Cards -->
     <div class="summary-cards">
         <div class="summary-card">
             <div class="icon">
                 <i class="bi bi-boxes"></i>
             </div>
-            <div class="value">{{ number_format($total_products) }}</div>
-            <div class="label">Products Tracked</div>
+            <div class="value">{{ number_format($valuation['total_items']) }}</div>
+            <div class="label">Items Tracked</div>
+            <small class="text-muted d-block mt-1">Products + Variants</small>
         </div>
         <div class="summary-card">
             <div class="icon">
                 <i class="bi bi-stack"></i>
             </div>
-            <div class="value">{{ number_format($total_units) }}</div>
+            <div class="value">{{ number_format($valuation['total_quantity']) }}</div>
             <div class="label">Total Units</div>
+            <small class="text-muted d-block mt-1">In Stock</small>
+        </div>
+        <div class="summary-card">
+            <div class="icon">
+                {{ store_currency_symbol() }}
+            </div>
+            <div class="value">{{ store_currency_symbol() }}{{ number_format($valuation['total_cost'], 2) }}</div>
+            <div class="label">Total Cost</div>
+            <small class="text-muted d-block mt-1">Purchase Value</small>
         </div>
         <div class="summary-card">
             <div class="icon">
                 <i class="bi bi-graph-up"></i>
             </div>
-            <div class="value">{{ store_currency_symbol() }}{{ number_format($average_unit_value, 2) }}</div>
-            <div class="label">Avg Unit Value</div>
-        </div>
-        <div class="summary-card">
-            <div class="icon">
-                <i class="bi bi-building"></i>
-            </div>
-            <div class="value">{{ number_format($categories_count) }}</div>
-            <div class="label">Categories</div>
+            <div class="value">{{ store_currency_symbol() }}{{ number_format($valuation['total_profit'], 2) }}</div>
+            <div class="label">Potential Profit</div>
+            <small class="text-muted d-block mt-1">{{ $valuation['profit_margin'] }}% Margin</small>
         </div>
     </div>
 
-    <!-- Filter Section -->
+    <!-- ✅ UPDATED: Filter Section -->
     <div class="filter-section no-print">
         <form method="GET" action="{{ route('admin.reports.inventory.valuation') }}">
             <div class="row align-items-end">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">
+                        <i class="bi bi-building"></i> Warehouse
+                    </label>
+                    <select class="form-select" name="warehouse_id" onchange="this.form.submit()">
+                        <option value="">All Warehouses</option>
+                        @foreach($warehouses as $warehouse)
+                        <option value="{{ $warehouse->id }}" {{ request('warehouse_id') == $warehouse->id ? 'selected' : '' }}>
+                            {{ $warehouse->name }}
+                        </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label fw-semibold">
                         <i class="bi bi-grid-3x3-gap"></i> Category
                     </label>
-                    <select class="form-select" name="category_id">
+                    <select class="form-select" name="category_id" onchange="this.form.submit()">
                         <option value="">All Categories</option>
                         @foreach($categories as $category)
                         <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
@@ -462,9 +515,9 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label fw-semibold">
-                        <i class="bi bi-search"></i> Search Product
+                        <i class="bi bi-search"></i> Search
                     </label>
                     <input type="text" class="form-control" name="search"
                            placeholder="Product name or SKU..."
@@ -472,7 +525,7 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label fw-semibold">
-                        <i class="bi bi-sort-down"></i> Sort By
+                        <i class="bi bi-sort-down"></i> Sort
                     </label>
                     <select class="form-select" name="sort">
                         <option value="value_desc" {{ request('sort') == 'value_desc' ? 'selected' : '' }}>Value: High to Low</option>
@@ -481,66 +534,65 @@
                         <option value="stock_desc" {{ request('sort') == 'stock_desc' ? 'selected' : '' }}>Stock: High to Low</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <button type="submit" class="btn btn-brand w-100">
-                        <i class="bi bi-funnel"></i> Apply
+                        <i class="bi bi-funnel"></i>
                     </button>
                 </div>
             </div>
+
+            @if(request()->hasAny(['warehouse_id', 'category_id', 'search']))
+            <div class="mt-3">
+                <a href="{{ route('admin.reports.inventory.valuation') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-x-circle"></i> Clear Filters
+                </a>
+            </div>
+            @endif
         </form>
     </div>
 
-    <!-- Valuation by Category -->
-    @if(count($category_valuations) > 0)
-    <div class="chart-section">
-        <h5 class="mb-4">
-            <i class="bi bi-pie-chart text-brand"></i> Valuation by Category
-        </h5>
-        <div class="row">
-            <div class="col-lg-6">
-                <div class="chart-container">
-                    <canvas id="categoryValuationChart"></canvas>
+    <!-- ✅ NEW: Valuation Breakdown -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-success shadow-sm">
+                <div class="card-body text-center">
+                    <i class="bi bi-piggy-bank text-success fs-1 mb-3"></i>
+                    <h6 class="text-muted">Cost Value</h6>
+                    <h3 class="text-success">{{ store_currency_symbol() }}{{ number_format($valuation['total_cost'], 2) }}</h3>
+                    <small class="text-muted">What we paid</small>
                 </div>
             </div>
-            <div class="col-lg-6">
-                @foreach($category_valuations as $index => $cat_val)
-                <div class="category-valuation" style="border-left-color: {{ ['#5B914C', '#0dcaf0', '#0d6efd', '#ffc107', '#dc3545'][$index % 5] }};">
-                    <div class="category-header">
-                        <div class="category-name">
-                            <i class="bi bi-folder"></i> {{ $cat_val['category_name'] }}
-                        </div>
-                        <div class="category-value">
-                            {{ store_currency_symbol() }}{{ number_format($cat_val['total_value'], 2) }}
-                        </div>
-                    </div>
-                    <div class="breakdown-grid">
-                        <div class="breakdown-item">
-                            <span class="value">{{ number_format($cat_val['product_count']) }}</span>
-                            <span class="label">Products</span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span class="value">{{ number_format($cat_val['total_units']) }}</span>
-                            <span class="label">Units</span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span class="value">{{ $total_valuation > 0 ? number_format(($cat_val['total_value'] / $total_valuation) * 100, 1) : 0 }}%</span>
-                            <span class="label">% of Total</span>
-                        </div>
-                    </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-primary shadow-sm">
+                <div class="card-body text-center">
+                    <i class="bi bi-tag text-primary fs-1 mb-3"></i>
+                    <h6 class="text-muted">Retail Value</h6>
+                    <h3 class="text-primary">{{ store_currency_symbol() }}{{ number_format($valuation['total_value'], 2) }}</h3>
+                    <small class="text-muted">What we can sell for</small>
                 </div>
-                @endforeach
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-warning shadow-sm">
+                <div class="card-body text-center">
+                    <i class="bi bi-graph-up-arrow text-warning fs-1 mb-3"></i>
+                    <h6 class="text-muted">Potential Profit</h6>
+                    <h3 class="text-warning">{{ store_currency_symbol() }}{{ number_format($valuation['total_profit'], 2) }}</h3>
+                    <small class="text-muted">{{ $valuation['profit_margin'] }}% margin</small>
+                </div>
             </div>
         </div>
     </div>
-    @endif
 
-    <!-- Detailed Product Valuation Table -->
-    @if($products->count() > 0)
+    <!-- ✅ UPDATED: Detailed Product Valuation Table -->
+    @if(count($valuation['items']) > 0)
     <div class="mb-4">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white border-0">
                 <h5 class="mb-0">
-                    <i class="bi bi-list-check text-brand"></i> Detailed Product Valuation
+                    <i class="bi bi-list-check text-brand"></i> Detailed Valuation
+                    <span class="badge bg-brand ms-2">{{ number_format(count($valuation['items'])) }} Items</span>
                 </h5>
             </div>
             <div class="card-body p-0">
@@ -548,20 +600,22 @@
                     <table class="table product-valuation-table mb-0">
                         <thead>
                             <tr>
-                                <th>Product</th>
-                                <th>SKU</th>
-                                <th>Category</th>
-                                <th class="text-center">Stock Qty</th>
-                                <th class="text-end">Unit Cost</th>
-                                <th class="text-end">Total Value</th>
-                                <th class="text-center">% of Total</th>
+                                <th width="35%">Product</th>
+                                <th width="12%">SKU</th>
+                                <th width="12%">Category</th>
+                                <th width="8%" class="text-center">Stock</th>
+                                <th width="10%" class="text-end">Unit Cost</th>
+                                <th width="10%" class="text-end">Unit Price</th>
+                                <th width="10%" class="text-end">Total Value</th>
+                                <th width="8%" class="text-center">% Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($products as $product)
+                            @foreach($valuation['items'] as $item)
                             @php
-                                $product_value = $product->stock_quantity * $product->price;
-                                $percentage = $total_valuation > 0 ? ($product_value / $total_valuation) * 100 : 0;
+                                $percentage = $valuation['total_value'] > 0
+                                    ? ($item['total_value'] / $valuation['total_value']) * 100
+                                    : 0;
 
                                 if ($percentage > 5) {
                                     $badge_class = 'percentage-high';
@@ -573,36 +627,32 @@
                             @endphp
                             <tr>
                                 <td>
-                                    <div class="d-flex align-items-center">
-                                        @if($product->main_image)
-                                        <img src="{{ asset('storage/' . $product->main_image) }}"
-                                             alt="{{ $product->name }}"
-                                             class="product-thumbnail me-3"
-                                             onerror="this.src='{{ asset('images/placeholders/not_availble.jpg') }}'">
-                                        @else
-                                        <div class="product-thumbnail bg-light d-flex align-items-center justify-content-center me-3">
-                                            <i class="bi bi-box text-muted"></i>
+                                    <div class="d-flex align-items-start">
+                                        <div>
+                                            <strong>{{ $item['name'] }}</strong>
+                                            @if($item['type'] === 'variant')
+                                            <span class="variant-badge">
+                                                <i class="bi bi-layers"></i> {{ $item['variant_name'] }}
+                                            </span>
+                                            @endif
                                         </div>
-                                        @endif
-                                        <strong>{{ Str::limit($product->name, 40) }}</strong>
                                     </div>
                                 </td>
-                                <td><code>{{ $product->sku }}</code></td>
+                                <td><code class="small">{{ $item['sku'] }}</code></td>
                                 <td>
-                                    @if($product->category)
-                                    <span class="badge bg-light text-dark">{{ $product->category->title }}</span>
-                                    @else
-                                    <span class="text-muted">—</span>
-                                    @endif
+                                    <span class="badge bg-light text-dark small">{{ $item['category'] }}</span>
                                 </td>
                                 <td class="text-center">
-                                    <strong>{{ number_format($product->stock_quantity) }}</strong>
+                                    <strong>{{ number_format($item['quantity']) }}</strong>
                                 </td>
                                 <td class="text-end">
-                                    {{ store_currency_symbol() }}{{ number_format($product->price, 2) }}
+                                    <span class="text-muted">{{ store_currency_symbol() }}{{ number_format($item['unit_cost'], 2) }}</span>
+                                </td>
+                                <td class="text-end">
+                                    <strong>{{ store_currency_symbol() }}{{ number_format($item['unit_price'], 2) }}</strong>
                                 </td>
                                 <td class="text-end value-cell">
-                                    {{ store_currency_symbol() }}{{ number_format($product_value, 2) }}
+                                    {{ store_currency_symbol() }}{{ number_format($item['total_value'], 2) }}
                                 </td>
                                 <td class="text-center">
                                     <span class="percentage-badge {{ $badge_class }}">
@@ -615,10 +665,11 @@
                         <tfoot class="table-light">
                             <tr>
                                 <th colspan="3">TOTAL</th>
-                                <th class="text-center">{{ number_format($total_units) }}</th>
+                                <th class="text-center">{{ number_format($valuation['total_quantity']) }}</th>
+                                <th class="text-end">—</th>
                                 <th class="text-end">—</th>
                                 <th class="text-end value-cell">
-                                    {{ store_currency_symbol() }}{{ number_format($total_valuation, 2) }}
+                                    {{ store_currency_symbol() }}{{ number_format($valuation['total_value'], 2) }}
                                 </th>
                                 <th class="text-center">100%</th>
                             </tr>
@@ -631,8 +682,8 @@
     @else
     <div class="alert alert-info text-center py-5">
         <i class="bi bi-inbox fs-1 mb-3"></i>
-        <h5>No Products Found</h5>
-        <p class="mb-0">No products match your current filters.</p>
+        <h5>No Items Found</h5>
+        <p class="mb-0">No products or variants match your current filters, or all items are out of stock.</p>
     </div>
     @endif
 
@@ -641,23 +692,23 @@
         <div class="row">
             <div class="col-md-4 text-center">
                 <i class="bi bi-calculator text-primary fs-3 mb-2"></i>
-                <h6 class="fw-bold">Average Cost Method</h6>
+                <h6 class="fw-bold">Current Price Method</h6>
                 <p class="text-muted small mb-0">
-                    Inventory valued using average unit cost for accurate financial reporting.
+                    Inventory valued using current unit prices for accurate financial reporting.
                 </p>
             </div>
             <div class="col-md-4 text-center border-start border-end">
-                <i class="bi bi-graph-up text-success fs-3 mb-2"></i>
-                <h6 class="fw-bold">Real-Time Tracking</h6>
+                <i class="bi bi-layers text-info fs-3 mb-2"></i>
+                <h6 class="fw-bold">Variant Support</h6>
                 <p class="text-muted small mb-0">
-                    Valuation updates automatically as stock levels and costs change.
+                    Individual variants tracked separately with their own costs and prices.
                 </p>
             </div>
             <div class="col-md-4 text-center">
-                <i class="bi bi-shield-check text-warning fs-3 mb-2"></i>
-                <h6 class="fw-bold">Financial Accuracy</h6>
+                <i class="bi bi-building text-success fs-3 mb-2"></i>
+                <h6 class="fw-bold">Multi-Warehouse</h6>
                 <p class="text-muted small mb-0">
-                    Accurate inventory valuation for balance sheet and financial statements.
+                    View total valuation or filter by specific warehouse locations.
                 </p>
             </div>
         </div>
@@ -666,65 +717,18 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Category Valuation Pie Chart
-    const chartCtx = document.getElementById('categoryValuationChart');
-    if (chartCtx) {
-        const categoryData = @json($category_valuations);
+// ✅ Export valuation
+function exportValuation(format) {
+    const params = new URLSearchParams({
+        export: format,
+        warehouse_id: '{{ request("warehouse_id") }}',
+        category_id: '{{ request("category_id") }}',
+        search: '{{ request("search") }}',
+        sort: '{{ request("sort", "value_desc") }}'
+    });
 
-        const colors = ['#5B914C', '#0dcaf0', '#0d6efd', '#ffc107', '#dc3545', '#6c757d', '#20c997'];
-
-        new Chart(chartCtx, {
-            type: 'doughnut',
-            data: {
-                labels: categoryData.map(c => c.category_name),
-                datasets: [{
-                    data: categoryData.map(c => c.total_value),
-                    backgroundColor: colors.slice(0, categoryData.length),
-                    borderColor: '#fff',
-                    borderWidth: 3
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 20,
-                            usePointStyle: true,
-                            font: {
-                                size: 12
-                            }
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        padding: 12,
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.parsed;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
-                                return [
-                                    label,
-                                    'Value: {{ store_currency_symbol() }}' + value.toLocaleString('en-US', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    }),
-                                    'Share: ' + percentage + '%'
-                                ];
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-});
+    window.open("{{ route('admin.reports.inventory.valuation') }}?" + params.toString(), '_blank');
+}
 </script>
 @endpush

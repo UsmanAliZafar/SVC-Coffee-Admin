@@ -10,10 +10,12 @@ use Carbon\CarbonPeriod;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Response;
+use Yajra\DataTables\Facades\DataTables;
 //
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Customer;
 use App\Models\ProductWarehouseStock;
 use App\Models\InventoryMovement;
@@ -25,11 +27,19 @@ use App\Models\ProductsCategories;
 class ReportsController extends Controller
 {
     /**
-     * Reports Dashboard - Main overview
+     *  Now accepts date range from request
      */
-    public function index()
+    public function index(Request $request)
     {
-        $dateRange = $this->getDefaultDateRange();
+        // ✅ Get date range from request or use defaults
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $dateRange = [
+                'start' => Carbon::parse($request->start_date)->startOfDay(),
+                'end' => Carbon::parse($request->end_date)->endOfDay(),
+            ];
+        } else {
+            $dateRange = $this->getDefaultDateRange();
+        }
 
         $data = [
             'sales_summary' => $this->getSalesSummary($dateRange['start'], $dateRange['end']),
@@ -38,9 +48,18 @@ class ReportsController extends Controller
             'customer_summary' => $this->getCustomerSummary($dateRange['start'], $dateRange['end']),
             'inventory_summary' => $this->getInventorySummary(),
             'date_range' => $dateRange,
+            'days_difference' => $this->calculateDaysDifference($dateRange['start'], $dateRange['end']),
         ];
 
         return view('admin.reports.index', $data);
+    }
+
+    /**
+     *Calculate days between dates (inclusive, no floating point errors)
+     */
+    private function calculateDaysDifference($startDate, $endDate)
+    {
+        return $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()) + 1;
     }
 
     // ==================== SALES REPORTS ====================
@@ -727,387 +746,699 @@ class ReportsController extends Controller
     // ==================== INVENTORY REPORTS ====================
 
     /**
-     * Inventory Overview
+     *Inventory Index Report - Matches Inventory Module
      */
-    public function inventoryIndex(Request $request)
+    public function inventoryIndex()
     {
-        // Get filter parameters
-        $status = $request->input('status', 'all');
-        $category_id = $request->input('category_id');
-        $search = $request->input('search');
-
-        // Build query
-        $query = Product::with('category')
-            ->select('products.*');
-
-        // Apply status filter
-        if ($status == 'out_of_stock') {
-            $query->where('stock_quantity', '<=', 0);
-        } elseif ($status == 'low_stock') {
-            $query->whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold');
-        } elseif ($status == 'in_stock') {
-            $query->whereRaw('stock_quantity > low_stock_threshold');
+        if (!auth('admin')->user()->hasPermission('reports.read')) {
+            abort(403, 'Unauthorized access');
         }
 
-        // Apply category filter
-        if ($category_id) {
-            $query->where('category_id', $category_id);
-        }
+        $warehouses = Warehouse::active()->byPriority()->get();
 
-        // Apply search filter
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                ->orWhere('sku', 'like', "%{$search}%");
+        // ✅ Calculate accurate statistics
+        $stats = $this->getInventoryStatistics();
+
+        return view('admin.reports.inventory.index', compact('warehouses', 'stats'));
+    }
+
+    /**
+     * Get accurate inventory statistics
+     */
+    private function getInventoryStatistics()
+    {
+        // 1. Count simple products (no variants)
+        $simpleProductsTotal = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->count();
+
+        // 2. Count active variants
+        $variantsTotal = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->count();
+
+        $totalProducts = $simpleProductsTotal + $variantsTotal;
+
+        // 3. IN STOCK: Products/variants with stock > 0
+        $inStockSimple = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->where(function($q) {
+                // Has warehouse stock OR has product-level stock
+                $q->whereHas('warehouseStock', function($wq) {
+                    $wq->where('quantity', '>', 0);
+                })->orWhere('stock_quantity', '>', 0);
+            })->count();
+
+        $inStockVariants = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->where(function($q) {
+                $q->whereHas('warehouseStock', function($wq) {
+                    $wq->where('quantity', '>', 0);
+                })->orWhere('stock_quantity', '>', 0);
+            })->count();
+
+        $inStock = $inStockSimple + $inStockVariants;
+
+        // 4. LOW STOCK: Stock <= threshold AND > 0
+        $lowStockSimple = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0)
+            ->count();
+
+        $lowStockVariants = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->where('stock_quantity', '>', 0)
+            ->count();
+
+        $lowStock = $lowStockSimple + $lowStockVariants;
+
+        // 5. OUT OF STOCK: Stock <= 0 everywhere
+        $outOfStockSimple = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->where('stock_quantity', '<=', 0)
+            ->whereDoesntHave('warehouseStock', function($q) {
+                $q->where('quantity', '>', 0);
+            })->count();
+
+        $outOfStockVariants = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->where('stock_quantity', '<=', 0)
+            ->whereDoesntHave('warehouseStock', function($q) {
+                $q->where('quantity', '>', 0);
+            })->count();
+
+        $outOfStock = $outOfStockSimple + $outOfStockVariants;
+
+        // 6. TOTAL STOCK VALUE
+        // Simple products
+        $simpleProductValue = Product::where('track_inventory', true)
+            ->where('has_variants', false)
+            ->get()
+            ->sum(function($product) {
+                // Use warehouse stock if available, otherwise product stock
+                $totalStock = $product->warehouseStock()->sum('quantity');
+                if ($totalStock <= 0) {
+                    $totalStock = $product->stock_quantity;
+                }
+                return $totalStock * $product->price;
             });
-        }
 
-        // Get products
-        $products = $query->orderBy('stock_quantity', 'asc')->get();
+        // Variants
+        $variantValue = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE')
+            ->get()
+            ->sum(function($variant) {
+                $totalStock = $variant->warehouseStock()->sum('quantity');
+                if ($totalStock <= 0) {
+                    $totalStock = $variant->stock_quantity;
+                }
+                return $totalStock * $variant->price;
+            });
 
-        // Get all categories for filter
-        $categories = ProductsCategories::orderBy('title')->get();
+        $totalValue = $simpleProductValue + $variantValue;
 
-        // Calculate summary statistics
-        $total_products = Product::count();
-        $total_stock_value = Product::sum('stock_quantity');
-        $low_stock_count = Product::whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold')->count();
-        $out_of_stock_count = Product::where('stock_quantity', '<=', 0)->count();
+        // 7. TOTAL STOCK QUANTITY
+        $totalStockQty = ProductWarehouseStock::sum('quantity') +
+                        Product::where('track_inventory', true)
+                            ->where('has_variants', false)
+                            ->whereDoesntHave('warehouseStock')
+                            ->sum('stock_quantity') +
+                        ProductVariant::whereHas('product', function($q) {
+                                $q->where('track_inventory', true);
+                            })
+                            ->where('status_key_code', 'VARIANT_ACTIVE')
+                            ->whereDoesntHave('warehouseStock')
+                            ->sum('stock_quantity');
 
-        // Get critical alerts (out of stock)
-        $critical_alerts = Product::where('stock_quantity', '<=', 0)
-            ->orderBy('name')
-            ->get();
+        return [
+            'total_products' => $totalProducts,
+            'in_stock' => $inStock,
+            'low_stock' => $lowStock,
+            'out_of_stock' => $outOfStock,
+            'total_value' => round($totalValue, 2),
+            'total_quantity' => $totalStockQty,
+            'total_warehouses' => Warehouse::active()->count(),
+            'total_reserved' => ProductWarehouseStock::sum('reserved_quantity'),
+            'total_available' => ProductWarehouseStock::sum('available_quantity'),
 
-        // Get low stock alerts
-        $low_stock_alerts = Product::whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold')
-            ->orderBy('stock_quantity', 'asc')
-            ->get();
-
-        return view('admin.reports.inventory.index', compact(
-            'products',
-            'categories',
-            'total_products',
-            'total_stock_value',
-            'low_stock_count',
-            'out_of_stock_count',
-            'critical_alerts',
-            'low_stock_alerts'
-        ));
+            // Percentages
+            'in_stock_percentage' => $totalProducts > 0 ? round(($inStock / $totalProducts) * 100, 1) : 0,
+            'low_stock_percentage' => $totalProducts > 0 ? round(($lowStock / $totalProducts) * 100, 1) : 0,
+            'out_of_stock_percentage' => $totalProducts > 0 ? round(($outOfStock / $totalProducts) * 100, 1) : 0,
+        ];
     }
     /**
-     * Stock Levels Report
-     */
+    * Stock Levels Report - DataTable compatible
+    */
     public function inventoryStockLevels(Request $request)
     {
-        // Get filter parameters
-        $status = $request->input('status', 'all');
-        $category_id = $request->input('category_id');
-        $search = $request->input('search');
-        $sort = $request->input('sort', 'stock_asc');
-
-        // Build query
-        $query = Product::with('category');
-
-        // Apply status filter
-        if ($status == 'critical') {
-            $query->where('stock_quantity', '<=', 0);
-        } elseif ($status == 'low') {
-            $query->whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold');
-        } elseif ($status == 'good') {
-            $query->whereRaw('stock_quantity > low_stock_threshold');
-        } elseif ($status == 'reorder') {
-            $query->whereRaw('stock_quantity <= low_stock_threshold');
+        if (!auth('admin')->user()->hasPermission('reports.read')) {
+            abort(403, 'Unauthorized access');
         }
 
-        // Apply category filter
-        if ($category_id) {
-            $query->where('category_id', $category_id);
+        $warehouses = Warehouse::active()->byPriority()->get();
+        $categories = \App\Models\ProductsCategories::active()->orderBy('title')->get();
+
+        // If AJAX request, return DataTable data
+        if ($request->ajax()) {
+            return $this->getStockLevelsData($request);
         }
 
-        // Apply search filter
+        return view('admin.reports.inventory.stock-levels', compact('warehouses', 'categories'));
+    }
+
+    /**
+     * Get stock levels data for DataTable
+     */
+    private function getStockLevelsData(Request $request)
+    {
+        $warehouseId = $request->get('warehouse_id');
+        $categoryId = $request->get('category_id');
+        $stockStatus = $request->get('stock_status');
+        $search = $request->get('search');
+
+        $items = collect();
+
+        // 1. Get simple products
+        $productsQuery = Product::with(['category', 'warehouseStock.warehouse'])
+            ->where('track_inventory', true)
+            ->where('has_variants', false);
+
+        if ($categoryId) {
+            $productsQuery->where('category_id', $categoryId);
+        }
+
         if ($search) {
-            $query->where(function($q) use ($search) {
+            $productsQuery->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                 ->orWhere('sku', 'like', "%{$search}%");
             });
         }
 
-        // Apply sorting
-        switch ($sort) {
-            case 'stock_asc':
-                $query->orderBy('stock_quantity', 'asc');
-                break;
-            case 'stock_desc':
-                $query->orderBy('stock_quantity', 'desc');
-                break;
-            case 'name_asc':
-                $query->orderBy('name', 'asc');
-                break;
-            case 'value_desc':
-                $query->orderByRaw('stock_quantity * price DESC');
-                break;
-            default:
-                $query->orderBy('stock_quantity', 'asc');
+        foreach ($productsQuery->get() as $product) {
+            if ($warehouseId) {
+                $warehouseStock = $product->warehouseStock()
+                    ->where('warehouse_id', $warehouseId)
+                    ->first();
+
+                $currentStock = $warehouseStock ? $warehouseStock->quantity : 0;
+                $reserved = $warehouseStock ? $warehouseStock->reserved_quantity : 0;
+                $available = $warehouseStock ? $warehouseStock->available_quantity : 0;
+            } else {
+                $currentStock = $product->warehouseStock()->sum('quantity');
+                if ($currentStock <= 0) {
+                    $currentStock = $product->stock_quantity;
+                }
+                $reserved = $product->getTotalReservedStock();
+                $available = $currentStock - $reserved;
+            }
+
+            // Apply stock status filter
+            if ($stockStatus) {
+                if ($stockStatus === 'in_stock' && $currentStock <= 0) continue;
+                if ($stockStatus === 'low_stock' && !($currentStock > 0 && $currentStock <= $product->low_stock_threshold)) continue;
+                if ($stockStatus === 'out_of_stock' && $currentStock > 0) continue;
+            }
+
+            $items->push([
+                'type' => 'product',
+                'id' => $product->id,
+                'product_id' => $product->id,
+                'variant_id' => null,
+                'name' => $product->name,
+                'variant_name' => null,
+                'sku' => $product->sku,
+                'category' => $product->category ? $product->category->title : 'N/A',
+                'current_stock' => $currentStock,
+                'reserved' => $reserved,
+                'available' => $available,
+                'threshold' => $product->low_stock_threshold ?? 10,
+                'price' => $product->price,
+                'stock_value' => $currentStock * $product->price,
+                'status' => $this->getStockStatus($currentStock, $product->low_stock_threshold),
+            ]);
         }
 
-        // Get products
-        $products = $query->get();
+        // 2. Get variants
+        $variantsQuery = ProductVariant::with(['product.category', 'warehouseStock.warehouse'])
+            ->whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE');
 
-        // Get all categories for filter
-        $categories = ProductsCategories::orderBy('title')->get();
+        if ($categoryId) {
+            $variantsQuery->whereHas('product', function($q) use ($categoryId) {
+                $q->where('category_id', $categoryId);
+            });
+        }
 
-        // Calculate summary statistics
-        $total_products = Product::count();
-        $total_stock = Product::sum('stock_quantity');
-        $total_value = Product::selectRaw('SUM(stock_quantity * price) as total')->value('total') ?? 0;
-        $average_value = $total_products > 0 ? $total_value / $total_products : 0;
+        if ($search) {
+            $variantsQuery->where(function($q) use ($search) {
+                $q->where('variant_name', 'like', "%{$search}%")
+                ->orWhere('variant_value', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%")
+                ->orWhereHas('product', function($pq) use ($search) {
+                    $pq->where('name', 'like', "%{$search}%");
+                });
+            });
+        }
 
-        // Count by status
-        $in_stock_count = Product::whereRaw('stock_quantity > low_stock_threshold')->count();
-        $low_stock_count = Product::whereRaw('stock_quantity > 0 AND stock_quantity <= low_stock_threshold')->count();
-        $out_of_stock_count = Product::where('stock_quantity', '<=', 0)->count();
-        $reorder_needed = Product::whereRaw('stock_quantity <= low_stock_threshold')->count();
+        foreach ($variantsQuery->get() as $variant) {
+            if ($warehouseId) {
+                $warehouseStock = $variant->warehouseStock()
+                    ->where('warehouse_id', $warehouseId)
+                    ->first();
 
-        return view('admin.reports.inventory.stock-levels', compact(
-            'products',
-            'categories',
-            'status',
-            'total_products',
-            'total_stock',
-            'total_value',
-            'average_value',
-            'in_stock_count',
-            'low_stock_count',
-            'out_of_stock_count',
-            'reorder_needed'
-        ));
+                $currentStock = $warehouseStock ? $warehouseStock->quantity : 0;
+                $reserved = $warehouseStock ? $warehouseStock->reserved_quantity : 0;
+                $available = $warehouseStock ? $warehouseStock->available_quantity : 0;
+            } else {
+                $currentStock = $variant->warehouseStock()->sum('quantity');
+                if ($currentStock <= 0) {
+                    $currentStock = $variant->stock_quantity;
+                }
+                $reserved = $variant->getTotalReservedStock();
+                $available = $currentStock - $reserved;
+            }
+
+            // Apply stock status filter
+            if ($stockStatus) {
+                if ($stockStatus === 'in_stock' && $currentStock <= 0) continue;
+                if ($stockStatus === 'low_stock' && !($currentStock > 0 && $currentStock <= $variant->low_stock_threshold)) continue;
+                if ($stockStatus === 'out_of_stock' && $currentStock > 0) continue;
+            }
+
+            $items->push([
+                'type' => 'variant',
+                'id' => $variant->id,
+                'product_id' => $variant->product_id,
+                'variant_id' => $variant->id,
+                'name' => $variant->product->name,
+                'variant_name' => $variant->getFullName(),
+                'sku' => $variant->sku,
+                'category' => $variant->product->category ? $variant->product->category->title : 'N/A',
+                'current_stock' => $currentStock,
+                'reserved' => $reserved,
+                'available' => $available,
+                'threshold' => $variant->low_stock_threshold ?? 10,
+                'price' => $variant->price,
+                'stock_value' => $currentStock * $variant->price,
+                'status' => $this->getStockStatus($currentStock, $variant->low_stock_threshold),
+            ]);
+        }
+
+        return DataTables::of($items)
+            ->addColumn('product_info', function($item) {
+                $variantBadge = '';
+                if ($item['type'] === 'variant') {
+                    $variantBadge = '<br><span class="badge bg-info">
+                        <i class="bi bi-layers"></i> ' . htmlspecialchars($item['variant_name']) . '
+                    </span>';
+                }
+
+                return '<div>
+                    <strong>' . htmlspecialchars($item['name']) . '</strong>' . $variantBadge . '<br>
+                    <small class="text-muted">SKU: ' . htmlspecialchars($item['sku']) . '</small>
+                </div>';
+            })
+            ->addColumn('category', function($item) {
+                return '<span class="badge bg-light text-dark">' . htmlspecialchars($item['category']) . '</span>';
+            })
+            ->addColumn('current_stock', function($item) {
+                $class = $item['status'] === 'out_of_stock' ? 'text-danger' :
+                        ($item['status'] === 'low_stock' ? 'text-warning' : 'text-success');
+
+                return '<strong class="' . $class . '">' . number_format($item['current_stock']) . '</strong>';
+            })
+            ->addColumn('available', function($item) {
+                return '<span class="badge bg-success">' . number_format($item['available']) . '</span>';
+            })
+            ->addColumn('reserved', function($item) {
+                return $item['reserved'] > 0
+                    ? '<span class="badge bg-warning">' . number_format($item['reserved']) . '</span>'
+                    : '<span class="text-muted">0</span>';
+            })
+            ->addColumn('threshold', function($item) {
+                return '<span class="badge bg-secondary">' . number_format($item['threshold']) . '</span>';
+            })
+            ->addColumn('stock_value', function($item) {
+                return '<strong>' . store_currency_symbol() . number_format($item['stock_value'], 2) . '</strong>';
+            })
+            ->addColumn('status_badge', function($item) {
+                return $this->getStockStatusBadge($item['status']);
+            })
+            ->rawColumns(['product_info', 'category', 'current_stock', 'available', 'reserved', 'threshold', 'stock_value', 'status_badge'])
+            ->make(true);
     }
 
     /**
-     * Inventory Movement Report
+     *  Get stock status
+     */
+    private function getStockStatus($currentStock, $threshold)
+    {
+        if ($currentStock <= 0) {
+            return 'out_of_stock';
+        } elseif ($currentStock <= $threshold) {
+            return 'low_stock';
+        }
+        return 'in_stock';
+    }
+
+    /**
+     *  Get stock status badge HTML
+     */
+    private function getStockStatusBadge($status)
+    {
+        switch ($status) {
+            case 'in_stock':
+                return '<span class="badge bg-success"><i class="bi bi-check-circle"></i> In Stock</span>';
+            case 'low_stock':
+                return '<span class="badge bg-warning"><i class="bi bi-exclamation-triangle"></i> Low Stock</span>';
+            case 'out_of_stock':
+                return '<span class="badge bg-danger"><i class="bi bi-x-circle"></i> Out of Stock</span>';
+            default:
+                return '<span class="badge bg-secondary">Unknown</span>';
+        }
+    }
+
+    /**
+     * ✅ FIXED: Inventory Movement Report
      */
     public function inventoryMovement(Request $request)
     {
-        // Get date range from request or default to last 30 days
-        $start_date = $request->start_date
-            ? Carbon::parse($request->start_date)->startOfDay()
-            : now()->subDays(30)->startOfDay();
-
-        $end_date = $request->end_date
-            ? Carbon::parse($request->end_date)->endOfDay()
-            : now()->endOfDay();
-
-        // Get filter parameters
-        $type = $request->input('type', 'all');
-        $category = $request->input('category'); // order, quality, loss, supplier, production, warehouse, adjustment
-        $product_search = $request->input('product');
-        $warehouse_id = $request->input('warehouse_id');
-
-        // Build query for inventory movements
-        $query = InventoryMovement::with(['product', 'creator', 'warehouse', 'fromWarehouse', 'toWarehouse'])
-            ->whereBetween('created_at', [$start_date, $end_date]);
-
-        // Apply type filter
-        if ($type != 'all') {
-            $query->where('type', $type);
+        if (!auth('admin')->user()->hasPermission('reports.read')) {
+            abort(403, 'Unauthorized access');
         }
 
-        // Apply category filter (using your model's scope)
-        if ($category) {
-            $query->byCategory($category);
+        $warehouses = Warehouse::active()->byPriority()->get();
+
+        // ✅ If AJAX request (DataTables), return movement data
+        if ($request->ajax()) {
+            return $this->getInventoryMovementData($request);
         }
 
-        // Apply warehouse filter
-        if ($warehouse_id) {
-            $query->where(function($q) use ($warehouse_id) {
-                $q->where('warehouse_id', $warehouse_id)
-                ->orWhere('from_warehouse_id', $warehouse_id)
-                ->orWhere('to_warehouse_id', $warehouse_id);
-            });
-        }
-
-        // Apply product search
-        if ($product_search) {
-            $query->whereHas('product', function($q) use ($product_search) {
-                $q->where('name', 'like', "%{$product_search}%")
-                ->orWhere('sku', 'like', "%{$product_search}%");
-            });
-        }
-
-        // Get movements
-        $movements = $query->orderBy('created_at', 'desc')
-            ->limit(100)
-            ->get();
-
-        // Calculate summary statistics
-        $total_movements = $movements->count();
-
-        // Count movements by increase/decrease
-        $stock_increases = $movements->filter(fn($m) => $m->isIncrease())->count();
-        $stock_decreases = $movements->filter(fn($m) => $m->isDecrease())->count();
-
-        // Calculate quantities
-        $stock_in_quantity = $movements->filter(fn($m) => $m->isIncrease())->sum('quantity');
-        $stock_out_quantity = abs($movements->filter(fn($m) => $m->isDecrease())->sum('quantity'));
-        $net_change = $stock_in_quantity - $stock_out_quantity;
-
-        // Count by specific types
-        $adjustments_count = $movements->whereIn('type', ['adjustment', 'cycle_count', 'physical_count'])->count();
-        $total_in = $stock_increases;
-        $total_out = $stock_decreases;
-
-        // Generate movement trends (daily aggregation)
-        $movement_trends = [];
-        $current_date = $start_date->copy();
-
-        while ($current_date <= $end_date) {
-            $day_movements = $movements->filter(function($m) use ($current_date) {
-                return $m->created_at->isSameDay($current_date);
-            });
-
-            $day_in = $day_movements->filter(fn($m) => $m->isIncrease())->sum('quantity');
-            $day_out = abs($day_movements->filter(fn($m) => $m->isDecrease())->sum('quantity'));
-
-            $movement_trends[] = [
-                'date' => $current_date->format('M d'),
-                'stock_in' => $day_in,
-                'stock_out' => $day_out,
-                'net_change' => $day_in - $day_out
-            ];
-
-            $current_date->addDay();
-        }
-
-        // Get all warehouses for filter
-        $warehouses = Warehouse::orderBy('name')->get();
-
-        // Get movement type categories for filter
-        $movement_categories = [
-            'order' => 'Order Related',
-            'quality' => 'Quality Control',
-            'loss' => 'Loss & Found',
-            'supplier' => 'Supplier Operations',
-            'production' => 'Production',
-            'warehouse' => 'Warehouse Operations',
-            'adjustment' => 'Adjustments & Counts'
-        ];
-
-        return view('admin.reports.inventory.movement', compact(
-            'start_date',
-            'end_date',
-            'movements',
-            'total_movements',
-            'total_in',
-            'total_out',
-            'net_change',
-            'stock_in_quantity',
-            'stock_out_quantity',
-            'adjustments_count',
-            'movement_trends',
-            'warehouses',
-            'movement_categories'
-        ));
+        // ✅ For initial page load, return view with warehouses
+        return view('admin.reports.inventory.movement', compact('warehouses'));
     }
 
     /**
-     * Inventory Valuation Report
+     * ✅ EXISTING METHOD: Already implemented in previous response
      */
-    public function inventoryValuation(Request $request)
+    private function getInventoryMovementData(Request $request)
     {
-        // Get filter parameters
-        $category_id = $request->input('category_id');
-        $search = $request->input('search');
-        $sort = $request->input('sort', 'value_desc');
+        $query = InventoryMovement::with([
+                'product' => function($query) {
+                    $query->withTrashed();
+                },
+                'variant', // ← Includes variants
+                'warehouse',
+                'fromWarehouse',
+                'toWarehouse',
+                'creator'
+            ])
+            ->latest();
 
-        // Build query
-        $query = Product::with('category')
-            ->where('stock_quantity', '>', 0); // Only products with stock
-
-        // Apply category filter
-        if ($category_id) {
-            $query->where('category_id', $category_id);
+        // Apply filters
+        if ($request->filled('warehouse_id')) {
+            $query->where('warehouse_id', $request->warehouse_id);
         }
 
-        // Apply search filter
-        if ($search) {
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                ->orWhere('sku', 'like', "%{$search}%");
+                $q->whereHas('product', function($pq) use ($search) {
+                    $pq->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%");
+                })->orWhereHas('variant', function($vq) use ($search) {
+                    $vq->where('sku', 'like', "%{$search}%")
+                    ->orWhere('variant_name', 'like', "%{$search}%");
+                })->orWhereHas('creator', function($cq) use ($search) {
+                    $cq->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+                });
             });
         }
 
-        // Apply sorting
-        switch ($sort) {
-            case 'value_desc':
-                $query->orderByRaw('stock_quantity * price DESC');
-                break;
-            case 'value_asc':
-                $query->orderByRaw('stock_quantity * price ASC');
-                break;
-            case 'name_asc':
-                $query->orderBy('name', 'asc');
-                break;
-            case 'stock_desc':
-                $query->orderBy('stock_quantity', 'desc');
-                break;
-            default:
-                $query->orderByRaw('stock_quantity * price DESC');
+        return DataTables::of($query)
+            ->addColumn('product_info', function($movement) {
+                if (!$movement->product) {
+                    return '<div>
+                        <strong class="text-danger">Product Deleted</strong><br>
+                        <small class="text-muted">ID: ' . $movement->product_id . '</small>
+                    </div>';
+                }
+
+                $variantBadge = '';
+                if ($movement->variant_id && $movement->variant) {
+                    $variantBadge = '<span class="variant-badge">
+                        <i class="bi bi-layers"></i> ' . htmlspecialchars($movement->variant->getFullName()) . '
+                    </span>';
+                }
+
+                return '<div>
+                    <strong>' . htmlspecialchars($movement->product->name) . '</strong>' . $variantBadge . '<br>
+                    <small class="text-muted">SKU: ' .
+                        htmlspecialchars($movement->variant ? $movement->variant->sku : $movement->product->sku) .
+                    '</small>
+                </div>';
+            })
+            ->addColumn('type_badge', function($movement) {
+                return $movement->getTypeBadge();
+            })
+            ->addColumn('warehouse_info', function($movement) {
+                if ($movement->type === 'transfer') {
+                    return '<div>
+                        <small><strong>From:</strong> ' . ($movement->fromWarehouse ? htmlspecialchars($movement->fromWarehouse->name) : 'N/A') . '</small><br>
+                        <small><strong>To:</strong> ' . ($movement->toWarehouse ? htmlspecialchars($movement->toWarehouse->name) : 'N/A') . '</small>
+                    </div>';
+                }
+                return $movement->warehouse ? htmlspecialchars($movement->warehouse->name) : '<span class="text-muted">N/A</span>';
+            })
+            ->addColumn('quantity_change', function($movement) {
+                $class = $movement->quantity >= 0 ? 'text-success' : 'text-danger';
+                $sign = $movement->quantity >= 0 ? '+' : '';
+                return '<strong class="' . $class . '">' . $sign . number_format($movement->quantity) . '</strong>';
+            })
+            ->addColumn('stock_levels', function($movement) {
+                if ($movement->previous_quantity !== null && $movement->new_quantity !== null) {
+                    return '<small>' . number_format($movement->previous_quantity) . ' → ' . number_format($movement->new_quantity) . '</small>';
+                }
+                return '<span class="text-muted">—</span>';
+            })
+            ->addColumn('created_info', function($movement) {
+                return '<div>
+                    <small>' . $movement->created_at->format('M d, Y H:i') . '</small><br>
+                    <small class="text-muted">' . ($movement->creator ? htmlspecialchars($movement->creator->name) : 'System') . '</small>
+                </div>';
+            })
+            ->addColumn('reason', function($movement) {
+                return $movement->reason ? htmlspecialchars($movement->reason) : null;
+            })
+            ->rawColumns(['product_info', 'type_badge', 'warehouse_info', 'quantity_change', 'stock_levels', 'created_info'])
+            ->make(true);
+    }
+
+    /**
+     * ✅ FIXED: Inventory Valuation Report
+     */
+    public function inventoryValuation(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('reports.read')) {
+            abort(403, 'Unauthorized access');
         }
 
-        // Get products
-        $products = $query->get();
+        $warehouses = Warehouse::active()->byPriority()->get();
+        $categories = \App\Models\ProductsCategories::active()->orderBy('title')->get();
 
-        // Calculate total valuation
-        $total_valuation = $products->sum(function($product) {
-            return $product->stock_quantity * $product->price;
-        });
+        // ✅ Calculate valuation (method provided in earlier response)
+        $valuation = $this->calculateInventoryValuation(
+            $request->get('warehouse_id'),
+            $request->get('category_id')
+        );
 
-        // Calculate summary statistics
-        $total_products = $products->count();
-        $total_units = $products->sum('stock_quantity');
-        $average_unit_value = $total_units > 0 ? $total_valuation / $total_units : 0;
+        // ✅ Apply search filter
+        if ($request->filled('search')) {
+            $search = strtolower($request->search);
+            $valuation['items'] = collect($valuation['items'])->filter(function($item) use ($search) {
+                return str_contains(strtolower($item['name']), $search) ||
+                    str_contains(strtolower($item['sku']), $search) ||
+                    (isset($item['variant_name']) && str_contains(strtolower($item['variant_name']), $search));
+            })->values()->all();
+        }
 
-        // Get all categories for filter
-        $categories = ProductsCategories::orderBy('title')->get();
-        $categories_count = $categories->count();
+        // ✅ Apply sorting
+        $sort = $request->get('sort', 'value_desc');
+        $valuation['items'] = collect($valuation['items']);
 
-        // Calculate valuation by category
-        $category_valuations = [];
+        switch ($sort) {
+            case 'value_desc':
+                $valuation['items'] = $valuation['items']->sortByDesc('total_value');
+                break;
+            case 'value_asc':
+                $valuation['items'] = $valuation['items']->sortBy('total_value');
+                break;
+            case 'name_asc':
+                $valuation['items'] = $valuation['items']->sortBy('name');
+                break;
+            case 'stock_desc':
+                $valuation['items'] = $valuation['items']->sortByDesc('quantity');
+                break;
+        }
 
-        foreach ($categories as $category) {
-            $category_products = $products->where('category_id', $category->id);
+        $valuation['items'] = $valuation['items']->values()->all();
 
-            if ($category_products->count() > 0) {
-                $category_value = $category_products->sum(function($product) {
-                    return $product->stock_quantity * $product->price;
-                });
+        return view('admin.reports.inventory.valuation', compact('warehouses', 'categories', 'valuation'));
+    }
 
-                $category_valuations[] = [
-                    'category_id' => $category->id,
-                    'category_name' => $category->title,
-                    'product_count' => $category_products->count(),
-                    'total_units' => $category_products->sum('stock_quantity'),
-                    'total_value' => $category_value
-                ];
+    /**
+     * ✅ EXISTING METHOD: Already provided in earlier response
+     */
+    private function calculateInventoryValuation($warehouseId = null, $categoryId = null)
+    {
+        $items = collect();
+
+        // 1. Simple products
+        $productsQuery = Product::where('track_inventory', true)
+            ->where('has_variants', false);
+
+        if ($categoryId) {
+            $productsQuery->where('category_id', $categoryId);
+        }
+
+        foreach ($productsQuery->get() as $product) {
+            if ($warehouseId) {
+                $stock = $product->warehouseStock()
+                    ->where('warehouse_id', $warehouseId)
+                    ->sum('quantity');
+            } else {
+                $stock = $product->warehouseStock()->sum('quantity');
+                if ($stock <= 0) {
+                    $stock = $product->stock_quantity;
+                }
+            }
+
+            if ($stock > 0) {
+                $items->push([
+                    'type' => 'product',
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'variant_name' => null,
+                    'sku' => $product->sku,
+                    'category' => $product->category ? $product->category->title : 'N/A',
+                    'quantity' => $stock,
+                    'unit_cost' => $product->cost_price ?? 0,
+                    'unit_price' => $product->price,
+                    'total_cost' => $stock * ($product->cost_price ?? 0),
+                    'total_value' => $stock * $product->price,
+                    'potential_profit' => $stock * ($product->price - ($product->cost_price ?? 0)),
+                ]);
             }
         }
 
-        // Sort category valuations by value descending
-        usort($category_valuations, function($a, $b) {
-            return $b['total_value'] <=> $a['total_value'];
-        });
+        // 2. Variants
+        $variantsQuery = ProductVariant::whereHas('product', function($q) {
+                $q->where('track_inventory', true);
+            })
+            ->where('status_key_code', 'VARIANT_ACTIVE');
 
-        return view('admin.reports.inventory.valuation', compact(
-            'products',
-            'categories',
-            'total_valuation',
-            'total_products',
-            'total_units',
-            'average_unit_value',
-            'categories_count',
-            'category_valuations'
-        ));
+        if ($categoryId) {
+            $variantsQuery->whereHas('product', function($q) use ($categoryId) {
+                $q->where('category_id', $categoryId);
+            });
+        }
+
+        foreach ($variantsQuery->get() as $variant) {
+            if ($warehouseId) {
+                $stock = $variant->warehouseStock()
+                    ->where('warehouse_id', $warehouseId)
+                    ->sum('quantity');
+            } else {
+                $stock = $variant->warehouseStock()->sum('quantity');
+                if ($stock <= 0) {
+                    $stock = $variant->stock_quantity;
+                }
+            }
+
+            if ($stock > 0) {
+                $items->push([
+                    'type' => 'variant',
+                    'id' => $variant->id,
+                    'name' => $variant->product->name,
+                    'variant_name' => $variant->getFullName(),
+                    'sku' => $variant->sku,
+                    'category' => $variant->product->category ? $variant->product->category->title : 'N/A',
+                    'quantity' => $stock,
+                    'unit_cost' => $variant->cost_price ?? 0,
+                    'unit_price' => $variant->price,
+                    'total_cost' => $stock * ($variant->cost_price ?? 0),
+                    'total_value' => $stock * $variant->price,
+                    'potential_profit' => $stock * ($variant->price - ($variant->cost_price ?? 0)),
+                ]);
+            }
+        }
+
+        // Calculate totals
+        return [
+            'items' => $items->all(),
+            'total_items' => $items->count(),
+            'total_quantity' => $items->sum('quantity'),
+            'total_cost' => round($items->sum('total_cost'), 2),
+            'total_value' => round($items->sum('total_value'), 2),
+            'total_profit' => round($items->sum('potential_profit'), 2),
+            'profit_margin' => $items->sum('total_value') > 0
+                ? round(($items->sum('potential_profit') / $items->sum('total_value')) * 100, 2)
+                : 0,
+        ];
+    }
+
+    /**
+     *Get product/variant stock (matches InventoryController logic)
+     */
+    private function getEntityStock($entity, $warehouseId = null)
+    {
+        if ($warehouseId) {
+            $warehouseStock = $entity->warehouseStock()
+                ->where('warehouse_id', $warehouseId)
+                ->first();
+
+            return [
+                'total' => $warehouseStock ? $warehouseStock->quantity : 0,
+                'reserved' => $warehouseStock ? $warehouseStock->reserved_quantity : 0,
+                'available' => $warehouseStock ? $warehouseStock->available_quantity : 0,
+            ];
+        }
+
+        $totalWarehouse = $entity->warehouseStock()->sum('quantity');
+
+        return [
+            'total' => $totalWarehouse > 0 ? $totalWarehouse : $entity->stock_quantity,
+            'reserved' => $entity->getTotalReservedStock(),
+            'available' => ($totalWarehouse > 0 ? $totalWarehouse : $entity->stock_quantity) - $entity->getTotalReservedStock(),
+        ];
     }
 
     /**

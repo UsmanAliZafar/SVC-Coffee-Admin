@@ -130,7 +130,7 @@
         <i class="bi bi-graph-up-arrow text-brand"></i> Reports & Analytics Dashboard
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group period-selector me-2">
+        <div class="btn-group period-selector me-2 d-none">
             <button type="button" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-calendar-day"></i> Today
             </button>
@@ -157,12 +157,28 @@
             <i class="bi bi-calendar3"></i>
             <strong>Report Period:</strong>
             {{ $date_range['start']->format('M d, Y') }} - {{ $date_range['end']->format('M d, Y') }}
-            <span class="text-muted ms-2">({{ $date_range['start']->diffInDays($date_range['end']) + 1 }} days)</span>
+            @php
+                // ✅ FIX: Use integer calculation to avoid floating point errors
+                $daysDifference = $date_range['start']->startOfDay()->diffInDays($date_range['end']->startOfDay()) + 1;
+            @endphp
+            <span class="text-muted ms-2">({{ $daysDifference }} {{ Str::plural('day', $daysDifference) }})</span>
+
+            @if(request()->filled('start_date'))
+            <span class="badge bg-info ms-2">
+                <i class="bi bi-funnel"></i> Custom Range
+            </span>
+            @endif
         </div>
         <div class="col-md-4 text-end">
             <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
                 <i class="bi bi-calendar-range"></i> Change Period
             </button>
+
+            @if(request()->filled('start_date'))
+            <a href="{{ route('admin.reports.index') }}" class="btn btn-sm btn-outline-danger ms-2">
+                <i class="bi bi-x-circle"></i> Reset
+            </a>
+            @endif
         </div>
     </div>
 </div>
@@ -600,35 +616,79 @@
 <div class="modal fade" id="dateRangeModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-brand text-white">
                 <h5 class="modal-title">
                     <i class="bi bi-calendar-range"></i> Select Date Range
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form method="GET" action="{{ route('admin.reports.index') }}">
+            <form method="GET" action="{{ route('admin.reports.index') }}" id="dateRangeForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Start Date</label>
-                        <input type="date" name="start_date" class="form-control" value="{{ $date_range['start']->format('Y-m-d') }}" required>
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-calendar-event"></i> Start Date
+                        </label>
+                        <input type="date"
+                               name="start_date"
+                               id="start_date_input"
+                               class="form-control"
+                               value="{{ request('start_date', $date_range['start']->format('Y-m-d')) }}"
+                               required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">End Date</label>
-                        <input type="date" name="end_date" class="form-control" value="{{ $date_range['end']->format('Y-m-d') }}" required>
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-calendar-event"></i> End Date
+                        </label>
+                        <input type="date"
+                               name="end_date"
+                               id="end_date_input"
+                               class="form-control"
+                               value="{{ request('end_date', $date_range['end']->format('Y-m-d')) }}"
+                               required>
+                        <small class="text-muted">End date must be after start date</small>
                     </div>
+
+                    <hr>
+
                     <div class="mb-3">
-                        <label class="form-label">Quick Select</label>
-                        <div class="btn-group w-100" role="group">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuickRange('today')">Today</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuickRange('week')">This Week</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuickRange('month')">This Month</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuickRange('year')">This Year</button>
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-lightning-charge"></i> Quick Select
+                        </label>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="setQuickRange('today')">
+                                <i class="bi bi-calendar-day"></i> Today
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="setQuickRange('yesterday')">
+                                <i class="bi bi-calendar-minus"></i> Yesterday
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="setQuickRange('last7days')">
+                                <i class="bi bi-calendar-week"></i> Last 7 Days
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="setQuickRange('week')">
+                                <i class="bi bi-calendar-week"></i> This Week
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="setQuickRange('last30days')">
+                                <i class="bi bi-calendar-range"></i> Last 30 Days
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="setQuickRange('month')">
+                                <i class="bi bi-calendar-month"></i> This Month
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="setQuickRange('lastmonth')">
+                                <i class="bi bi-calendar2-minus"></i> Last Month
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="setQuickRange('year')">
+                                <i class="bi bi-calendar-range"></i> This Year
+                            </button>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-brand">Apply</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-brand">
+                        <i class="bi bi-check-circle"></i> Apply Date Range
+                    </button>
                 </div>
             </form>
         </div>
@@ -636,40 +696,106 @@
 </div>
 @endsection
 
+
 @push('scripts')
 <script>
+    /**
+     * ✅ IMPROVED: Set quick date ranges with better logic
+     */
     function setQuickRange(range) {
         const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time to midnight
+
         let startDate, endDate;
 
         switch(range) {
             case 'today':
-                startDate = endDate = today;
+                startDate = new Date(today);
+                endDate = new Date(today);
                 break;
+
+            case 'yesterday':
+                startDate = new Date(today);
+                startDate.setDate(today.getDate() - 1);
+                endDate = new Date(startDate);
+                break;
+
+            case 'last7days':
+                startDate = new Date(today);
+                startDate.setDate(today.getDate() - 6);
+                endDate = new Date(today);
+                break;
+
             case 'week':
-                startDate = new Date(today.setDate(today.getDate() - today.getDay()));
-                endDate = new Date();
+                // Start of this week (Sunday)
+                startDate = new Date(today);
+                startDate.setDate(today.getDate() - today.getDay());
+                endDate = new Date(today);
                 break;
+
+            case 'last30days':
+                startDate = new Date(today);
+                startDate.setDate(today.getDate() - 29);
+                endDate = new Date(today);
+                break;
+
             case 'month':
+                // Start of this month
                 startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-                endDate = new Date();
+                endDate = new Date(today);
                 break;
+
+            case 'lastmonth':
+                // Start of last month
+                startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                // End of last month
+                endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+                break;
+
             case 'year':
+                // Start of this year
                 startDate = new Date(today.getFullYear(), 0, 1);
-                endDate = new Date();
+                endDate = new Date(today);
                 break;
         }
 
-        document.querySelector('input[name="start_date"]').value = formatDate(startDate);
-        document.querySelector('input[name="end_date"]').value = formatDate(endDate);
+        // Update the form inputs
+        document.getElementById('start_date_input').value = formatDate(startDate);
+        document.getElementById('end_date_input').value = formatDate(endDate);
     }
 
+    /**
+     * ✅ Format date to YYYY-MM-DD
+     */
     function formatDate(date) {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
+
+    /**
+     * ✅ Validate date range on form submit
+     */
+    document.getElementById('dateRangeForm').addEventListener('submit', function(e) {
+        const startDate = new Date(document.getElementById('start_date_input').value);
+        const endDate = new Date(document.getElementById('end_date_input').value);
+
+        if (endDate < startDate) {
+            e.preventDefault();
+            alert('End date must be after start date');
+            return false;
+        }
+
+        // Check if range is too large (optional)
+        const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 365) {
+            if (!confirm('You selected a range of ' + daysDiff + ' days. This might take a while to load. Continue?')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
 
     // Print functionality
     window.onbeforeprint = function() {

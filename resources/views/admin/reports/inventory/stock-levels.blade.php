@@ -389,6 +389,22 @@
         .stock-numbers { grid-template-columns: 1fr; }
         .action-buttons { flex-direction: column; }
     }
+.variant-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    .warehouse-indicator {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 5px;
+    }
 </style>
 @endpush
 
@@ -417,386 +433,116 @@
                 <i class="bi bi-download"></i> Export
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-pdf"></i> Export to PDF</a></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-excel"></i> Export to Excel</a></li>
-                <li><a class="dropdown-item" href="#"><i class="bi bi-file-csv"></i> Export to CSV</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportData('pdf')"><i class="bi bi-file-pdf"></i> Export to PDF</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportData('excel')"><i class="bi bi-file-excel"></i> Export to Excel</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportData('csv')"><i class="bi bi-file-csv"></i> Export to CSV</a></li>
             </ul>
         </div>
     </div>
 
-    <!-- Stock Header Summary -->
-    <div class="stock-header">
-        <div class="row">
-            <div class="col-md-3 mb-3">
-                <div class="stock-metric">
-                    <i class="bi bi-boxes fs-1"></i>
-                    <div class="value">{{ number_format($total_products) }}</div>
-                    <div class="label">Total Products</div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="stock-metric">
-                    <i class="bi bi-stack fs-1"></i>
-                    <div class="value">{{ number_format($total_stock) }}</div>
-                    <div class="label">Total Units</div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="stock-metric">
-                    <i class="bi bi-cash-stack fs-1"></i>
-                    <div class="value">{{ store_currency_symbol() }}{{ number_format($total_value, 2) }}</div>
-                    <div class="label">Stock Value</div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="stock-metric">
-                    <i class="bi bi-graph-up fs-1"></i>
-                    <div class="value">{{ store_currency_symbol() }}{{ number_format($average_value, 2) }}</div>
-                    <div class="label">Avg Value/Product</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Stats -->
-    <div class="quick-stats">
-        <div class="stat-box good">
-            <div class="icon">
-                <i class="bi bi-check-circle"></i>
-            </div>
-            <div class="value">{{ number_format($in_stock_count) }}</div>
-            <div class="label">In Stock</div>
-        </div>
-        <div class="stat-box warning">
-            <div class="icon">
-                <i class="bi bi-exclamation-triangle"></i>
-            </div>
-            <div class="value">{{ number_format($low_stock_count) }}</div>
-            <div class="label">Low Stock</div>
-        </div>
-        <div class="stat-box critical">
-            <div class="icon">
-                <i class="bi bi-x-circle"></i>
-            </div>
-            <div class="value">{{ number_format($out_of_stock_count) }}</div>
-            <div class="label">Out of Stock</div>
-        </div>
-        <div class="stat-box" style="border-left: 4px solid #17a2b8;">
-            <div class="icon" style="background: #17a2b8; color: white;">
-                <i class="bi bi-arrow-repeat"></i>
-            </div>
-            <div class="value">{{ number_format($reorder_needed) }}</div>
-            <div class="label">Need Reorder</div>
-        </div>
-    </div>
-
-    <!-- Filter Toolbar -->
+    <!-- ✅ UPDATED: Filter Toolbar with DataTables -->
     <div class="filter-toolbar no-print">
-        <form method="GET" action="{{ route('admin.reports.inventory.stock-levels') }}">
-            <div class="row align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">
-                        <i class="bi bi-funnel"></i> Status Filter
-                    </label>
-                    <select class="form-select" name="status">
-                        <option value="all" {{ $status == 'all' ? 'selected' : '' }}>All Products</option>
-                        <option value="critical" {{ $status == 'critical' ? 'selected' : '' }}>Critical (Out of Stock)</option>
-                        <option value="low" {{ $status == 'low' ? 'selected' : '' }}>Low Stock</option>
-                        <option value="good" {{ $status == 'good' ? 'selected' : '' }}>Good Stock</option>
-                        <option value="reorder" {{ $status == 'reorder' ? 'selected' : '' }}>Need Reorder</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">
-                        <i class="bi bi-grid-3x3-gap"></i> Category
-                    </label>
-                    <select class="form-select" name="category_id">
-                        <option value="">All Categories</option>
-                        @foreach($categories as $category)
-                        <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
-                            {{ $category->title }}
-                        </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">
-                        <i class="bi bi-search"></i> Search
-                    </label>
-                    <input type="text" class="form-control" name="search"
-                           placeholder="Product name or SKU..."
-                           value="{{ request('search') }}">
-                </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-brand w-100">
-                        <i class="bi bi-funnel"></i> Apply Filters
-                    </button>
-                </div>
+        <div class="row align-items-end mb-3">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-building"></i> Warehouse
+                </label>
+                <select class="form-select" id="warehouse_filter">
+                    <option value="">All Warehouses</option>
+                    @foreach($warehouses as $warehouse)
+                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                    @endforeach
+                </select>
             </div>
-
-            <div class="mt-3 d-flex justify-content-between align-items-center">
-                <div class="text-muted small">
-                    <i class="bi bi-info-circle"></i>
-                    Showing <strong>{{ $products->count() }}</strong> products
-                    @if($status != 'all')
-                    | Filter: <strong class="text-capitalize">{{ str_replace('_', ' ', $status) }}</strong>
-                    @endif
-                </div>
-                <div>
-                    <label class="small me-2">Sort by:</label>
-                    <select class="sort-dropdown" name="sort" onchange="this.form.submit()">
-                        <option value="stock_asc" {{ request('sort') == 'stock_asc' ? 'selected' : '' }}>Stock: Low to High</option>
-                        <option value="stock_desc" {{ request('sort') == 'stock_desc' ? 'selected' : '' }}>Stock: High to Low</option>
-                        <option value="name_asc" {{ request('sort') == 'name_asc' ? 'selected' : '' }}>Name: A-Z</option>
-                        <option value="value_desc" {{ request('sort') == 'value_desc' ? 'selected' : '' }}>Value: High to Low</option>
-                    </select>
-                </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-grid-3x3-gap"></i> Category
+                </label>
+                <select class="form-select" id="category_filter">
+                    <option value="">All Categories</option>
+                    @foreach($categories as $category)
+                    <option value="{{ $category->id }}">{{ $category->title }}</option>
+                    @endforeach
+                </select>
             </div>
-        </form>
-    </div>
-
-    <!-- Stock Level Cards -->
-    @if($products->count() > 0)
-    <div class="row">
-        @foreach($products as $product)
-        @php
-            // Calculate stock percentage
-            $max_stock = $product->low_stock_threshold * 3;
-            $stock_percentage = $max_stock > 0 ? min(($product->stock_quantity / $max_stock) * 100, 100) : 0;
-
-            // Determine status
-            if ($product->stock_quantity <= 0) {
-                $status_class = 'critical';
-                $status_text = 'Out of Stock';
-                $gauge_class = 'critical';
-            } elseif ($product->stock_quantity <= $product->low_stock_threshold) {
-                $status_class = 'warning';
-                $status_text = 'Low Stock';
-                $gauge_class = 'warning';
-            } else {
-                $status_class = 'good';
-                $status_text = 'In Stock';
-                $gauge_class = 'good';
-            }
-
-            // Calculate stock value
-            $stock_value = $product->stock_quantity * $product->price;
-
-            // Check if reorder needed
-            $needs_reorder = $product->stock_quantity <= $product->low_stock_threshold;
-        @endphp
-        <div class="col-xl-4 col-lg-6 mb-4">
-            <div class="stock-card {{ $status_class }}">
-                <!-- Product Header -->
-                <div class="product-header">
-                    @if($product->main_image)
-                    <img src="{{ asset('storage/' . $product->main_image) }}"
-                         alt="{{ $product->name }}"
-                         class="product-image-box"
-                         onerror="this.src='{{ asset('images/placeholders/not_availble.jpg') }}'">
-                    @else
-                    <div class="product-image-box bg-light d-flex align-items-center justify-content-center">
-                        <i class="bi bi-box fs-1 text-muted"></i>
-                    </div>
-                    @endif
-
-                    <div class="product-info-section">
-                        <div class="product-name-title">{{ $product->name }}</div>
-                        <div class="product-sku-code">SKU: {{ $product->sku }}</div>
-                        @if($product->category)
-                        <span class="badge bg-light text-dark mt-1">
-                            <i class="bi bi-tag"></i> {{ $product->category->title }}
-                        </span>
-                        @endif
-                    </div>
-                </div>
-
-                <!-- Stock Gauge -->
-                <div class="stock-gauge">
-                    <div class="gauge-background">
-                        <div class="gauge-fill {{ $gauge_class }}" style="width: {{ $stock_percentage }}%"></div>
-                    </div>
-                    <div class="gauge-markers">
-                        <div class="gauge-marker">
-                            <div class="line"></div>
-                            <div class="label">0</div>
-                        </div>
-                        <div class="gauge-marker">
-                            <div class="line"></div>
-                            <div class="label">{{ $product->low_stock_threshold }}</div>
-                        </div>
-                        <div class="gauge-marker">
-                            <div class="line"></div>
-                            <div class="label">{{ $max_stock }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stock Numbers -->
-                <div class="stock-numbers">
-                    <div class="stock-number-box">
-                        <span class="number">{{ number_format($product->stock_quantity) }}</span>
-                        <span class="label">Current</span>
-                    </div>
-                    <div class="stock-number-box">
-                        <span class="number">{{ number_format($product->low_stock_threshold) }}</span>
-                        <span class="label">Threshold</span>
-                    </div>
-                    <div class="stock-number-box">
-                        <span class="number">{{ store_currency_symbol() }}{{ number_format($stock_value, 2) }}</span>
-                        <span class="label">Value</span>
-                    </div>
-                </div>
-
-                <!-- Reorder Section -->
-                @if($needs_reorder)
-                <div class="reorder-section">
-                    <div class="reorder-point">
-                        <div>
-                            <div class="fw-bold text-danger">
-                                <i class="bi bi-exclamation-circle"></i> Reorder Required
-                            </div>
-                            <small>Below minimum threshold</small>
-                        </div>
-                        <div class="reorder-indicator active"></div>
-                    </div>
-                </div>
-                @else
-                <div class="reorder-section" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);">
-                    <div class="reorder-point">
-                        <div>
-                            <div class="fw-bold text-success">
-                                <i class="bi bi-check-circle"></i> Stock Level Good
-                            </div>
-                            <small>No action required</small>
-                        </div>
-                        <div class="reorder-indicator inactive"></div>
-                    </div>
-                </div>
-                @endif
-
-                <!-- Action Buttons -->
-                <div class="action-buttons">
-                    <button class="btn-restock" onclick="openRestockModal('{{ $product->id }}', '{{ $product->name }}')">
-                        <i class="bi bi-plus-circle"></i> Restock
-                    </button>
-                    <button class="btn-history" onclick="openHistoryModal('{{ $product->id }}')">
-                        <i class="bi bi-clock-history"></i> History
-                    </button>
-                </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-funnel"></i> Stock Status
+                </label>
+                <select class="form-select" id="status_filter">
+                    <option value="">All Status</option>
+                    <option value="in_stock">In Stock</option>
+                    <option value="low_stock">Low Stock</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-search"></i> Search
+                </label>
+                <input type="text" class="form-control" id="search_input" placeholder="Product name or SKU...">
             </div>
         </div>
-        @endforeach
+
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="text-muted small">
+                <i class="bi bi-info-circle"></i>
+                Showing <strong id="record_count">0</strong> items
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                <i class="bi bi-x-circle"></i> Clear Filters
+            </button>
+        </div>
     </div>
-    @else
-    <div class="alert alert-info text-center py-5">
-        <i class="bi bi-inbox fs-1 mb-3"></i>
-        <h5>No Products Found</h5>
-        <p class="mb-0">No products match your current filters.</p>
+
+    <!-- ✅ NEW: DataTable View -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="stockLevelsTable" class="table table-hover" style="width:100%">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th class="text-center">Current Stock</th>
+                            <th class="text-center">Available</th>
+                            <th class="text-center">Reserved</th>
+                            <th class="text-center">Threshold</th>
+                            <th class="text-end">Stock Value</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Populated by DataTables -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-    @endif
 
     <!-- Info Footer -->
     <div class="alert alert-light border mt-4">
         <div class="row">
             <div class="col-md-4 text-center">
                 <i class="bi bi-bar-chart text-primary fs-3 mb-2"></i>
-                <h6 class="fw-bold">Visual Stock Tracking</h6>
+                <h6 class="fw-bold">Real-Time Data</h6>
                 <p class="text-muted small mb-0">
-                    Easy-to-read gauges show stock levels at a glance with color-coded indicators.
+                    Stock levels reflect current inventory across all warehouses and variants.
                 </p>
             </div>
             <div class="col-md-4 text-center border-start border-end">
-                <i class="bi bi-bell text-warning fs-3 mb-2"></i>
-                <h6 class="fw-bold">Automated Alerts</h6>
+                <i class="bi bi-layers text-info fs-3 mb-2"></i>
+                <h6 class="fw-bold">Variant Support</h6>
                 <p class="text-muted small mb-0">
-                    Get notified when products reach reorder points or go out of stock.
+                    Track individual variant stock levels separately from parent products.
                 </p>
             </div>
             <div class="col-md-4 text-center">
-                <i class="bi bi-graph-up-arrow text-success fs-3 mb-2"></i>
-                <h6 class="fw-bold">Smart Reordering</h6>
+                <i class="bi bi-building text-success fs-3 mb-2"></i>
+                <h6 class="fw-bold">Multi-Warehouse</h6>
                 <p class="text-muted small mb-0">
-                    Threshold-based system helps maintain optimal inventory levels.
+                    View aggregated stock or filter by specific warehouse locations.
                 </p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Restock Modal -->
-<div class="modal fade" id="restockModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-brand text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-plus-circle"></i> Restock Product
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="restockForm">
-                    <input type="hidden" id="restock_product_id">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Product</label>
-                        <input type="text" class="form-control" id="restock_product_name" readonly>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Quantity to Add</label>
-                        <input type="number" class="form-control" id="restock_quantity" min="1" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Notes (Optional)</label>
-                        <textarea class="form-control" id="restock_notes" rows="3"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-brand" onclick="submitRestock()">
-                    <i class="bi bi-check-circle"></i> Confirm Restock
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- History Modal -->
-<div class="modal fade" id="historyModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-brand text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-clock-history"></i> Stock History
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="timeline">
-                    <div class="timeline-item">
-                        <div class="timeline-dot"></div>
-                        <div class="timeline-content">
-                            <div class="d-flex justify-content-between">
-                                <strong>Restocked</strong>
-                                <span class="text-muted">Nov 1, 2025</span>
-                            </div>
-                            <div class="text-success">+50 units</div>
-                            <small class="text-muted">New stock received from supplier</small>
-                        </div>
-                    </div>
-                    <div class="timeline-item">
-                        <div class="timeline-dot"></div>
-                        <div class="timeline-content">
-                            <div class="d-flex justify-content-between">
-                                <strong>Sale</strong>
-                                <span class="text-muted">Oct 28, 2025</span>
-                            </div>
-                            <div class="text-danger">-15 units</div>
-                            <small class="text-muted">Order #12345</small>
-                        </div>
-                    </div>
-                    <!-- More timeline items would be loaded dynamically -->
-                </div>
             </div>
         </div>
     </div>
@@ -804,49 +550,130 @@
 @endsection
 
 @push('scripts')
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+
 <script>
-function openRestockModal(productId, productName) {
-    document.getElementById('restock_product_id').value = productId;
-    document.getElementById('restock_product_name').value = productName;
-    document.getElementById('restock_quantity').value = '';
-    document.getElementById('restock_notes').value = '';
+let stockTable;
 
-    const modal = new bootstrap.Modal(document.getElementById('restockModal'));
-    modal.show();
-}
+$(document).ready(function() {
+    // ✅ Initialize DataTable
+    stockTable = $('#stockLevelsTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: "{{ route('admin.reports.inventory.stock-levels') }}",
+            data: function(d) {
+                d.warehouse_id = $('#warehouse_filter').val();
+                d.category_id = $('#category_filter').val();
+                d.stock_status = $('#status_filter').val();
+                d.search = $('#search_input').val();
+            }
+        },
+        columns: [
+            {
+                data: 'product_info',
+                name: 'product_info',
+                orderable: false,
+                searchable: false
+            },
+            {
+                data: 'category',
+                name: 'category',
+                orderable: false
+            },
+            {
+                data: 'current_stock',
+                name: 'current_stock',
+                className: 'text-center'
+            },
+            {
+                data: 'available',
+                name: 'available',
+                className: 'text-center'
+            },
+            {
+                data: 'reserved',
+                name: 'reserved',
+                className: 'text-center'
+            },
+            {
+                data: 'threshold',
+                name: 'threshold',
+                className: 'text-center'
+            },
+            {
+                data: 'stock_value',
+                name: 'stock_value',
+                className: 'text-end'
+            },
+            {
+                data: 'status_badge',
+                name: 'status_badge',
+                className: 'text-center',
+                orderable: false
+            }
+        ],
+        order: [[2, 'desc']], // Sort by current stock descending
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        language: {
+            emptyTable: "No products found",
+            info: "Showing _START_ to _END_ of _TOTAL_ items",
+            infoEmpty: "Showing 0 to 0 of 0 items",
+            infoFiltered: "(filtered from _MAX_ total items)",
+            lengthMenu: "Show _MENU_ items",
+            loadingRecords: "Loading...",
+            processing: '<div class="spinner-border text-brand" role="status"><span class="visually-hidden">Loading...</span></div>',
+            search: "Search:",
+            zeroRecords: "No matching records found"
+        },
+        drawCallback: function(settings) {
+            $('#record_count').text(settings._iRecordsDisplay);
+        }
+    });
 
-function submitRestock() {
-    const productId = document.getElementById('restock_product_id').value;
-    const quantity = document.getElementById('restock_quantity').value;
-    const notes = document.getElementById('restock_notes').value;
+    // ✅ Filter change handlers
+    $('#warehouse_filter, #category_filter, #status_filter').on('change', function() {
+        stockTable.ajax.reload();
+    });
 
-    if (!quantity || quantity < 1) {
-        alert('Please enter a valid quantity');
-        return;
-    }
-
-    // TODO: Implement AJAX call to restock endpoint
-    console.log('Restock:', { productId, quantity, notes });
-    alert('Restock functionality would be implemented here');
-
-    bootstrap.Modal.getInstance(document.getElementById('restockModal')).hide();
-}
-
-function openHistoryModal(productId) {
-    // TODO: Load stock history for this product
-    const modal = new bootstrap.Modal(document.getElementById('historyModal'));
-    modal.show();
-}
-
-// Animate gauges on page load
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.gauge-fill').forEach(fill => {
-        const width = fill.style.width;
-        fill.style.width = '0%';
-        setTimeout(() => {
-            fill.style.width = width;
-        }, 100);
+    // ✅ Search with debounce
+    let searchTimeout;
+    $('#search_input').on('keyup', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            stockTable.ajax.reload();
+        }, 500);
     });
 });
+
+// ✅ Clear all filters
+function clearFilters() {
+    $('#warehouse_filter').val('');
+    $('#category_filter').val('');
+    $('#status_filter').val('');
+    $('#search_input').val('');
+    stockTable.ajax.reload();
+}
+
+// ✅ Export functionality
+function exportData(format) {
+    const warehouseId = $('#warehouse_filter').val();
+    const categoryId = $('#category_filter').val();
+    const stockStatus = $('#status_filter').val();
+    const search = $('#search_input').val();
+
+    let url = "{{ route('admin.reports.inventory.stock-levels') }}";
+    url += `?export=${format}`;
+
+    if (warehouseId) url += `&warehouse_id=${warehouseId}`;
+    if (categoryId) url += `&category_id=${categoryId}`;
+    if (stockStatus) url += `&stock_status=${stockStatus}`;
+    if (search) url += `&search=${search}`;
+
+    window.open(url, '_blank');
+}
 </script>
 @endpush
