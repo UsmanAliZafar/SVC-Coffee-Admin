@@ -1262,7 +1262,7 @@ class Order extends Model
     // Check if can update status
     public function canUpdateStatus()
     {
-        return !in_array($this->status_key_code, ['ORDER_DELIVERED', 'ORDER_CANCELLED']);
+        return !in_array($this->status_key_code, [ 'ORDER_CANCELLED']);
     }
 
     // Check if can ship
