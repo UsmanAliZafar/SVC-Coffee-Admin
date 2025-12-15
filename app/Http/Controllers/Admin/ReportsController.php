@@ -3146,18 +3146,31 @@ class ReportsController extends Controller
     }
 
     // ==================== EXPORT METHODS ====================
-
     /**
      * Export report to PDF
      */
     public function exportPdf($reportType, Request $request)
     {
         try {
+            // Log the report type for debugging
+            \Log::info('PDF Export Request', [
+                'reportType' => $reportType,
+                'request_params' => $request->all()
+            ]);
+
             // Get report data based on type
             $data = $this->getReportData($reportType, $request);
 
             // Get appropriate view for PDF
             $view = $this->getReportView($reportType);
+
+            // Log the view being used
+            \Log::info('Using PDF view: ' . $view);
+
+            // Check if view exists
+            if (!view()->exists("admin.reports.exports.{$view}")) {
+                throw new \Exception("PDF template not found: admin.reports.exports.{$view}");
+            }
 
             // Generate PDF
             $pdf = Pdf::loadView("admin.reports.exports.{$view}", $data)
@@ -3174,6 +3187,12 @@ class ReportsController extends Controller
             return $pdf->download($filename);
 
         } catch (\Exception $e) {
+            \Log::error('PDF Export Error', [
+                'reportType' => $reportType,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return redirect()->back()->with('error', 'Failed to generate PDF: ' . $e->getMessage());
         }
     }
@@ -3232,12 +3251,30 @@ class ReportsController extends Controller
     private function getReportData($reportType, $request)
     {
         switch ($reportType) {
+            // ==================== SALES REPORTS ====================
+            case 'sales-daily':
+                return $this->getSalesDailyData($request);
+
+            case 'sales-weekly':
+                return $this->getSalesWeeklyData($request);
+
+            case 'sales-monthly':
+                return $this->getSalesMonthlyData($request);
+
+            case 'sales-yearly':
+                return $this->getSalesYearlyData($request);
+
+            case 'sales-custom-range':
+                return $this->getSalesCustomRangeData($request);
+
+            // ==================== REVENUE REPORTS ====================
             case 'revenue-by-category':
                 return $this->getRevenueByCategoryData($request);
 
             case 'revenue-by-product':
                 return $this->getRevenueByProductData($request);
 
+            // ==================== PRODUCT REPORTS ====================
             case 'products-top-selling':
                 return $this->getProductsTopSellingData($request);
 
@@ -3247,6 +3284,7 @@ class ReportsController extends Controller
             case 'products-performance':
                 return $this->getProductsPerformanceData($request);
 
+            // ==================== INVENTORY REPORTS ====================
             case 'inventory-stock-levels':
                 return $this->getInventoryStockLevelsData($request);
 
@@ -3256,6 +3294,7 @@ class ReportsController extends Controller
             case 'inventory-valuation':
                 return $this->getInventoryValuationData($request);
 
+            // ==================== CUSTOMER REPORTS ====================
             case 'customers-index':
                 return $this->getCustomersIndexData($request);
 
@@ -3266,7 +3305,381 @@ class ReportsController extends Controller
                 return $this->getCustomersLifetimeValueData($request);
 
             default:
-                throw new \Exception('Invalid report type');
+                throw new \Exception('Invalid report type: ' . $reportType);
+        }
+    }
+        /**
+     * Get Sales Daily data for export
+     */
+    private function getSalesDailyData($request)
+    {
+        $date = $request->input('date', Carbon::today()->format('Y-m-d'));
+        $selectedDate = Carbon::parse($date);
+
+        return [
+            'selected_date' => $selectedDate,
+            'sales_data' => $this->getDailySalesData($selectedDate),
+            'hourly_sales' => $this->getHourlySales($selectedDate),
+            'top_products_today' => $this->getTopProductsByDate($selectedDate),
+            'comparison' => $this->getDailyComparison($selectedDate),
+        ];
+    }
+
+    /**
+     * Get Sales Weekly data for export
+     */
+    private function getSalesWeeklyData($request)
+    {
+        $week = $request->input('week', Carbon::now()->week);
+        $year = $request->input('year', Carbon::now()->year);
+
+        $startOfWeek = Carbon::now()->setISODate($year, $week)->startOfWeek();
+        $endOfWeek = Carbon::now()->setISODate($year, $week)->endOfWeek();
+
+        return [
+            'week_number' => $week,
+            'year' => $year,
+            'start_date' => $startOfWeek,
+            'end_date' => $endOfWeek,
+            'sales_data' => $this->getWeeklySalesData($startOfWeek, $endOfWeek),
+            'daily_breakdown' => $this->getDailyBreakdown($startOfWeek, $endOfWeek),
+            'top_products_week' => $this->getTopProductsByDateRange($startOfWeek, $endOfWeek),
+            'comparison' => $this->getWeeklyComparison($startOfWeek),
+        ];
+    }
+
+    /**
+     * Get Sales Monthly data for export
+     */
+    private function getSalesMonthlyData($request)
+    {
+        $month = $request->input('month', Carbon::now()->month);
+        $year = $request->input('year', Carbon::now()->year);
+
+        $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
+        $endOfMonth = Carbon::create($year, $month, 1)->endOfMonth();
+
+        return [
+            'month' => $month,
+            'year' => $year,
+            'month_name' => $startOfMonth->format('F'),
+            'start_date' => $startOfMonth,
+            'end_date' => $endOfMonth,
+            'sales_data' => $this->getMonthlySalesData($startOfMonth, $endOfMonth),
+            'daily_breakdown' => $this->getDailyBreakdown($startOfMonth, $endOfMonth),
+            'weekly_breakdown' => $this->getWeeklyBreakdownForMonth($startOfMonth, $endOfMonth),
+            'top_products_month' => $this->getTopProductsByDateRange($startOfMonth, $endOfMonth),
+            'category_breakdown' => $this->getCategorySales($startOfMonth, $endOfMonth),
+            'comparison' => $this->getMonthlyComparison($startOfMonth),
+        ];
+    }
+
+    /**
+     * Get Sales Yearly data for export
+     */
+    private function getSalesYearlyData($request)
+    {
+        $year = $request->input('year', Carbon::now()->year);
+
+        $startOfYear = Carbon::create($year, 1, 1)->startOfYear();
+        $endOfYear = Carbon::create($year, 12, 31)->endOfYear();
+
+        return [
+            'year' => $year,
+            'start_date' => $startOfYear,
+            'end_date' => $endOfYear,
+            'sales_data' => $this->getYearlySalesData($startOfYear, $endOfYear),
+            'monthly_breakdown' => $this->getMonthlyBreakdownForYear($startOfYear, $endOfYear),
+            'quarterly_breakdown' => $this->getQuarterlyBreakdown($startOfYear, $endOfYear),
+            'top_products_year' => $this->getTopProductsByDateRange($startOfYear, $endOfYear, 20),
+            'category_breakdown' => $this->getCategorySales($startOfYear, $endOfYear),
+            'comparison' => $this->getYearlyComparison($startOfYear),
+        ];
+    }
+
+    /**
+     * Get Sales Custom Range data for export
+     */
+    private function getSalesCustomRangeData($request)
+    {
+        $startDate = $request->input('start_date', Carbon::now()->subDays(30)->format('Y-m-d'));
+        $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
+
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->endOfDay();
+
+        return [
+            'start_date' => $start,
+            'end_date' => $end,
+            'days_count' => $start->diffInDays($end) + 1,
+            'sales_data' => $this->getCustomRangeSalesData($start, $end),
+            'daily_breakdown' => $this->getDailyBreakdown($start, $end),
+            'top_products' => $this->getTopProductsByDateRange($start, $end, 20),
+            'category_breakdown' => $this->getCategorySales($start, $end),
+            'customer_analysis' => $this->getCustomerAnalysis($start, $end),
+        ];
+    }
+    /**
+     * Generate Sales Daily CSV
+     */
+    private function generateSalesDailyCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Daily Sales Report']);
+        fputcsv($output, ['Date: ' . $data['selected_date']->format('l, F d, Y')]);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Summary
+        fputcsv($output, ['Summary']);
+        fputcsv($output, ['Metric', 'Value']);
+        fputcsv($output, ['Total Orders', number_format($data['sales_data']['total_orders'])]);
+        fputcsv($output, ['Total Revenue', store_currency_symbol() . number_format($data['sales_data']['total_revenue'], 2)]);
+        fputcsv($output, ['Avg Order Value', store_currency_symbol() . number_format($data['sales_data']['avg_order_value'], 2)]);
+        fputcsv($output, ['Items Sold', number_format($data['sales_data']['items_sold'])]);
+        fputcsv($output, []);
+
+        // Hourly Breakdown
+        fputcsv($output, ['Hourly Sales Breakdown']);
+        fputcsv($output, ['Hour', 'Orders', 'Revenue']);
+        foreach ($data['hourly_sales'] as $hour) {
+            fputcsv($output, [
+                $hour['hour_label'],
+                number_format($hour['order_count']),
+                number_format($hour['revenue'], 2)
+            ]);
+        }
+        fputcsv($output, []);
+
+        // Top Products
+        fputcsv($output, ['Top Selling Products']);
+        fputcsv($output, ['Product', 'SKU', 'Units Sold', 'Revenue']);
+        foreach ($data['top_products_today'] as $product) {
+            fputcsv($output, [
+                $product->name,
+                $product->sku,
+                number_format($product->total_sold),
+                number_format($product->total_revenue, 2)
+            ]);
+        }
+    }
+
+    /**
+     * Generate Sales Weekly CSV
+     */
+    private function generateSalesWeeklyCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Weekly Sales Report']);
+        fputcsv($output, ['Week: ' . $data['week_number'] . ', ' . $data['year']]);
+        fputcsv($output, ['Period: ' . $data['start_date']->format('M d') . ' - ' . $data['end_date']->format('M d, Y')]);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Summary
+        fputcsv($output, ['Summary']);
+        fputcsv($output, ['Metric', 'Value']);
+        fputcsv($output, ['Total Orders', number_format($data['sales_data']['total_orders'])]);
+        fputcsv($output, ['Total Revenue', store_currency_symbol() . number_format($data['sales_data']['total_revenue'], 2)]);
+        fputcsv($output, ['Avg Order Value', store_currency_symbol() . number_format($data['sales_data']['avg_order_value'], 2)]);
+        fputcsv($output, ['Avg Daily Revenue', store_currency_symbol() . number_format($data['sales_data']['avg_daily_revenue'], 2)]);
+        fputcsv($output, []);
+
+        // Daily Breakdown
+        fputcsv($output, ['Daily Breakdown']);
+        fputcsv($output, ['Date', 'Day', 'Orders', 'Revenue', 'Avg Order Value']);
+        foreach ($data['daily_breakdown'] as $day) {
+            fputcsv($output, [
+                $day['date_label'],
+                $day['day_name'],
+                number_format($day['order_count']),
+                number_format($day['revenue'], 2),
+                number_format($day['avg_order_value'], 2)
+            ]);
+        }
+        fputcsv($output, []);
+
+        // Top Products
+        fputcsv($output, ['Top Selling Products']);
+        fputcsv($output, ['Product', 'SKU', 'Category', 'Units Sold', 'Revenue', 'Avg Price']);
+        foreach ($data['top_products_week'] as $product) {
+            fputcsv($output, [
+                $product->name,
+                $product->sku,
+                $product->category_name ?? 'N/A',
+                number_format($product->total_sold),
+                number_format($product->total_revenue, 2),
+                number_format($product->avg_price, 2)
+            ]);
+        }
+    }
+
+    /**
+     * Generate Sales Monthly CSV
+     */
+    private function generateSalesMonthlyCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Monthly Sales Report']);
+        fputcsv($output, ['Month: ' . $data['month_name'] . ' ' . $data['year']]);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Summary
+        fputcsv($output, ['Summary']);
+        fputcsv($output, ['Metric', 'Value']);
+        fputcsv($output, ['Total Orders', number_format($data['sales_data']['total_orders'])]);
+        fputcsv($output, ['Total Revenue', store_currency_symbol() . number_format($data['sales_data']['total_revenue'], 2)]);
+        fputcsv($output, ['Avg Order Value', store_currency_symbol() . number_format($data['sales_data']['avg_order_value'], 2)]);
+        fputcsv($output, ['Avg Daily Revenue', store_currency_symbol() . number_format($data['sales_data']['avg_daily_revenue'], 2)]);
+        fputcsv($output, []);
+
+        // Weekly Breakdown
+        fputcsv($output, ['Weekly Breakdown']);
+        fputcsv($output, ['Week', 'Orders', 'Revenue']);
+        foreach ($data['weekly_breakdown'] as $week) {
+            fputcsv($output, [
+                $week['label'],
+                number_format($week['order_count']),
+                number_format($week['revenue'], 2)
+            ]);
+        }
+        fputcsv($output, []);
+
+        // Category Breakdown
+        fputcsv($output, ['Sales by Category']);
+        fputcsv($output, ['Category', 'Units Sold', 'Revenue']);
+        foreach ($data['category_breakdown'] as $category) {
+            fputcsv($output, [
+                $category['category'],
+                number_format($category['units_sold']),
+                number_format($category['revenue'], 2)
+            ]);
+        }
+        fputcsv($output, []);
+
+        // Top Products
+        fputcsv($output, ['Top Selling Products']);
+        fputcsv($output, ['Rank', 'Product', 'SKU', 'Category', 'Units Sold', 'Revenue']);
+        foreach ($data['top_products_month'] as $index => $product) {
+            fputcsv($output, [
+                $index + 1,
+                $product->name,
+                $product->sku,
+                $product->category_name ?? 'N/A',
+                number_format($product->total_sold),
+                number_format($product->total_revenue, 2)
+            ]);
+        }
+    }
+
+    /**
+     * Generate Sales Yearly CSV
+     */
+    private function generateSalesYearlyCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Yearly Sales Report']);
+        fputcsv($output, ['Year: ' . $data['year']]);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Summary
+        fputcsv($output, ['Summary']);
+        fputcsv($output, ['Metric', 'Value']);
+        fputcsv($output, ['Total Orders', number_format($data['sales_data']['total_orders'])]);
+        fputcsv($output, ['Total Revenue', store_currency_symbol() . number_format($data['sales_data']['total_revenue'], 2)]);
+        fputcsv($output, ['Avg Order Value', store_currency_symbol() . number_format($data['sales_data']['avg_order_value'], 2)]);
+        fputcsv($output, ['Avg Monthly Revenue', store_currency_symbol() . number_format($data['sales_data']['avg_monthly_revenue'], 2)]);
+        fputcsv($output, []);
+
+        // Monthly Breakdown
+        fputcsv($output, ['Monthly Breakdown']);
+        fputcsv($output, ['Month', 'Orders', 'Revenue']);
+        foreach ($data['monthly_breakdown'] as $month) {
+            fputcsv($output, [
+                $month['month_name'],
+                number_format($month['order_count']),
+                number_format($month['revenue'], 2)
+            ]);
+        }
+        fputcsv($output, []);
+
+        // Quarterly Breakdown
+        fputcsv($output, ['Quarterly Breakdown']);
+        fputcsv($output, ['Quarter', 'Orders', 'Revenue']);
+        foreach ($data['quarterly_breakdown'] as $quarter) {
+            fputcsv($output, [
+                $quarter['label'],
+                number_format($quarter['order_count']),
+                number_format($quarter['revenue'], 2)
+            ]);
+        }
+        fputcsv($output, []);
+
+        // Category Breakdown
+        fputcsv($output, ['Sales by Category']);
+        fputcsv($output, ['Category', 'Units Sold', 'Revenue']);
+        foreach ($data['category_breakdown'] as $category) {
+            fputcsv($output, [
+                $category['category'],
+                number_format($category['units_sold']),
+                number_format($category['revenue'], 2)
+            ]);
+        }
+    }
+
+    /**
+     * Generate Sales Custom Range CSV
+     */
+    private function generateSalesCustomRangeCsv($output, $data)
+    {
+        // Header
+        fputcsv($output, ['Custom Range Sales Report']);
+        fputcsv($output, ['Period: ' . $data['start_date']->format('M d, Y') . ' - ' . $data['end_date']->format('M d, Y')]);
+        fputcsv($output, ['Days: ' . $data['days_count']]);
+        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+
+        // Summary
+        fputcsv($output, ['Summary']);
+        fputcsv($output, ['Metric', 'Value']);
+        fputcsv($output, ['Total Orders', number_format($data['sales_data']['total_orders'])]);
+        fputcsv($output, ['Total Revenue', store_currency_symbol() . number_format($data['sales_data']['total_revenue'], 2)]);
+        fputcsv($output, ['Avg Order Value', store_currency_symbol() . number_format($data['sales_data']['avg_order_value'], 2)]);
+        fputcsv($output, ['Avg Daily Revenue', store_currency_symbol() . number_format($data['sales_data']['avg_daily_revenue'], 2)]);
+        fputcsv($output, []);
+
+        // Daily Breakdown
+        fputcsv($output, ['Daily Breakdown']);
+        fputcsv($output, ['Date', 'Day', 'Orders', 'Revenue']);
+        foreach ($data['daily_breakdown'] as $day) {
+            fputcsv($output, [
+                $day['date_label'],
+                $day['day_name'],
+                number_format($day['order_count']),
+                number_format($day['revenue'], 2)
+            ]);
+        }
+        fputcsv($output, []);
+
+        // Customer Analysis
+        fputcsv($output, ['Customer Analysis']);
+        fputcsv($output, ['Metric', 'Value']);
+        fputcsv($output, ['Total Customers', number_format($data['customer_analysis']['total_customers'])]);
+        fputcsv($output, ['New Customers', number_format($data['customer_analysis']['new_customers'])]);
+        fputcsv($output, ['Returning Customers', number_format($data['customer_analysis']['returning_customers'])]);
+        fputcsv($output, []);
+
+        // Category Breakdown
+        fputcsv($output, ['Sales by Category']);
+        fputcsv($output, ['Category', 'Units Sold', 'Revenue']);
+        foreach ($data['category_breakdown'] as $category) {
+            fputcsv($output, [
+                $category['category'],
+                number_format($category['units_sold']),
+                number_format($category['revenue'], 2)
+            ]);
         }
     }
 
@@ -3276,20 +3689,42 @@ class ReportsController extends Controller
     private function getReportView($reportType)
     {
         $viewMap = [
+            // ==================== SALES REPORTS ====================
+            'sales-daily' => 'sales-daily-pdf',
+            'sales-weekly' => 'sales-weekly-pdf',
+            'sales-monthly' => 'sales-monthly-pdf',
+            'sales-yearly' => 'sales-yearly-pdf',
+            'sales-custom-range' => 'sales-custom-range-pdf',
+
+            // ==================== REVENUE REPORTS ====================
+            'revenue-index' => 'revenue-index-pdf',
             'revenue-by-category' => 'revenue-by-category-pdf',
             'revenue-by-product' => 'revenue-by-product-pdf',
+
+            // ==================== PRODUCT REPORTS ====================
             'products-top-selling' => 'products-top-selling-pdf',
             'products-by-category' => 'products-by-category-pdf',
             'products-performance' => 'products-performance-pdf',
+
+            // ==================== INVENTORY REPORTS ====================
+            'inventory-index' => 'inventory-index-pdf',
             'inventory-stock-levels' => 'inventory-stock-levels-pdf',
-            'inventory-movements' => 'inventory-movements-pdf',
+            'inventory-movement' => 'inventory-movement-pdf',
             'inventory-valuation' => 'inventory-valuation-pdf',
+            'inventory-alerts' => 'inventory-alerts-pdf',
+
+            // ==================== CUSTOMER REPORTS ====================
             'customers-index' => 'customers-index-pdf',
             'customers-new-vs-returning' => 'customers-new-vs-returning-pdf',
             'customers-lifetime-value' => 'customers-lifetime-value-pdf',
         ];
 
-        return $viewMap[$reportType] ?? 'default-pdf';
+        if (!isset($viewMap[$reportType])) {
+            \Log::error('Unknown report type for PDF', ['reportType' => $reportType]);
+            throw new \Exception("Unknown report type: {$reportType}");
+        }
+
+        return $viewMap[$reportType];
     }
 
     /**
@@ -3363,46 +3798,60 @@ class ReportsController extends Controller
         $output = fopen('php://temp', 'r+');
 
         switch ($reportType) {
+            // Sales Reports
+            case 'sales-daily':
+                $this->generateSalesDailyCsv($output, $data);
+                break;
+            case 'sales-weekly':
+                $this->generateSalesWeeklyCsv($output, $data);
+                break;
+            case 'sales-monthly':
+                $this->generateSalesMonthlyCsv($output, $data);
+                break;
+            case 'sales-yearly':
+                $this->generateSalesYearlyCsv($output, $data);
+                break;
+            case 'sales-custom-range':
+                $this->generateSalesCustomRangeCsv($output, $data);
+                break;
+
+            // Revenue Reports
             case 'revenue-by-category':
                 $this->generateRevenueByCategoryCsv($output, $data);
                 break;
-
             case 'revenue-by-product':
                 $this->generateRevenueByProductCsv($output, $data);
                 break;
 
+            // Product Reports
             case 'products-top-selling':
                 $this->generateProductsTopSellingCsv($output, $data);
                 break;
-
             case 'products-by-category':
                 $this->generateProductsByCategoryCsv($output, $data);
                 break;
-
             case 'products-performance':
                 $this->generateProductsPerformanceCsv($output, $data);
                 break;
 
+            // Inventory Reports
             case 'inventory-stock-levels':
                 $this->generateInventoryStockLevelsCsv($output, $data);
                 break;
-
             case 'inventory-movements':
                 $this->generateInventoryMovementsCsv($output, $data);
                 break;
-
             case 'inventory-valuation':
                 $this->generateInventoryValuationCsv($output, $data);
                 break;
 
+            // Customer Reports
             case 'customers-index':
                 $this->generateCustomersIndexCsv($output, $data);
                 break;
-
             case 'customers-new-vs-returning':
                 $this->generateCustomersNewVsReturningCsv($output, $data);
                 break;
-
             case 'customers-lifetime-value':
                 $this->generateCustomersLifetimeValueCsv($output, $data);
                 break;

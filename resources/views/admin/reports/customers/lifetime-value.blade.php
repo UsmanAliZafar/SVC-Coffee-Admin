@@ -400,7 +400,7 @@
             <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
                 <i class="bi bi-printer"></i> Print
             </button>
-            <button type="button" class="btn btn-brand dropdown-toggle" data-bs-toggle="dropdown">
+            <button type="button" class="btn btn-brand dropdown-toggle d-none" data-bs-toggle="dropdown">
                 <i class="bi bi-download"></i> Export
             </button>
             <ul class="dropdown-menu dropdown-menu-end">

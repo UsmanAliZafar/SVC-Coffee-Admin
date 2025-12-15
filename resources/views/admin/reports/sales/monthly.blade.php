@@ -166,7 +166,7 @@
             <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
                 <i class="bi bi-printer"></i> Print
             </button>
-            <button type="button" class="btn btn-outline-secondary">
+            <button type="button" class="btn btn-outline-secondary d-none">
                 <i class="bi bi-download"></i> Export
             </button>
             <a href="{{ route('admin.reports.sales.yearly') }}" class="btn btn-brand">
