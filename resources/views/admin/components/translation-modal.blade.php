@@ -122,8 +122,14 @@
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                                             <i class="bi bi-x"></i> Close
                                         </button>
-                                        <button type="submit" class="btn btn-success">
-                                            <i class="bi bi-check-circle"></i> Save Translation
+                                        <button type="submit" class="btn btn-success" id="saveTranslationBtn_{{ $safeModule }}_{{ $safeItemId }}">
+                                            <span class="btn-text">
+                                                <i class="bi bi-check-circle"></i> Save Translation
+                                            </span>
+                                            <span class="btn-loading" style="display: none;">
+                                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                                Saving...
+                                            </span>
                                         </button>
                                     </div>
                                 </div>
@@ -311,10 +317,44 @@
         justify-content: center;
     }
 }
+/* CKEditor in Translation Modal */
+.translation-editor-full .ck-editor__editable {
+    min-height: 300px;
+}
+
+.translation-editor-simple .ck-editor__editable {
+    min-height: 100px;
+}
+
+.ck-editor__editable.ck-blurred .ck-placeholder::before {
+    color: #adb5bd;
+}
+
+/* RTL Support for CKEditor */
+.ck-editor__editable[dir="rtl"] {
+    text-align: right;
+}
+/* Save Button Loading State */
+#saveTranslationBtn_{{ $safeModule }}_{{ $safeItemId }}:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.btn-loading .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15em;
+}
+
+.btn-success:disabled {
+    background-color: #5B914C;
+    border-color: #5B914C;
+}
 </style>
 @endpush
 
 @push('scripts')
+<script src="https://cdn.ckeditor.com/ckeditor5/39.0.0/classic/ckeditor.js"></script>
 <script>
 (function() {
     'use strict';
@@ -365,6 +405,52 @@
                 console.error('❌ Translation Manager Init Error:', error);
                 this.showError('Failed to initialize: ' + error.message);
             }
+        },
+
+        // Initialize CKEditor for translation fields
+        initializeTranslationEditors: function(lang) {
+            const manager = this;
+            const isRTL = this.languages[lang].direction === 'rtl';
+
+            // Destroy existing editors first
+            if (window.translationEditors) {
+                Object.values(window.translationEditors).forEach(editor => {
+                    if (editor) editor.destroy();
+                });
+            }
+            window.translationEditors = {};
+
+            // Initialize full editors (for description field)
+            document.querySelectorAll('.translation-editor-full').forEach(textarea => {
+                ClassicEditor
+                    .create(textarea, {
+                        toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', '|', 'blockQuote', 'insertTable', '|', 'undo', 'redo'],
+                        language: {
+                            ui: 'en',
+                            content: isRTL ? 'ar' : 'en'
+                        }
+                    })
+                    .then(editor => {
+                        window.translationEditors[textarea.id] = editor;
+                    })
+                    .catch(error => console.error(error));
+            });
+
+            // Initialize simple editors (for short_description, meta_description, etc.)
+            document.querySelectorAll('.translation-editor-simple').forEach(textarea => {
+                ClassicEditor
+                    .create(textarea, {
+                        toolbar: ['bold', 'italic', 'link', '|', 'undo', 'redo'],
+                        language: {
+                            ui: 'en',
+                            content: isRTL ? 'ar' : 'en'
+                        }
+                    })
+                    .then(editor => {
+                        window.translationEditors[textarea.id] = editor;
+                    })
+                    .catch(error => console.error(error));
+            });
         },
 
         // Load available languages
@@ -486,6 +572,7 @@
 
             await this.loadTranslations(lang);
             this.renderFormFields(lang);
+            this.initializeTranslationEditors(lang);
         },
 
         // Load translations
@@ -515,7 +602,7 @@
                 const originalValue = (this.originalValues[field] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const fieldId = 'translation_' + field + '_' + lang;
 
-                const isTextarea = ['description', 'short_description', 'meta_description'].includes(field);
+                const isTextarea = ['description', 'content', 'short_description', 'meta_description'].includes(field);
                 const rows = field === 'description' ? 8 : 3;
 
                 html += '<div class="translation-field-group">';
@@ -525,7 +612,8 @@
                 html += '</label>';
 
                 if (isTextarea) {
-                    html += '<textarea id="' + fieldId + '" name="' + field + '" class="form-control ' + (isRTL ? 'rtl-field' : '') + '" rows="' + rows + '" placeholder="Enter ' + fieldName + ' in ' + langData.name + '" dir="' + langData.direction + '">' + value + '</textarea>';
+                    const editorClass = field === 'description' ? 'translation-editor-full' : 'translation-editor-simple';
+                    html += '<textarea id="' + fieldId + '" name="' + field + '" class="form-control ' + editorClass + ' ' + (isRTL ? 'rtl-field' : '') + '" rows="' + rows + '" placeholder="Enter ' + fieldName + ' in ' + langData.name + '" dir="' + langData.direction + '">' + value + '</textarea>';
                 } else {
                     html += '<input type="text" id="' + fieldId + '" name="' + field + '" class="form-control ' + (isRTL ? 'rtl-field' : '') + '" value="' + value + '" placeholder="Enter ' + fieldName + ' in ' + langData.name + '" dir="' + langData.direction + '">';
                 }
@@ -558,8 +646,28 @@
             event.preventDefault();
             if (!this.currentLang) return;
 
+            //Get the save button
+            const saveBtn = document.getElementById('saveTranslationBtn_' + safeModule + '_' + safeItemId);
+            const btnText = saveBtn.querySelector('.btn-text');
+            const btnLoading = saveBtn.querySelector('.btn-loading');
+
             const formData = {};
             this.fields.forEach(field => {
+                const fieldId = 'translation_' + field + '_' + this.currentLang;
+                // Check if field has CKEditor
+                if (window.translationEditors && window.translationEditors[fieldId]) {
+                    const editorData = window.translationEditors[fieldId].getData();
+                    if (editorData.trim()) {
+                        formData[field] = editorData;
+                    }
+                } else {
+                    // Regular input/textarea
+                    const input = document.querySelector('#translationFields_' + safeModule + '_' + safeItemId + ' [name="' + field + '"]');
+                    if (input && input.value.trim()) {
+                        formData[field] = input.value.trim();
+                    }
+                }
+                //
                 const input = document.querySelector('#translationFields_' + safeModule + '_' + safeItemId + ' [name="' + field + '"]');
                 if (input && input.value.trim()) {
                     formData[field] = input.value.trim();
@@ -567,6 +675,9 @@
             });
 
             try {
+                saveBtn.disabled = true;
+                btnText.style.display = 'none';
+                btnLoading.style.display = 'inline-block';
                 const response = await TranslationAPI.saveTranslations(this.module, this.itemId, this.currentLang, formData);
                 if (response.success) {
                     this.showSuccess('Translation saved successfully!');
@@ -577,6 +688,11 @@
             } catch (error) {
                 console.error('❌ Save error:', error);
                 this.showError('Failed to save translation');
+            } finally {
+                //Reset button state
+                saveBtn.disabled = false;
+                btnText.style.display = 'inline-block';
+                btnLoading.style.display = 'none';
             }
         },
 
