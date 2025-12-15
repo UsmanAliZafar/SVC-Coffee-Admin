@@ -143,11 +143,11 @@
                 <i class="bi bi-printer"></i> Print
             </button>
            {{-- Export Dropdown --}}
-            @include('admin.reports.partials.export-dropdown', [
+            {{-- @include('admin.reports.partials.export-dropdown', [
                 'pdfUrl' => route('admin.reports.export.pdf', 'sales-daily') . '?' . http_build_query(request()->all()),
                 'excelUrl' => route('admin.reports.export.excel', 'sales-daily') . '?' . http_build_query(request()->all()),
                 'csvUrl' => route('admin.reports.export.csv', 'sales-daily') . '?' . http_build_query(request()->all())
-            ])
+            ]) --}}
             <a href="{{ route('admin.reports.sales.custom-range') }}" class="btn btn-brand">
                 <i class="bi bi-calendar-range"></i> Custom Range
             </a>
