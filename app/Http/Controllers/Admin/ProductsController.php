@@ -1304,7 +1304,7 @@ class ProductsController extends Controller
     }
 
     /**
-     * Upload product images via AJAX
+     * Upload product images/videos via AJAX
      */
     public function uploadImages(Request $request, $id)
     {
@@ -1314,7 +1314,15 @@ class ProductsController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048'
+            'images.*' => [
+                'required',
+                'file',
+                'mimes:jpeg,png,jpg,gif,webp,mp4,mov,avi,wmv,flv,webm',
+                'max:51200' // 50MB max for videos
+            ]
+        ], [
+            'images.*.mimes' => 'File must be an image (jpeg, png, jpg, gif, webp) or video (mp4, mov, avi, wmv, flv, webm)',
+            'images.*.max' => 'File size must not exceed 50MB'
         ]);
 
         if ($validator->fails()) {
@@ -1325,79 +1333,291 @@ class ProductsController extends Controller
         }
 
         $product = Product::findOrFail($id);
-        $uploadedImages = [];
+        $uploadedMedia = [];
 
         try {
             if ($request->hasFile('images')) {
                 $maxOrder = ProductImage::where('product_id', $product->id)->max('sort_order') ?? -1;
 
-                foreach ($request->file('images') as $image) {
-                    $imageName = time() . '_' . Str::random(10) . '.' . $image->extension();
-                    $imagePath = $image->storeAs('products/gallery', $imageName, 'public');
+                foreach ($request->file('images') as $file) {
+                    $mimeType = $file->getMimeType();
+                    $isVideo = Str::startsWith($mimeType, 'video/');
+
+                    // Determine folder and media type
+                    $folder = $isVideo ? 'products/videos' : 'products/gallery';
+                    $mediaType = $isVideo ? 'video' : 'image';
+
+                    // Generate unique filename
+                    $extension = $file->extension();
+                    $fileName = time() . '_' . Str::random(10) . '.' . $extension;
+                    $filePath = $file->storeAs($folder, $fileName, 'public');
+
+                    // Get file size
+                    $fileSize = $file->getSize();
+
+                    // Get video duration if it's a video (optional - requires FFmpeg)
+                    $duration = null;
+                    if ($isVideo) {
+                        $duration = $this->getVideoDuration($file->getRealPath());
+                    }
 
                     $productImage = ProductImage::create([
                         'product_id' => $product->id,
-                        'image_path' => $imagePath,
-                        'image_name' => $image->getClientOriginalName(),
+                        'image_path' => $filePath,
+                        'image_name' => $file->getClientOriginalName(),
+                        'media_type' => $mediaType,
+                        'mime_type' => $mimeType,
+                        'file_size' => $fileSize,
+                        'duration' => $duration,
                         'sort_order' => ++$maxOrder,
                         'is_primary' => false,
                     ]);
 
-                    $uploadedImages[] = [
+                    $uploadedMedia[] = [
                         'id' => $productImage->id,
-                        'url' => $productImage->getImageUrl(),
+                        'url' => $productImage->getMediaUrl(),
                         'name' => $productImage->image_name,
+                        'media_type' => $mediaType,
+                        'is_video' => $isVideo,
+                        'duration' => $productImage->getFormattedDuration(),
+                        'file_size' => $this->formatBytes($fileSize),
                     ];
                 }
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Images uploaded successfully',
-                'images' => $uploadedImages
+                'message' => 'Media uploaded successfully',
+                'media' => $uploadedMedia
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload images: ' . $e->getMessage()
+                'message' => 'Failed to upload media: ' . $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Delete product image
+     * Get video duration (requires FFmpeg)
+     * If FFmpeg is not available, returns null
      */
-    public function deleteImage($productId, $imageId)
+    private function getVideoDuration($filePath): ?int
     {
-        // Check permission
-        if (!auth('admin')->user()->hasPermission('products.update')) {
+        try {
+            if (!function_exists('shell_exec')) {
+                return null;
+            }
+
+            $command = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($filePath);
+            $duration = shell_exec($command);
+
+            if ($duration) {
+                return (int) round(floatval($duration));
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to get video duration: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Format bytes to human readable format
+     */
+    private function formatBytes($bytes, $precision = 2): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $bytes = max($bytes, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+        $bytes /= pow(1024, $pow);
+
+        return round($bytes, $precision) . ' ' . $units[$pow];
+    }
+
+    /**
+     * Upload temporary images/videos (for create page)
+     */
+    public function uploadTempImages(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('products.create')) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
+        $validator = Validator::make($request->all(), [
+            'session_id' => 'required|string',
+            'images.*' => [
+                'required',
+                'file',
+                'mimes:jpeg,png,jpg,gif,webp,mp4,mov,avi,wmv,flv,webm',
+                'max:51200' // 50MB
+            ]
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $sessionId = $request->session_id;
+        $uploadedMedia = [];
+
         try {
-            $image = ProductImage::where('product_id', $productId)
-                ->where('id', $imageId)
-                ->firstOrFail();
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $file) {
+                    $mimeType = $file->getMimeType();
+                    $isVideo = Str::startsWith($mimeType, 'video/');
 
-            // Delete file from storage
-            if ($image->image_path && Storage::disk('public')->exists($image->image_path)) {
-                Storage::disk('public')->delete($image->image_path);
+                    $folder = $isVideo ? 'temp/videos/' . $sessionId : 'temp/images/' . $sessionId;
+                    $mediaType = $isVideo ? 'video' : 'image';
+
+                    $fileName = time() . '_' . Str::random(10) . '.' . $file->extension();
+                    $filePath = $file->storeAs($folder, $fileName, 'public');
+
+                    $fileSize = $file->getSize();
+                    $duration = null;
+
+                    if ($isVideo) {
+                        $duration = $this->getVideoDuration($file->getRealPath());
+                    }
+
+                    $uploadedMedia[] = [
+                        'path' => $filePath,
+                        'url' => asset('storage/' . $filePath),
+                        'name' => $file->getClientOriginalName(),
+                        'media_type' => $mediaType,
+                        'mime_type' => $mimeType,
+                        'is_video' => $isVideo,
+                        'duration' => $duration ? $this->formatDuration($duration) : null,
+                        'file_size' => $this->formatBytes($fileSize),
+                    ];
+                }
             }
-
-            $image->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Image deleted successfully'
+                'media' => $uploadedMedia
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete image: ' . $e->getMessage()
+                'message' => 'Failed to upload media: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Delete temporary image/video
+     */
+    public function deleteTempImage(Request $request)
+    {
+        if (!auth('admin')->user()->hasPermission('products.create')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            $imagePath = $request->image_path;
+
+            if ($imagePath && Storage::disk('public')->exists($imagePath)) {
+                Storage::disk('public')->delete($imagePath);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Media deleted successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete media: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Move temporary media to product folder
+     */
+    private function moveTempImages($sessionId, $productId)
+    {
+        try {
+            // Move temp images
+            $tempImagePath = 'temp/images/' . $sessionId;
+            if (Storage::disk('public')->exists($tempImagePath)) {
+                $files = Storage::disk('public')->files($tempImagePath);
+
+                foreach ($files as $file) {
+                    $fileName = basename($file);
+                    $newPath = 'products/gallery/' . $fileName;
+
+                    Storage::disk('public')->move($file, $newPath);
+
+                    // Create ProductImage record
+                    ProductImage::create([
+                        'product_id' => $productId,
+                        'image_path' => $newPath,
+                        'image_name' => $fileName,
+                        'media_type' => 'image',
+                        'mime_type' => Storage::disk('public')->mimeType($newPath),
+                        'file_size' => Storage::disk('public')->size($newPath),
+                        'sort_order' => ProductImage::where('product_id', $productId)->max('sort_order') + 1 ?? 0,
+                    ]);
+                }
+
+                // Delete temp folder
+                Storage::disk('public')->deleteDirectory($tempImagePath);
+            }
+
+            // Move temp videos
+            $tempVideoPath = 'temp/videos/' . $sessionId;
+            if (Storage::disk('public')->exists($tempVideoPath)) {
+                $files = Storage::disk('public')->files($tempVideoPath);
+
+                foreach ($files as $file) {
+                    $fileName = basename($file);
+                    $newPath = 'products/videos/' . $fileName;
+
+                    Storage::disk('public')->move($file, $newPath);
+
+                    // Create ProductImage record (yes, videos are also stored in product_images table)
+                    ProductImage::create([
+                        'product_id' => $productId,
+                        'image_path' => $newPath,
+                        'image_name' => $fileName,
+                        'media_type' => 'video',
+                        'mime_type' => Storage::disk('public')->mimeType($newPath),
+                        'file_size' => Storage::disk('public')->size($newPath),
+                        'sort_order' => ProductImage::where('product_id', $productId)->max('sort_order') + 1 ?? 0,
+                    ]);
+                }
+
+                // Delete temp folder
+                Storage::disk('public')->deleteDirectory($tempVideoPath);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Failed to move temp media: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Format duration in seconds to MM:SS
+     */
+    private function formatDuration(?int $seconds): ?string
+    {
+        if (!$seconds) {
+            return null;
+        }
+
+        $minutes = floor($seconds / 60);
+        $seconds = $seconds % 60;
+
+        return sprintf('%02d:%02d', $minutes, $seconds);
     }
 
     /**
@@ -2423,124 +2643,6 @@ class ProductsController extends Controller
             'success' => true,
             'session_id' => $sessionId
         ]);
-    }
-
-    /**
-     * Upload images before form submission
-     */
-    public function uploadTempImages(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'session_id' => 'required|string',
-            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $sessionId = $request->session_id;
-        $uploadedImages = [];
-
-        try {
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $image) {
-                    $imageName = time() . '_' . Str::random(10) . '.' . $image->extension();
-                    $imagePath = $image->storeAs('products/temp/' . $sessionId, $imageName, 'public');
-
-                    $uploadedImages[] = [
-                        'path' => $imagePath,
-                        'url' => asset('storage/' . $imagePath),
-                        'name' => $image->getClientOriginalName(),
-                    ];
-                }
-            }
-
-            return response()->json([
-                'success' => true,
-                'images' => $uploadedImages
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to upload images: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Delete temp image before form submission
-     */
-    public function deleteTempImage(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'image_path' => 'required|string'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            $imagePath = $request->image_path;
-
-            if (Storage::disk('public')->exists($imagePath)) {
-                Storage::disk('public')->delete($imagePath);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Image deleted successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete image: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Move temp images to product folder and create records
-     */
-    protected function moveTempImages($sessionId, $productId)
-    {
-        $tempPath = 'products/temp/' . $sessionId;
-
-        if (!Storage::disk('public')->exists($tempPath)) {
-            return;
-        }
-
-        $files = Storage::disk('public')->files($tempPath);
-        $sortOrder = 0;
-
-        foreach ($files as $file) {
-            $fileName = basename($file);
-            $newPath = 'products/gallery/' . $fileName;
-
-            // Move file
-            Storage::disk('public')->move($file, $newPath);
-
-            // Create product image record
-            ProductImage::create([
-                'product_id' => $productId,
-                'image_path' => $newPath,
-                'image_name' => $fileName,
-                'sort_order' => $sortOrder++,
-                'is_primary' => $sortOrder === 1,
-            ]);
-        }
-
-        // Delete temp directory
-        Storage::disk('public')->deleteDirectory($tempPath);
     }
 
     /**

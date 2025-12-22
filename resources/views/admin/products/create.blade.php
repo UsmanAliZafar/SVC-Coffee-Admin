@@ -359,6 +359,25 @@
         border-radius: 0.375rem 0 0 0.375rem;
         border-right: none;
     }
+
+    .video-preview-wrapper {
+        position: relative;
+        width: 150px;
+        height: 150px;
+    }
+
+    .video-preview-wrapper video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 2px solid #ddd;
+    }
+
+    .image-preview-container .badge {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
 </style>
 @endpush
 
@@ -441,9 +460,9 @@
                     </div>
                 </div>
 
-                <!-- Product Images -->
+                <!-- Product Images & Videos -->
                 <div class="form-section">
-                    <h5 class="section-title"><i class="bi bi-image"></i> Product Images</h5>
+                    <h5 class="section-title"><i class="bi bi-camera-video"></i> Product Media (Images & Videos)</h5>
 
                     <div class="mb-3">
                         <label class="form-label">Main Image</label>
@@ -453,16 +472,21 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Gallery Images</label>
+                        <label class="form-label">Gallery Media (Images & Videos)</label>
                         <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> <strong>Note:</strong> Images are uploaded immediately when selected. They will be linked to this product when you submit the form.
+                            <i class="bi bi-info-circle"></i> <strong>Note:</strong> Media files are uploaded immediately when selected. They will be linked to this product when you submit the form.
+                            <ul class="mb-0 mt-2">
+                                <li><strong>Images:</strong> PNG, JPG, GIF, WEBP up to 2MB each</li>
+                                <li><strong>Videos:</strong> MP4, MOV, AVI, WMV, FLV, WEBM up to 50MB each</li>
+                            </ul>
                         </div>
                         <div class="dropzone-area" id="dropzoneArea">
                             <i class="bi bi-cloud-upload" style="font-size: 3rem; color: #5B914C;"></i>
                             <p class="mb-2"><strong>Click to upload</strong> or drag and drop</p>
-                            <p class="text-muted mb-0">PNG, JPG, GIF, WEBP up to 2MB each</p>
+                            <p class="text-muted mb-0">Images & Videos supported</p>
                         </div>
-                        <input type="file" name="images[]" id="galleryImages" class="d-none" accept="image/*" multiple>
+                        <input type="file" name="images[]" id="galleryImages" class="d-none"
+                            accept="image/*,video/*" multiple>
                         <div id="galleryPreview" class="mt-3"></div>
                     </div>
                 </div>
@@ -926,7 +950,7 @@
         uploadImagesToServer(files);
     });
 
-    // Upload images immediately to server
+    // Upload media (images and videos) immediately to server
     function uploadImagesToServer(files) {
         if (files.length === 0) return;
 
@@ -946,7 +970,7 @@
             contentType: false,
             beforeSend: function() {
                 Swal.fire({
-                    title: 'Uploading Images...',
+                    title: 'Uploading Media...',
                     text: 'Please wait',
                     allowOutsideClick: false,
                     didOpen: () => {
@@ -957,28 +981,60 @@
             success: function(response) {
                 Swal.close();
                 if (response.success) {
-                    response.images.forEach(image => {
-                        $('#galleryPreview').append(`
-                            <div class="image-preview-container" data-path="${image.path}">
-                                <img src="${image.url}" class="image-preview" alt="${image.name}">
-                                <button type="button" class="remove-image" onclick="deleteGalleryImage('${image.path}', this)">
-                                    <i class="bi bi-x"></i>
-                                </button>
-                            </div>
-                        `);
+                    response.media.forEach(media => {
+                        let mediaHtml = '';
+
+                        if (media.is_video) {
+                            // Video preview
+                            mediaHtml = `
+                                <div class="image-preview-container" data-path="${media.path}">
+                                    <div class="video-preview-wrapper" style="position: relative;">
+                                        <video class="image-preview" controls>
+                                            <source src="${media.url}" type="${media.mime_type}">
+                                            Your browser does not support the video tag.
+                                        </video>
+                                        <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
+                                            <i class="bi bi-play-circle"></i> Video
+                                        </span>
+                                        ${media.duration ? `<span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">${media.duration}</span>` : ''}
+                                        <span class="badge bg-secondary" style="position: absolute; bottom: 5px; left: 5px;">
+                                            ${media.file_size}
+                                        </span>
+                                    </div>
+                                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            // Image preview
+                            mediaHtml = `
+                                <div class="image-preview-container" data-path="${media.path}">
+                                    <img src="${media.url}" class="image-preview" alt="${media.name}">
+                                    <span class="badge bg-secondary" style="position: absolute; bottom: 5px; left: 5px;">
+                                        ${media.file_size}
+                                    </span>
+                                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            `;
+                        }
+
+                        $('#galleryPreview').append(mediaHtml);
                     });
 
                     Swal.fire({
                         icon: 'success',
                         title: 'Uploaded!',
-                        text: `${response.images.length} image(s) uploaded successfully`,
+                        text: `${response.media.length} file(s) uploaded successfully`,
                         timer: 1500,
                         showConfirmButton: false
                     });
                 }
             },
             error: function(xhr) {
-                Swal.fire('Error!', 'Failed to upload images', 'error');
+                Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to upload media', 'error');
             }
         });
     }

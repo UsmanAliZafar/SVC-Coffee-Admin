@@ -301,6 +301,229 @@
     .stat-value {
         word-break: break-word;
     }
+
+    /* Media Gallery Styling */
+    .media-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 15px;
+    }
+
+    .gallery-item {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid #e0e0e0;
+        transition: all 0.3s ease;
+        background: #fff;
+    }
+
+    .gallery-item:hover {
+        border-color: #5B914C;
+        box-shadow: 0 4px 12px rgba(91, 145, 76, 0.3);
+        transform: translateY(-5px);
+    }
+
+    /* Image Styling */
+    .gallery-image {
+        position: relative;
+        cursor: pointer;
+        overflow: hidden;
+        aspect-ratio: 1;
+    }
+
+    .gallery-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .gallery-image:hover img {
+        transform: scale(1.1);
+    }
+
+    /* Video Styling */
+    .gallery-video {
+        position: relative;
+        cursor: pointer;
+        aspect-ratio: 1;
+        background: #000;
+    }
+
+    .video-thumbnail {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .video-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.4);
+        transition: background 0.3s ease;
+    }
+
+    .gallery-video:hover .video-overlay {
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    .video-overlay i {
+        font-size: 4rem;
+        color: white;
+        opacity: 0.9;
+        transition: all 0.3s ease;
+    }
+
+    .gallery-video:hover .video-overlay i {
+        font-size: 5rem;
+        opacity: 1;
+    }
+
+    /* Media Badges */
+    .media-badges {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        z-index: 10;
+    }
+
+    .media-badges .badge {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+        backdrop-filter: blur(4px);
+    }
+
+    /* File Size Badge */
+    .file-size-badge {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        z-index: 10;
+    }
+
+    /* Media Info */
+    .media-info {
+        padding: 8px;
+        background: #f8f9fa;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .media-info small {
+        font-size: 0.75rem;
+        line-height: 1.4;
+    }
+
+    /* Main Media Container */
+    .main-media-container {
+        display: inline-block;
+        position: relative;
+    }
+
+    .main-product-image {
+        max-width: 100%;
+        max-height: 500px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .main-product-image:hover {
+        transform: scale(1.02);
+    }
+
+    /* Statistics Box */
+    .stat-box {
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .stat-box:hover {
+        background: #e9ecef;
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-box h4 {
+        color: #5B914C;
+        font-weight: 700;
+    }
+
+    /* Primary Badge */
+    .primary-badge {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: #ffc107;
+        color: #000;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .media-gallery {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .video-overlay i {
+            font-size: 3rem;
+        }
+
+        .gallery-video:hover .video-overlay i {
+            font-size: 3.5rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .media-gallery {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+    }
+
+    /* Video Modal Styling */
+    .video-modal {
+        background: rgba(0, 0, 0, 0.95) !important;
+    }
+
+    .video-modal-container {
+        background: #000;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    .video-modal .swal2-title {
+        color: white !important;
+    }
+
+    .video-modal video {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
 </style>
 @endpush
 
@@ -397,36 +620,169 @@
     <div class="row">
         <!-- Left Column -->
         <div class="col-lg-8">
-
-            <!-- Product Image & Gallery -->
+            <!-- Product Media (Images & Videos) -->
             <div class="info-section">
                 <h5 class="section-title">
-                    <i class="bi bi-images"></i> Product Images
+                    <i class="bi bi-camera-video"></i> Product Media
                 </h5>
 
                 @if($product->getMainImageUrl())
                 <div class="text-center mb-4">
-                    <img src="{{ $product->getMainImageUrl() }}" alt="{{ $product->name }}" class="main-product-image" onclick="viewImage('{{ $product->getMainImageUrl() }}')">
+                    <div class="main-media-container">
+                        <img src="{{ $product->getMainImageUrl() }}"
+                            alt="{{ $product->name }}"
+                            class="main-product-image"
+                            onclick="viewImage('{{ $product->getMainImageUrl() }}')">
+                        <div class="mt-2">
+                            <span class="badge bg-primary">
+                                <i class="bi bi-image"></i> Main Image
+                            </span>
+                        </div>
+                    </div>
                 </div>
                 @endif
 
                 @if($product->images->count() > 0)
-                <div class="image-gallery">
-                    @foreach($product->images as $image)
-                    <div class="gallery-image" onclick="viewImage('{{ $image->getImageUrl() }}')">
-                        <img src="{{ $image->getImageUrl() }}" alt="{{ $image->alt_text }}">
-                        @if($image->is_primary)
-                            <span class="primary-badge"><i class="bi bi-star-fill"></i> Primary</span>
+                <div class="row">
+                    <div class="col-12">
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-grid-3x3"></i> Gallery
+                            <span class="badge bg-secondary">{{ $product->images->count() }} items</span>
+                        </h6>
+                    </div>
+                </div>
+
+                <div class="media-gallery">
+                    @foreach($product->images as $media)
+                    <div class="gallery-item {{ $media->isVideo() ? 'video-item' : 'image-item' }}"
+                        data-id="{{ $media->id }}"
+                        data-type="{{ $media->media_type }}">
+
+                        @if($media->isVideo())
+                            <!-- Video Item -->
+                            <div class="gallery-video" onclick="viewVideo('{{ $media->getMediaUrl() }}', '{{ $media->image_name }}', '{{ $media->mime_type }}')">
+                                <video class="video-thumbnail">
+                                    <source src="{{ $media->getMediaUrl() }}" type="{{ $media->mime_type }}">
+                                </video>
+
+                                <!-- Video Overlay -->
+                                <div class="video-overlay">
+                                    <i class="bi bi-play-circle-fill"></i>
+                                </div>
+
+                                <!-- Media Info Badges -->
+                                <div class="media-badges">
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-play-circle"></i> Video
+                                    </span>
+                                    @if($media->duration)
+                                    <span class="badge bg-dark">
+                                        {{ $media->getFormattedDuration() }}
+                                    </span>
+                                    @endif
+                                    @if($media->is_primary)
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-star-fill"></i> Primary
+                                    </span>
+                                    @endif
+                                </div>
+
+                                <!-- File Size -->
+                                @if($media->file_size)
+                                <div class="file-size-badge">
+                                    {{ number_format($media->file_size / 1048576, 2) }} MB
+                                </div>
+                                @endif
+                            </div>
+
+                            <!-- Video Info -->
+                            <div class="media-info">
+                                <small class="text-muted d-block text-truncate" title="{{ $media->image_name }}">
+                                    <i class="bi bi-file-earmark-play"></i> {{ $media->image_name }}
+                                </small>
+                                @if($media->mime_type)
+                                <small class="text-muted">{{ strtoupper(str_replace('video/', '', $media->mime_type)) }}</small>
+                                @endif
+                            </div>
+                        @else
+                            <!-- Image Item -->
+                            <div class="gallery-image" onclick="viewImage('{{ $media->getImageUrl() }}')">
+                                <img src="{{ $media->getImageUrl() }}"
+                                    alt="{{ $media->alt_text }}"
+                                    loading="lazy">
+
+                                <!-- Media Info Badges -->
+                                <div class="media-badges">
+                                    @if($media->is_primary)
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-star-fill"></i> Primary
+                                    </span>
+                                    @endif
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-image"></i> Image
+                                    </span>
+                                </div>
+
+                                <!-- File Size -->
+                                @if($media->file_size)
+                                <div class="file-size-badge">
+                                    {{ number_format($media->file_size / 1048576, 2) }} MB
+                                </div>
+                                @endif
+                            </div>
+
+                            <!-- Image Info -->
+                            <div class="media-info">
+                                <small class="text-muted d-block text-truncate" title="{{ $media->image_name }}">
+                                    <i class="bi bi-file-earmark-image"></i> {{ $media->image_name }}
+                                </small>
+                                @if($media->alt_text)
+                                <small class="text-muted">{{ $media->alt_text }}</small>
+                                @endif
+                            </div>
                         @endif
                     </div>
                     @endforeach
                 </div>
                 @else
                 <div class="alert alert-info mb-0">
-                    <i class="bi bi-info-circle"></i> No gallery images available
+                    <i class="bi bi-info-circle"></i> No gallery media available
                 </div>
                 @endif
             </div>
+
+            <!-- Media Statistics (Optional) -->
+            @if($product->images->count() > 0)
+            <div class="info-section">
+                <h6 class="text-muted mb-3">
+                    <i class="bi bi-bar-chart"></i> Media Statistics
+                </h6>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="stat-box">
+                            <i class="bi bi-image text-primary" style="font-size: 2rem;"></i>
+                            <h4 class="mb-0 mt-2">{{ $product->images->where('media_type', 'image')->count() }}</h4>
+                            <small class="text-muted">Images</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="stat-box">
+                            <i class="bi bi-play-circle text-success" style="font-size: 2rem;"></i>
+                            <h4 class="mb-0 mt-2">{{ $product->images->where('media_type', 'video')->count() }}</h4>
+                            <small class="text-muted">Videos</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="stat-box">
+                            <i class="bi bi-hdd text-info" style="font-size: 2rem;"></i>
+                            <h4 class="mb-0 mt-2">{{ number_format($product->images->sum('file_size') / 1048576, 2) }}</h4>
+                            <small class="text-muted">MB Total</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+            {{--  --}}
 
             <!-- Product Description -->
             @if($product->short_description || $product->description)
@@ -1363,6 +1719,63 @@ $('#updateStockForm').on('submit', function(e) {
                 text: xhr.responseJSON?.message || 'Failed to update stock'
             });
         }
+    });
+});
+//
+function viewImage(imageUrl) {
+    Swal.fire({
+        imageUrl: imageUrl,
+        imageAlt: 'Product Image',
+        showCloseButton: true,
+        showConfirmButton: false,
+        customClass: {
+            image: 'img-fluid'
+        },
+        width: '80%'
+    });
+}
+
+// NEW: View Video in Modal
+function viewVideo(videoUrl, videoName, mimeType) {
+    Swal.fire({
+        title: videoName || 'Product Video',
+        html: `
+            <div class="video-modal-container">
+                <video controls autoplay style="width: 100%; max-height: 70vh; border-radius: 8px;">
+                    <source src="${videoUrl}" type="${mimeType}">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        `,
+        showCloseButton: true,
+        showConfirmButton: false,
+        width: '90%',
+        customClass: {
+            popup: 'video-modal'
+        },
+        didOpen: () => {
+            // Pause video when modal closes
+            const video = Swal.getPopup().querySelector('video');
+            Swal.getCloseButton().addEventListener('click', () => {
+                if (video) {
+                    video.pause();
+                }
+            });
+        }
+    });
+}
+
+// Load video thumbnail on page load (optional - for better performance)
+document.addEventListener('DOMContentLoaded', function() {
+    const videoThumbnails = document.querySelectorAll('.video-thumbnail');
+
+    videoThumbnails.forEach(video => {
+        // Set video to first frame
+        video.currentTime = 1;
+        video.pause();
+
+        // Preload metadata
+        video.preload = 'metadata';
     });
 });
 </script>

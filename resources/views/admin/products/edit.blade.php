@@ -447,6 +447,45 @@
         border-radius: 0.375rem 0 0 0.375rem;
         border-right: none;
     }
+
+    /* Video Preview Styling */
+    .video-preview-wrapper {
+        position: relative;
+        width: 150px;
+        height: 150px;
+    }
+
+    .video-preview-wrapper video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 2px solid #ddd;
+    }
+
+    .image-preview-container .badge {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+        z-index: 5;
+    }
+
+    /* Video hover effects */
+    .video-preview-wrapper:hover {
+        border-color: #5B914C;
+    }
+
+    .video-preview-wrapper video::-webkit-media-controls-panel {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    /* Media type badge colors */
+    .badge.bg-primary {
+        background-color: #5B914C !important;
+    }
+
+    .badge.bg-dark {
+        background-color: rgba(0, 0, 0, 0.8) !important;
+    }
 </style>
 @endpush
 
@@ -556,9 +595,9 @@
                     </div>
                 </div>
 
-                <!-- Product Images -->
+                <!-- Product Images & Videos -->
                 <div class="form-section">
-                    <h5 class="section-title"><i class="bi bi-image"></i> Product Images</h5>
+                    <h5 class="section-title"><i class="bi bi-camera-video"></i> Product Media (Images & Videos)</h5>
 
                     <div class="mb-3">
                         <label class="form-label">Main Image</label>
@@ -577,26 +616,61 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Gallery Images</label>
+                        <label class="form-label">Gallery Media (Images & Videos)</label>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> <strong>Supported Formats:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li><strong>Images:</strong> PNG, JPG, GIF, WEBP up to 2MB each</li>
+                                <li><strong>Videos:</strong> MP4, MOV, AVI, WMV, FLV, WEBM up to 50MB each</li>
+                            </ul>
+                        </div>
                         <div class="dropzone-area" id="dropzoneArea">
                             <i class="bi bi-cloud-upload" style="font-size: 3rem; color: #5B914C;"></i>
                             <p class="mb-2"><strong>Click to upload</strong> or drag and drop</p>
-                            <p class="text-muted mb-0">PNG, JPG, GIF, WEBP up to 2MB each</p>
+                            <p class="text-muted mb-0">Images & Videos supported</p>
                         </div>
-                        <input type="file" name="images[]" id="galleryImages" class="d-none" accept="image/*" multiple>
+                        <input type="file" name="images[]" id="galleryImages" class="d-none"
+                            accept="image/*,video/*" multiple>
 
                         <div id="galleryPreview" class="mt-3">
-                            @foreach($product->images as $image)
-                            <div class="image-preview-container" data-id="{{ $image->id }}">
-                                @if($image->is_primary)
+                            @foreach($product->images as $media)
+                            <div class="image-preview-container" data-id="{{ $media->id }}">
+                                @if($media->is_primary)
                                 <span class="primary-badge"><i class="bi bi-star-fill"></i> Primary</span>
                                 @endif
-                                <img src="{{ $image->getImageUrl() }}" class="image-preview" alt="{{ $image->image_name }}">
-                                <button type="button" class="remove-image" onclick="deleteProductImage('{{ $product->id }}', '{{ $image->id }}', this)">
+
+                                @if($media->isVideo())
+                                    <!-- Video Preview -->
+                                    <div class="video-preview-wrapper" style="position: relative;">
+                                        <video class="image-preview" controls>
+                                            <source src="{{ $media->getMediaUrl() }}" type="{{ $media->mime_type }}">
+                                            Your browser does not support the video tag.
+                                        </video>
+                                        <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
+                                            <i class="bi bi-play-circle"></i> Video
+                                        </span>
+                                        @if($media->duration)
+                                        <span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">
+                                            {{ $media->getFormattedDuration() }}
+                                        </span>
+                                        @endif
+                                        @if($media->file_size)
+                                        <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
+                                            {{ number_format($media->file_size / 1048576, 2) }} MB
+                                        </span>
+                                        @endif
+                                    </div>
+                                @else
+                                    <!-- Image Preview -->
+                                    <img src="{{ $media->getImageUrl() }}" class="image-preview" alt="{{ $media->image_name }}">
+                                @endif
+
+                                <button type="button" class="remove-image" onclick="deleteProductImage('{{ $product->id }}', '{{ $media->id }}', this)">
                                     <i class="bi bi-x"></i>
                                 </button>
-                                @if(!$image->is_primary)
-                                <button type="button" class="set-primary-btn" onclick="setPrimaryImage('{{ $product->id }}', '{{ $image->id }}')">
+
+                                @if(!$media->is_primary && $media->isImage())
+                                <button type="button" class="set-primary-btn" onclick="setPrimaryImage('{{ $product->id }}', '{{ $media->id }}')">
                                     <i class="bi bi-star"></i> Set Primary
                                 </button>
                                 @endif
@@ -605,6 +679,7 @@
                         </div>
                     </div>
                 </div>
+
                 <!--  FeatureLinting. -->
                 @include('admin.products.partials.features', ['product' => $product])
                 <!--   -->
@@ -1451,7 +1526,7 @@ $(document).ready(function() {
         uploadImagesToProduct(files);
     });
 
-    // Upload images to product
+    // Upload media (images and videos) to product
     function uploadImagesToProduct(files) {
         if (files.length === 0) return;
 
@@ -1470,8 +1545,8 @@ $(document).ready(function() {
             contentType: false,
             beforeSend: function() {
                 Swal.fire({
-                    title: 'Uploading Images...',
-                    text: 'Please wait',
+                    title: 'Uploading Media...',
+                    html: '<p>Please wait while we upload your files...</p><small class="text-muted">Large videos may take longer</small>',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -1481,31 +1556,78 @@ $(document).ready(function() {
             success: function(response) {
                 Swal.close();
                 if (response.success) {
-                    response.images.forEach(image => {
-                        $('#galleryPreview').append(`
-                            <div class="image-preview-container" data-id="${image.id}">
-                                <img src="${image.url}" class="image-preview" alt="${image.name}">
-                                <button type="button" class="remove-image" onclick="deleteProductImage('${PRODUCT_ID}', '${image.id}', this)">
-                                    <i class="bi bi-x"></i>
-                                </button>
-                                <button type="button" class="set-primary-btn" onclick="setPrimaryImage('${PRODUCT_ID}', '${image.id}')">
-                                    <i class="bi bi-star"></i> Set Primary
-                                </button>
-                            </div>
-                        `);
+                    response.media.forEach(media => {
+                        let mediaHtml = '';
+
+                        if (media.is_video) {
+                            // Video preview
+                            mediaHtml = `
+                                <div class="image-preview-container" data-id="${media.id}">
+                                    <div class="video-preview-wrapper" style="position: relative;">
+                                        <video class="image-preview" controls>
+                                            <source src="${media.url}" type="${media.mime_type || 'video/mp4'}">
+                                            Your browser does not support the video tag.
+                                        </video>
+                                        <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
+                                            <i class="bi bi-play-circle"></i> Video
+                                        </span>
+                                        ${media.duration ? `<span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">${media.duration}</span>` : ''}
+                                        <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
+                                            ${media.file_size}
+                                        </span>
+                                    </div>
+                                    <button type="button" class="remove-image" onclick="deleteProductImage('${PRODUCT_ID}', '${media.id}', this)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            // Image preview
+                            mediaHtml = `
+                                <div class="image-preview-container" data-id="${media.id}">
+                                    <img src="${media.url}" class="image-preview" alt="${media.name}">
+                                    <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
+                                        ${media.file_size}
+                                    </span>
+                                    <button type="button" class="remove-image" onclick="deleteProductImage('${PRODUCT_ID}', '${media.id}', this)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                    <button type="button" class="set-primary-btn" onclick="setPrimaryImage('${PRODUCT_ID}', '${media.id}')">
+                                        <i class="bi bi-star"></i> Set Primary
+                                    </button>
+                                </div>
+                            `;
+                        }
+
+                        $('#galleryPreview').append(mediaHtml);
                     });
 
+                    const fileText = response.media.length === 1 ? 'file' : 'files';
                     Swal.fire({
                         icon: 'success',
                         title: 'Uploaded!',
-                        text: `${response.images.length} image(s) uploaded successfully`,
-                        timer: 1500,
+                        text: `${response.media.length} ${fileText} uploaded successfully`,
+                        timer: 2000,
                         showConfirmButton: false
                     });
                 }
             },
             error: function(xhr) {
-                Swal.fire('Error!', 'Failed to upload images', 'error');
+                Swal.close();
+
+                let errorMessage = 'Failed to upload media';
+                if (xhr.status === 422 && xhr.responseJSON?.errors) {
+                    const errors = xhr.responseJSON.errors;
+                    errorMessage = Object.values(errors).flat().join('<br>');
+                } else if (xhr.responseJSON?.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Upload Failed',
+                    html: errorMessage
+                });
             }
         });
     }
@@ -2035,8 +2157,12 @@ function removeMainImage() {
 }
 
 function deleteProductImage(productId, imageId, button) {
+    const container = $(button).closest('.image-preview-container');
+    const isVideo = container.find('video').length > 0;
+    const mediaType = isVideo ? 'video' : 'image';
+
     Swal.fire({
-        title: 'Delete this image?',
+        title: `Delete this ${mediaType}?`,
         text: "This action cannot be undone!",
         icon: 'warning',
         showCancelButton: true,
@@ -2053,21 +2179,21 @@ function deleteProductImage(productId, imageId, button) {
                 },
                 success: function(response) {
                     if (response.success) {
-                        $(button).closest('.image-preview-container').fadeOut(300, function() {
+                        container.fadeOut(300, function() {
                             $(this).remove();
                         });
 
                         Swal.fire({
                             icon: 'success',
                             title: 'Deleted!',
-                            text: 'Image removed successfully',
-                            timer: 1000,
+                            text: `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} removed successfully`,
+                            timer: 1500,
                             showConfirmButton: false
                         });
                     }
                 },
                 error: function(xhr) {
-                    Swal.fire('Error!', 'Failed to delete image', 'error');
+                    Swal.fire('Error!', `Failed to delete ${mediaType}`, 'error');
                 }
             });
         }
@@ -2098,6 +2224,19 @@ function setPrimaryImage(productId, imageId) {
             Swal.fire('Error!', 'Failed to set primary image', 'error');
         }
     });
+}
+
+// Format bytes to human readable
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 function toggleFeatured() {

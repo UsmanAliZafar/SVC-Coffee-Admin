@@ -45,6 +45,10 @@ class ProductImage extends Model
         'caption',
         'sort_order',
         'is_primary',
+        'media_type',
+        'mime_type',
+        'file_size',
+        'duration',
     ];
 
     /**
@@ -53,6 +57,8 @@ class ProductImage extends Model
     protected $casts = [
         'sort_order' => 'integer',
         'is_primary' => 'boolean',
+        'file_size' => 'integer',
+        'duration' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -259,11 +265,11 @@ class ProductImage extends Model
     /**
      * Check if file is an image
      */
-    public function isImage(): bool
-    {
-        $mimeType = $this->getMimeType();
-        return $mimeType && Str::startsWith($mimeType, 'image/');
-    }
+    // public function isImage(): bool
+    // {
+    //     $mimeType = $this->getMimeType();
+    //     return $mimeType && Str::startsWith($mimeType, 'image/');
+    // }
 
     /**
      * Get image dimensions [width, height]
@@ -362,5 +368,69 @@ class ProductImage extends Model
     public function getDisplayName(): string
     {
         return $this->image_name ?: basename($this->image_path);
+    }
+
+    /**
+     * Check if media is a video
+     */
+    public function isVideo(): bool
+    {
+        return $this->media_type === 'video';
+    }
+
+    /**
+     * Check if media is an image
+     */
+    public function isImage(): bool
+    {
+        return $this->media_type === 'image';
+    }
+
+    /**
+     * Get media URL (works for both images and videos)
+     */
+    public function getMediaUrl(): string
+    {
+        if ($this->image_path) {
+            if (Str::startsWith($this->image_path, ['http://', 'https://'])) {
+                return $this->image_path;
+            }
+
+            if (Storage::disk('public')->exists($this->image_path)) {
+                return asset('storage/' . $this->image_path);
+            }
+        }
+
+        // Return placeholder based on media type
+        if ($this->isVideo()) {
+            return asset('images/placeholders/video_placeholder.jpg');
+        }
+
+        return asset('images/placeholders/not_availble.jpg');
+    }
+
+    /**
+     * Get formatted duration (for videos)
+     */
+    public function getFormattedDuration(): ?string
+    {
+        if (!$this->duration) {
+            return null;
+        }
+
+        $minutes = floor($this->duration / 60);
+        $seconds = $this->duration % 60;
+
+        return sprintf('%02d:%02d', $minutes, $seconds);
+    }
+
+    /**
+     * Get video thumbnail (you can generate this or use a placeholder)
+     */
+    public function getVideoThumbnail(): string
+    {
+        // If you have a thumbnail stored, return it
+        // Otherwise return a video icon placeholder
+        return asset('images/placeholders/video_thumbnail.jpg');
     }
 }

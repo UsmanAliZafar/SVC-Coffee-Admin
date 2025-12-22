@@ -948,6 +948,8 @@ class CategoriesController extends Controller
                 return [
                     'id' => $image->id,
                     'url' => $image->getImageUrl(),
+                    'media_type' => $image->media_type ?? 'image',
+                    'mime_type' => $image->mime_type ?? 'image/jpeg',
                     'alt_text' => $image->alt_text,
                     'is_primary' => $image->is_primary,
                 ];
