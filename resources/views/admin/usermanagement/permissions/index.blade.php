@@ -99,7 +99,7 @@
                         <a href="{{ route('admin.permissions.create') }}" class="btn btn-light btn-sm me-2">
                             <i class="bi bi-plus-circle me-1"></i>Add Permission
                         </a>
-                        <a href="{{ route('admin.permissions.bulk-create') }}" class="btn btn-outline-light btn-sm">
+                        <a href="{{ route('admin.permissions.bulk-create') }}" class="btn btn-outline-light btn-sm d-none">
                             <i class="bi bi-plus-square me-1"></i>Bulk Create
                         </a>
                     </div>

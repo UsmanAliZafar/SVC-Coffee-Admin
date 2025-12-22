@@ -172,17 +172,25 @@ class ReportsController extends Controller
         $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
 
         $start = Carbon::parse($startDate)->startOfDay();
-        $end = Carbon::parse($endDate)->endOfDay();
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $dateRange = [
+                'start' => Carbon::parse($request->start_date)->startOfDay(),
+                'end' => Carbon::parse($request->end_date)->endOfDay(),
+            ];
+        } else {
+            $dateRange = $this->getDefaultDateRange();
+        }
 
         $data = [
-            'start_date' => $start,
-            'end_date' => $end,
-            'days_count' => $start->diffInDays($end) + 1,
-            'sales_data' => $this->getCustomRangeSalesData($start, $end),
-            'daily_breakdown' => $this->getDailyBreakdown($start, $end),
-            'top_products' => $this->getTopProductsByDateRange($start, $end, 20),
-            'category_breakdown' => $this->getCategorySales($start, $end),
-            'customer_analysis' => $this->getCustomerAnalysis($start, $end),
+            'start_date' => $dateRange['start'],
+            'end_date' => $dateRange['end'],
+            'days_count' => $this->calculateDaysDifference($dateRange['start'], $dateRange['end']),
+            'sales_data' => $this->getCustomRangeSalesData($dateRange['start'], $dateRange['end']),
+            'daily_breakdown' => $this->getDailyBreakdown($dateRange['start'], $dateRange['end']),
+            'top_products' => $this->getTopProductsByDateRange($dateRange['start'], $dateRange['end'], 20),
+            'category_breakdown' => $this->getCategorySales($dateRange['start'], $dateRange['end']),
+            'customer_analysis' => $this->getCustomerAnalysis($dateRange['start'], $dateRange['end']),
+            'days_difference' => $this->calculateDaysDifference($dateRange['start'], $dateRange['end']),
         ];
 
         return view('admin.reports.sales.custom-range', $data);
