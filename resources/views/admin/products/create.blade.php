@@ -2774,7 +2774,8 @@ $('#taxType').on('change', function() {
 
     if (taxType === 'inclusive') {
         // Disable tax percentage when inclusive
-        $('#taxPercentage').val('0').prop('disabled', true).addClass('bg-light');
+        // $('#taxPercentage').val('0').prop('disabled', true).addClass('bg-light');
+        $('#taxPercentage').prop('disabled', false).removeClass('bg-light');
 
         // Update help text
         $('.form-text', '#taxPercentage').closest('.mb-3').find('.form-text').html(
