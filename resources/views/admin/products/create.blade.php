@@ -584,6 +584,273 @@
     .validation-error-modal .alert {
         text-align: left;
     }
+
+    /* Gallery Preview - Fixed Layout */
+    #galleryPreview {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .image-preview-container {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1;
+        background: #f8f9fa;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid #ddd;
+        transition: all 0.3s ease;
+    }
+
+    .image-preview-container:hover {
+        border-color: #5B914C;
+        box-shadow: 0 4px 12px rgba(91, 145, 76, 0.2);
+        transform: translateY(-2px);
+    }
+
+    .image-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .video-preview-wrapper {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    .video-preview-wrapper video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Remove Image Button */
+    .remove-image {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        line-height: 1;
+        transition: all 0.2s;
+        opacity: 0;
+    }
+
+    .image-preview-container:hover .remove-image {
+        opacity: 1;
+    }
+
+    .remove-image:hover {
+        background: #c82333;
+        transform: scale(1.1);
+    }
+
+    /* Badges */
+    .image-preview-container .badge {
+        position: absolute;
+        font-size: 0.65rem;
+        padding: 4px 8px;
+        z-index: 5;
+        max-width: calc(100% - 45px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .badge.bg-primary {
+        top: 5px;
+        left: 5px;
+    }
+
+    .badge.bg-dark {
+        top: 5px;
+        right: 40px;
+    }
+
+    .badge.bg-secondary {
+        bottom: 30px;
+        left: 5px;
+    }
+
+    /* File Name Below Image */
+    .image-preview-container small {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px;
+        font-size: 0.7rem;
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Main Image Preview */
+    #mainImagePreview {
+        margin-top: 15px;
+    }
+
+    #mainImagePreview .image-preview-container {
+        display: inline-block;
+        width: 200px;
+        aspect-ratio: 1;
+    }
+
+    #mainImagePreview .remove-image {
+        opacity: 1;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        #galleryPreview {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .image-preview-container .badge {
+            font-size: 0.6rem;
+            padding: 3px 6px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        #galleryPreview {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        #mainImagePreview .image-preview-container {
+            width: 150px;
+        }
+    }
+
+    /* Media Preview Modal Styles */
+    #mediaPreviewModal .modal-body {
+        background: #000;
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    #mediaPreviewModal .modal-body img {
+        max-width: 100%;
+        max-height: 70vh;
+        object-fit: contain;
+        border-radius: 4px;
+    }
+
+    #mediaPreviewModal .modal-body video {
+        max-width: 100%;
+        max-height: 70vh;
+        border-radius: 4px;
+    }
+
+    #mediaPreviewModal .modal-header {
+        background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
+    }
+
+    #mediaPreviewModal .modal-footer {
+        background: #f8f9fa;
+    }
+
+    #mediaModalInfo {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    #mediaModalInfo small {
+        color: #6c757d;
+    }
+
+    /* Loading Spinner */
+    .media-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+    }
+
+    .media-loading .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+
+    /* Clickable Preview */
+    .image-preview-container {
+        cursor: pointer;
+    }
+
+    .image-preview-container::after {
+        content: '\F341'; /* Bootstrap Icons: eye */
+        font-family: 'bootstrap-icons';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2.5rem;
+        color: white;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    .image-preview-container:hover::after {
+        opacity: 1;
+    }
+
+    .image-preview-container:hover::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    /* Prevent click on remove button from triggering preview */
+    .remove-image {
+        z-index: 20;
+    }
+
+    /* Responsive Modal */
+    @media (max-width: 768px) {
+        #mediaPreviewModal .modal-dialog {
+            margin: 10px;
+        }
+
+        #mediaPreviewModal .modal-body {
+            min-height: 300px;
+        }
+
+        #mediaPreviewModal .modal-body img,
+        #mediaPreviewModal .modal-body video {
+            max-height: 50vh;
+        }
+    }
 </style>
 @endpush
 
@@ -1056,6 +1323,35 @@
         </div>
     </div>
 </div>
+
+<!-- Media Preview Modal -->
+<div class="modal fade" id="mediaPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-eye"></i> <span id="mediaModalTitle">Media Preview</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="mediaModalBody">
+                <!-- Media content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <div class="me-auto" id="mediaModalInfo">
+                    <!-- File info will be shown here -->
+                </div>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Close
+                </button>
+                <button type="button" class="btn btn-danger" id="deleteMediaFromModal">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -1112,14 +1408,25 @@
         if (file) {
             let reader = new FileReader();
             reader.onload = function(e) {
+                const mediaData = {
+                    name: file.name,
+                    url: e.target.result,
+                    file_size: formatBytes(file.size),
+                    mime_type: file.type,
+                    is_video: false
+                };
+
                 $('#mainImagePreview').html(`
-                    <div class="image-preview-container">
+                    <div class="image-preview-container" data-media='${JSON.stringify(mediaData)}'>
                         <img src="${e.target.result}" class="image-preview" alt="Main Image">
-                        <button type="button" class="remove-image" onclick="removeMainImage()">
+                        <button type="button" class="remove-image" onclick="removeMainImage(); event.stopPropagation();" style="opacity: 1;">
                             <i class="bi bi-x"></i>
                         </button>
                     </div>
                 `);
+
+                // Attach click event
+                attachMediaClickEvents();
             };
             reader.readAsDataURL(file);
         }
@@ -1516,48 +1823,173 @@
         $(`#${uploadId}-status`).text(statusText);
     }
 
-    // Add media to gallery preview
+        // Global variable to store current media data
+    let currentMediaData = null;
+
+    // Update the addMediaToGallery function to include click event
     function addMediaToGallery(media) {
         let mediaHtml = '';
 
         if (media.is_video) {
             mediaHtml = `
-                <div class="image-preview-container" data-path="${media.path}">
-                    <div class="video-preview-wrapper" style="position: relative;">
-                        <video class="image-preview" controls preload="metadata">
+                <div class="image-preview-container" data-path="${media.path}" data-media='${JSON.stringify(media)}'>
+                    <div class="video-preview-wrapper">
+                        <video class="image-preview" preload="metadata">
                             <source src="${media.url}" type="${media.mime_type}">
                         </video>
-                        <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
-                            <i class="bi bi-play-circle"></i> Video
-                        </span>
-                        ${media.duration ? `<span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">${media.duration}</span>` : ''}
-                        <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
-                            ${media.file_size}
-                        </span>
                     </div>
-                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this)">
+                    <span class="badge bg-primary">
+                        <i class="bi bi-play-circle"></i> Video
+                    </span>
+                    ${media.duration ? `<span class="badge bg-dark">${media.duration}</span>` : ''}
+                    <span class="badge bg-secondary">${media.file_size}</span>
+                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this); event.stopPropagation();">
                         <i class="bi bi-x"></i>
                     </button>
-                    <small class="d-block text-center text-muted mt-1" style="font-size: 0.75rem;">${media.name}</small>
+                    <small title="${media.name}">${media.name}</small>
                 </div>
             `;
         } else {
             mediaHtml = `
-                <div class="image-preview-container" data-path="${media.path}">
+                <div class="image-preview-container" data-path="${media.path}" data-media='${JSON.stringify(media)}'>
                     <img src="${media.url}" class="image-preview" alt="${media.name}">
-                    <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
-                        ${media.file_size}
-                    </span>
-                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this)">
+                    <span class="badge bg-secondary">${media.file_size}</span>
+                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this); event.stopPropagation();">
                         <i class="bi bi-x"></i>
                     </button>
-                    <small class="d-block text-center text-muted mt-1" style="font-size: 0.75rem;">${media.name}</small>
+                    <small title="${media.name}">${media.name}</small>
                 </div>
             `;
         }
 
         $('#galleryPreview').append(mediaHtml);
+
+        // Attach click event to newly added media
+        attachMediaClickEvents();
     }
+
+    // Attach click events to media items
+    function attachMediaClickEvents() {
+        $('.image-preview-container').off('click').on('click', function(e) {
+            // Prevent opening modal when clicking remove button
+            if ($(e.target).closest('.remove-image').length) {
+                return;
+            }
+
+            const mediaData = $(this).data('media');
+            openMediaPreviewModal(mediaData);
+        });
+    }
+
+    // Open media preview modal
+    function openMediaPreviewModal(media) {
+        currentMediaData = media;
+
+        // Set title
+        $('#mediaModalTitle').text(media.name);
+
+        // Show loading
+        $('#mediaModalBody').html(`
+            <div class="media-loading">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `);
+
+        // Set file info
+        $('#mediaModalInfo').html(`
+            <div><strong>File:</strong> ${media.name}</div>
+            <small><strong>Size:</strong> ${media.file_size}</small>
+            <small><strong>Type:</strong> ${media.mime_type}</small>
+            ${media.duration ? `<small><strong>Duration:</strong> ${media.duration}</small>` : ''}
+        `);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('mediaPreviewModal'));
+        modal.show();
+
+        // Load media content
+        setTimeout(() => {
+            let content = '';
+
+            if (media.is_video) {
+                content = `
+                    <video controls autoplay style="max-width: 100%; max-height: 70vh;">
+                        <source src="${media.url}" type="${media.mime_type}">
+                        Your browser does not support the video tag.
+                    </video>
+                `;
+            } else {
+                content = `<img src="${media.url}" alt="${media.name}">`;
+            }
+
+            $('#mediaModalBody').html(content);
+        }, 300);
+    }
+
+    // Delete media from modal
+    $('#deleteMediaFromModal').on('click', function() {
+        if (!currentMediaData) return;
+
+        Swal.fire({
+            title: 'Delete this media?',
+            text: "This will remove the file from server",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '/admin/products/temp-images/delete',
+                    type: 'POST',
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                        image_path: currentMediaData.path
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Remove from gallery
+                            $(`.image-preview-container[data-path="${currentMediaData.path}"]`).fadeOut(300, function() {
+                                $(this).remove();
+                            });
+
+                            // Close modal
+                            bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal')).hide();
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Deleted!',
+                                text: 'Media removed successfully',
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+
+                            currentMediaData = null;
+                        }
+                    },
+                    error: function(xhr) {
+                        Swal.fire('Error!', 'Failed to delete media', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Close modal and cleanup
+    $('#mediaPreviewModal').on('hidden.bs.modal', function() {
+        $('#mediaModalBody').html('');
+        currentMediaData = null;
+    });
+
+    // Initialize on document ready
+    $(document).ready(function() {
+        // Attach events to existing media items (if any)
+        attachMediaClickEvents();
+    });
 
     // Finalize upload
     function finalizeUpload(uploadId, uploadResults, completed, failed, total) {

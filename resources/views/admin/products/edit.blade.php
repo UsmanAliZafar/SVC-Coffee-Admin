@@ -682,6 +682,262 @@
             width: auto;
         }
     }
+
+    /* Gallery Preview - Fixed Layout */
+    #galleryPreview {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .image-preview-container {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1;
+        background: #f8f9fa;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid #ddd;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .image-preview-container:hover {
+        border-color: #5B914C;
+        box-shadow: 0 4px 12px rgba(91, 145, 76, 0.2);
+        transform: translateY(-2px);
+    }
+
+    .image-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .video-preview-wrapper {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    .video-preview-wrapper video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Remove Image Button */
+    .remove-image {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        line-height: 1;
+        transition: all 0.2s;
+        opacity: 0;
+    }
+
+    .image-preview-container:hover .remove-image {
+        opacity: 1;
+    }
+
+    .remove-image:hover {
+        background: #c82333;
+        transform: scale(1.1);
+    }
+
+    /* Badges */
+    .image-preview-container .badge {
+        position: absolute;
+        font-size: 0.65rem;
+        padding: 4px 8px;
+        z-index: 5;
+        max-width: calc(100% - 45px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .badge.bg-primary {
+        top: 5px;
+        left: 5px;
+    }
+
+    .badge.bg-dark {
+        top: 5px;
+        right: 40px;
+    }
+
+    .badge.bg-secondary {
+        bottom: 30px;
+        left: 5px;
+    }
+
+    /* File Name Below Image */
+    .image-preview-container small {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px;
+        font-size: 0.7rem;
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Main Image Preview */
+    #mainImagePreview {
+        margin-top: 15px;
+    }
+
+    #mainImagePreview .image-preview-container {
+        display: inline-block;
+        width: 200px;
+        aspect-ratio: 1;
+    }
+
+    #mainImagePreview .remove-image {
+        opacity: 1;
+    }
+
+    /* Hover Effects */
+    .image-preview-container::after {
+        content: '\F341';
+        font-family: 'bootstrap-icons';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2.5rem;
+        color: white;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        z-index: 10;
+    }
+
+    .image-preview-container:hover::after {
+        opacity: 1;
+    }
+
+    .image-preview-container:hover::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    /* Media Preview Modal Styles */
+    #mediaPreviewModal .modal-body {
+        background: #000;
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    #mediaPreviewModal .modal-body img {
+        max-width: 100%;
+        max-height: 70vh;
+        object-fit: contain;
+        border-radius: 4px;
+    }
+
+    #mediaPreviewModal .modal-body video {
+        max-width: 100%;
+        max-height: 70vh;
+        border-radius: 4px;
+    }
+
+    #mediaPreviewModal .modal-header {
+        background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
+    }
+
+    #mediaPreviewModal .modal-footer {
+        background: #f8f9fa;
+    }
+
+    #mediaModalInfo {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    #mediaModalInfo small {
+        color: #6c757d;
+    }
+
+    .media-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+    }
+
+    .media-loading .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        #galleryPreview {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .image-preview-container .badge {
+            font-size: 0.6rem;
+            padding: 3px 6px;
+        }
+
+        #mediaPreviewModal .modal-dialog {
+            margin: 10px;
+        }
+
+        #mediaPreviewModal .modal-body {
+            min-height: 300px;
+        }
+
+        #mediaPreviewModal .modal-body img,
+        #mediaPreviewModal .modal-body video {
+            max-height: 50vh;
+        }
+    }
+
+    @media (max-width: 576px) {
+        #galleryPreview {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        #mainImagePreview .image-preview-container {
+            width: 150px;
+        }
+    }
 </style>
 @endpush
 
@@ -830,47 +1086,72 @@
 
                         <div id="galleryPreview" class="mt-3">
                             @foreach($product->images as $media)
-                            <div class="image-preview-container" data-id="{{ $media->id }}">
-                                @if($media->is_primary)
-                                <span class="primary-badge"><i class="bi bi-star-fill"></i> Primary</span>
-                                @endif
+                                @php
+                                    $mediaData = [
+                                        'id' => $media->id,
+                                        'name' => $media->image_name ?? $media->video_name ?? 'Media',
+                                        'url' => $media->isVideo() ? $media->getMediaUrl() : $media->getImageUrl(),
+                                        'file_size' => $media->file_size ? number_format($media->file_size / 1048576, 2) . ' MB' : 'N/A',
+                                        'mime_type' => $media->mime_type ?? 'N/A',
+                                        'duration' => $media->duration ? $media->getFormattedDuration() : null,
+                                        'is_video' => $media->isVideo(),
+                                        'isVideo' => $media->isVideo()
+                                    ];
+                                @endphp
 
-                                @if($media->isVideo())
-                                    <!-- Video Preview -->
-                                    <div class="video-preview-wrapper" style="position: relative;">
-                                        <video class="image-preview" controls>
-                                            <source src="{{ $media->getMediaUrl() }}" type="{{ $media->mime_type }}">
-                                            Your browser does not support the video tag.
-                                        </video>
-                                        <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
-                                            <i class="bi bi-play-circle"></i> Video
-                                        </span>
-                                        @if($media->duration)
-                                        <span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">
-                                            {{ $media->getFormattedDuration() }}
-                                        </span>
-                                        @endif
+                                <div class="image-preview-container"
+                                    data-id="{{ $media->id }}"
+                                    data-media="{{ htmlspecialchars(json_encode($mediaData), ENT_QUOTES, 'UTF-8') }}">
+
+                                    @if($media->is_primary)
+                                    <span class="primary-badge"><i class="bi bi-star-fill"></i> Primary</span>
+                                    @endif
+
+                                    @if($media->isVideo())
+                                        <!-- Video Preview -->
+                                        <div class="video-preview-wrapper" style="position: relative;">
+                                            <video class="image-preview" controls>
+                                                <source src="{{ $media->getMediaUrl() }}" type="{{ $media->mime_type }}">
+                                                Your browser does not support the video tag.
+                                            </video>
+                                            <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
+                                                <i class="bi bi-play-circle"></i> Video
+                                            </span>
+                                            @if($media->duration)
+                                            <span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">
+                                                {{ $media->getFormattedDuration() }}
+                                            </span>
+                                            @endif
+                                            @if($media->file_size)
+                                            <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
+                                                {{ number_format($media->file_size / 1048576, 2) }} MB
+                                            </span>
+                                            @endif
+                                        </div>
+                                    @else
+                                        <!-- Image Preview -->
+                                        <img src="{{ $media->getImageUrl() }}" class="image-preview" alt="{{ $media->image_name }}">
                                         @if($media->file_size)
                                         <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
                                             {{ number_format($media->file_size / 1048576, 2) }} MB
                                         </span>
                                         @endif
-                                    </div>
-                                @else
-                                    <!-- Image Preview -->
-                                    <img src="{{ $media->getImageUrl() }}" class="image-preview" alt="{{ $media->image_name }}">
-                                @endif
+                                    @endif
 
-                                <button type="button" class="remove-image" onclick="deleteProductImage('{{ $product->id }}', '{{ $media->id }}', this)">
-                                    <i class="bi bi-x"></i>
-                                </button>
+                                    <button type="button" class="remove-image" onclick="deleteProductImage('{{ $product->id }}', '{{ $media->id }}', this); event.stopPropagation();">
+                                        <i class="bi bi-x"></i>
+                                    </button>
 
-                                @if(!$media->is_primary && $media->isImage())
-                                <button type="button" class="set-primary-btn" onclick="setPrimaryImage('{{ $product->id }}', '{{ $media->id }}')">
-                                    <i class="bi bi-star"></i> Set Primary
-                                </button>
-                                @endif
-                            </div>
+                                    @if(!$media->is_primary && $media->isImage())
+                                    <button type="button" class="set-primary-btn" onclick="setPrimaryImage('{{ $product->id }}', '{{ $media->id }}'); event.stopPropagation();">
+                                        <i class="bi bi-star"></i> Set Primary
+                                    </button>
+                                    @endif
+
+                                    <small title="{{ $media->image_name ?? $media->video_name ?? 'Media' }}">
+                                        {{ $media->image_name ?? $media->video_name ?? 'Media' }}
+                                    </small>
+                                </div>
                             @endforeach
                         </div>
                     </div>
@@ -1617,6 +1898,35 @@
         </div>
     </div>
 </div>
+
+<!-- Media Preview Modal -->
+<div class="modal fade" id="mediaPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-eye"></i> <span id="mediaModalTitle">Media Preview</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="mediaModalBody">
+                <!-- Media content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <div class="me-auto" id="mediaModalInfo">
+                    <!-- File info will be shown here -->
+                </div>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Close
+                </button>
+                <button type="button" class="btn btn-danger" id="deleteMediaFromModal">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- Translation button --}}
 @include('admin.components.translation-modal', [
     'module' => 'product',
@@ -1650,6 +1960,12 @@ $(document).ready(function() {
         allowClear: true,
         width: '100%'
     });
+    attachMediaClickEvents();
+    const originalAddMediaToGallery = addMediaToGallery;
+    addMediaToGallery = function(media) {
+        originalAddMediaToGallery(media);
+        attachMediaClickEvents();
+    };
     // Initialize CKEditor
     let descriptionEditor;
     ClassicEditor
@@ -1972,45 +2288,194 @@ $(document).ready(function() {
 
         if (media.is_video) {
             mediaHtml = `
-                <div class="image-preview-container" data-id="${media.id}">
-                    <div class="video-preview-wrapper" style="position: relative;">
-                        <video class="image-preview" controls preload="metadata">
+                <div class="image-preview-container" data-id="${media.id}" data-media='${JSON.stringify(media)}'>
+                    <div class="video-preview-wrapper">
+                        <video class="image-preview" preload="metadata">
                             <source src="${media.url}" type="${media.mime_type}">
                         </video>
-                        <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
+                        <span class="badge bg-primary">
                             <i class="bi bi-play-circle"></i> Video
                         </span>
-                        ${media.duration ? `<span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">${media.duration}</span>` : ''}
-                        <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
-                            ${media.file_size}
-                        </span>
+                        ${media.duration ? `<span class="badge bg-dark">${media.duration}</span>` : ''}
+                        <span class="badge bg-secondary">${media.file_size}</span>
                     </div>
-                    <button type="button" class="remove-image" onclick="deleteProductImage('${PRODUCT_ID}', '${media.id}', this)">
+                    <button type="button" class="remove-image" onclick="deleteProductImage('${PRODUCT_ID}', '${media.id}', this); event.stopPropagation();">
                         <i class="bi bi-x"></i>
                     </button>
-                    <small class="d-block text-center text-muted mt-1" style="font-size: 0.75rem;">${media.name}</small>
+                    <small title="${media.name}">${media.name}</small>
                 </div>
             `;
         } else {
             mediaHtml = `
-                <div class="image-preview-container" data-id="${media.id}">
+                <div class="image-preview-container" data-id="${media.id}" data-media='${JSON.stringify(media)}'>
                     <img src="${media.url}" class="image-preview" alt="${media.name}">
-                    <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
-                        ${media.file_size}
-                    </span>
-                    <button type="button" class="remove-image" onclick="deleteProductImage('${PRODUCT_ID}', '${media.id}', this)">
+                    <span class="badge bg-secondary">${media.file_size}</span>
+                    <button type="button" class="remove-image" onclick="deleteProductImage('${PRODUCT_ID}', '${media.id}', this); event.stopPropagation();">
                         <i class="bi bi-x"></i>
                     </button>
-                    <button type="button" class="set-primary-btn" onclick="setPrimaryImage('${PRODUCT_ID}', '${media.id}')">
+                    <button type="button" class="set-primary-btn" onclick="setPrimaryImage('${PRODUCT_ID}', '${media.id}'); event.stopPropagation();">
                         <i class="bi bi-star"></i> Set Primary
                     </button>
-                    <small class="d-block text-center text-muted mt-1" style="font-size: 0.75rem;">${media.name}</small>
+                    <small title="${media.name}">${media.name}</small>
                 </div>
             `;
         }
 
         $('#galleryPreview').append(mediaHtml);
+        attachMediaClickEvents();
     }
+    // Global variable for current media
+    let currentMediaData = null;
+
+    // Attach click events to media items - FIXED VERSION
+function attachMediaClickEvents() {
+    $('.image-preview-container').off('click').on('click', function(e) {
+        // Prevent modal from opening when clicking buttons
+        if ($(e.target).closest('.remove-image, .set-primary-btn').length) {
+            return;
+        }
+
+        const container = $(this);
+        let mediaData = null;
+
+        // Try to get and parse media data from data attribute
+        try {
+            const rawData = container.attr('data-media');
+            if (rawData) {
+                mediaData = JSON.parse(rawData);
+            }
+        } catch (e) {
+            console.log('Failed to parse media data, building from DOM');
+        }
+
+        // Build media data from DOM if parsing failed
+        if (!mediaData || !mediaData.url) {
+            const isVideo = container.find('video').length > 0;
+            const mediaUrl = isVideo
+                ? container.find('video source').attr('src')
+                : container.find('img.image-preview').attr('src');
+            const fileName = container.find('small').attr('title') || container.find('small').text() || 'Media';
+            const fileSize = container.find('.badge.bg-secondary').text().trim() || 'N/A';
+            const duration = container.find('.badge.bg-dark').text().trim() || null;
+            const mimeType = isVideo
+                ? (container.find('video source').attr('type') || 'video/mp4')
+                : 'image/jpeg';
+
+            mediaData = {
+                id: container.data('id') || container.attr('data-id'),
+                name: fileName,
+                url: mediaUrl,
+                file_size: fileSize,
+                mime_type: mimeType,
+                duration: duration,
+                is_video: isVideo,
+                isVideo: isVideo
+            };
+        }
+
+        console.log('Media data:', mediaData); // Debug log
+
+        if (mediaData && mediaData.url) {
+            openMediaPreviewModal(mediaData);
+        } else {
+            console.error('Invalid media data or missing URL:', mediaData);
+        }
+    });
+}
+    // Open media preview modal
+    function openMediaPreviewModal(media) {
+        currentMediaData = media;
+
+        $('#mediaModalTitle').text(media.name);
+
+        $('#mediaModalBody').html(`
+            <div class="media-loading">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `);
+
+        $('#mediaModalInfo').html(`
+            <div><strong>File:</strong> ${media.name}</div>
+            <small><strong>Size:</strong> ${media.file_size || 'N/A'}</small>
+            <small><strong>Type:</strong> ${media.mime_type || 'N/A'}</small>
+            ${media.duration ? `<small><strong>Duration:</strong> ${media.duration}</small>` : ''}
+        `);
+
+        const modal = new bootstrap.Modal(document.getElementById('mediaPreviewModal'));
+        modal.show();
+
+        setTimeout(() => {
+            let content = '';
+            if (media.is_video || media.isVideo) {
+                content = `
+                    <video controls autoplay style="max-width: 100%; max-height: 70vh;">
+                        <source src="${media.url}" type="${media.mime_type}">
+                    </video>
+                `;
+            } else {
+                content = `<img src="${media.url}" alt="${media.name}">`;
+            }
+            $('#mediaModalBody').html(content);
+        }, 300);
+    }
+
+    // Delete media from modal (EDIT VERSION)
+    $('#deleteMediaFromModal').on('click', function() {
+        if (!currentMediaData) return;
+
+        const mediaType = currentMediaData.is_video || currentMediaData.isVideo ? 'video' : 'image';
+
+        Swal.fire({
+            title: `Delete this ${mediaType}?`,
+            text: "This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/admin/products/${PRODUCT_ID}/images/${currentMediaData.id}`,
+                    type: 'DELETE',
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content')
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $(`.image-preview-container[data-id="${currentMediaData.id}"]`).fadeOut(300, function() {
+                                $(this).remove();
+                            });
+
+                            bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal')).hide();
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Deleted!',
+                                text: 'Media removed successfully',
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+
+                            currentMediaData = null;
+                        }
+                    },
+                    error: function(xhr) {
+                        Swal.fire('Error!', 'Failed to delete media', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Close modal and cleanup
+    $('#mediaPreviewModal').on('hidden.bs.modal', function() {
+        $('#mediaModalBody').html('');
+        currentMediaData = null;
+    });
+
     //-------------------
     // Create floating upload widget (Google Drive style)
     function createUploadWidget(uploadId, totalFiles, files) {
