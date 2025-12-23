@@ -1438,7 +1438,7 @@ class ProductsController extends Controller
     }
 
     /**
-     * Upload temporary images/videos (for create page)
+     * Upload temporary images/videos (OPTIMIZED VERSION)
      */
     public function uploadTempImages(Request $request)
     {
@@ -1452,8 +1452,20 @@ class ProductsController extends Controller
                 'required',
                 'file',
                 'mimes:jpeg,png,jpg,gif,webp,mp4,mov,avi,wmv,flv,webm',
-                'max:51200' // 50MB
+                function ($attribute, $value, $fail) {
+                    $mimeType = $value->getMimeType();
+                    $isVideo = Str::startsWith($mimeType, 'video/');
+                    $maxSize = $isVideo ? 50 * 1024 * 1024 : 2 * 1024 * 1024; // 50MB video, 2MB image
+
+                    if ($value->getSize() > $maxSize) {
+                        $type = $isVideo ? 'Video' : 'Image';
+                        $maxLabel = $isVideo ? '50MB' : '2MB';
+                        $fail("$type file {$value->getClientOriginalName()} exceeds maximum size of $maxLabel");
+                    }
+                }
             ]
+        ], [
+            'images.*.mimes' => 'File must be an image (jpeg, png, jpg, gif, webp) or video (mp4, mov, avi, wmv, flv, webm)',
         ]);
 
         if ($validator->fails()) {
@@ -1475,8 +1487,14 @@ class ProductsController extends Controller
                     $folder = $isVideo ? 'temp/videos/' . $sessionId : 'temp/images/' . $sessionId;
                     $mediaType = $isVideo ? 'video' : 'image';
 
-                    $fileName = time() . '_' . Str::random(10) . '.' . $file->extension();
-                    $filePath = $file->storeAs($folder, $fileName, 'public');
+                    // Optimize filename
+                    $fileName = time() . '_' . Str::random(8) . '.' . $file->extension();
+
+                    // Store with optimized settings
+                    $filePath = $file->storeAs($folder, $fileName, [
+                        'disk' => 'public',
+                        'visibility' => 'public'
+                    ]);
 
                     $fileSize = $file->getSize();
                     $duration = null;
@@ -1504,9 +1522,11 @@ class ProductsController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            Log::error('Media upload failed: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload media: ' . $e->getMessage()
+                'message' => 'Upload failed: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1604,6 +1624,61 @@ class ProductsController extends Controller
             Log::error('Failed to move temp media: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Delete product image/video
+     */
+    public function deleteImage($productId, $imageId)
+    {
+        if (!auth('admin')->user()->hasPermission('products.update')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            $product = Product::findOrFail($productId);
+            $media = ProductImage::where('product_id', $productId)
+                ->where('id', $imageId)
+                ->firstOrFail();
+
+            // Store info before deletion
+            $isPrimary = $media->is_primary;
+            $mediaType = $media->media_type;
+
+            // Delete file from storage
+            if ($media->image_path && Storage::disk('public')->exists($media->image_path)) {
+                Storage::disk('public')->delete($media->image_path);
+            }
+
+            // Delete database record
+            $media->delete();
+
+            // If deleted media was primary, set another image as primary (only images, not videos)
+            if ($isPrimary) {
+                $newPrimary = ProductImage::where('product_id', $productId)
+                    ->where('media_type', 'image')
+                    ->orderBy('created_at', 'asc')
+                    ->first();
+
+                if ($newPrimary) {
+                    $newPrimary->update(['is_primary' => true]);
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => ucfirst($mediaType) . ' deleted successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Media deletion failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete media: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
 
     /**
      * Format duration in seconds to MM:SS

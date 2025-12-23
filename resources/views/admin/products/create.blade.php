@@ -378,6 +378,212 @@
         font-size: 0.7rem;
         padding: 3px 6px;
     }
+
+    /* Upload Widget - Google Drive Style */
+    .upload-widget {
+        position: fixed;
+        bottom: -400px;
+        right: 20px;
+        width: 400px;
+        max-height: 500px;
+        background: white;
+        border-radius: 8px 8px 0 0;
+        box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.2);
+        z-index: 9999;
+        transition: bottom 0.3s ease, max-height 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .upload-widget.show {
+        bottom: 0;
+    }
+
+    .upload-widget.minimized {
+        max-height: 60px;
+    }
+
+    .upload-widget.minimized .upload-widget-body {
+        display: none;
+    }
+
+    /* Widget Header */
+    .upload-widget-header {
+        padding: 15px;
+        background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
+        color: white;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .upload-widget-header strong {
+        font-size: 0.95rem;
+    }
+
+    .upload-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-widget-minimize,
+    .btn-widget-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-widget-minimize:hover,
+    .btn-widget-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .overall-progress small {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .overall-progress .progress {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+    }
+
+    .overall-progress .progress-bar {
+        background: white !important;
+        transition: width 0.3s ease;
+    }
+
+    /* Widget Body */
+    .upload-widget-body {
+        padding: 15px;
+        max-height: 400px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .upload-files-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* File Item */
+    .upload-file-item {
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border-left: 3px solid #dee2e6;
+        transition: all 0.3s;
+    }
+
+    .upload-file-item.success {
+        border-left-color: #28a745;
+        background: #d4edda;
+    }
+
+    .upload-file-item.error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+    }
+
+    .file-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .file-info i {
+        font-size: 1.2rem;
+    }
+
+    .file-name {
+        flex: 1;
+        font-size: 0.85rem;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .file-size {
+        font-size: 0.75rem;
+    }
+
+    .file-progress .progress {
+        height: 4px;
+        background: #dee2e6;
+        border-radius: 2px;
+        margin-bottom: 4px;
+    }
+
+    .file-progress .progress-bar {
+        background: #5B914C;
+        transition: width 0.3s ease;
+    }
+
+    .file-status {
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* Scrollbar Styling */
+    .upload-widget-body::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .upload-widget-body::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .upload-widget-body::-webkit-scrollbar-thumb {
+        background: #5B914C;
+        border-radius: 3px;
+    }
+
+    .upload-widget-body::-webkit-scrollbar-thumb:hover {
+        background: #4a7a3d;
+    }
+
+    /* Animations */
+    @keyframes slideUp {
+        from {
+            bottom: -400px;
+        }
+        to {
+            bottom: 0;
+        }
+    }
+
+    /* Responsive */
+    @media (max-width: 576px) {
+        .upload-widget {
+            right: 10px;
+            left: 10px;
+            width: auto;
+        }
+    }
+
+    /* Validation Error Modal */
+    .validation-error-modal ul {
+        padding-left: 20px;
+    }
+
+    .validation-error-modal ul li {
+        margin-bottom: 10px;
+    }
+
+    .validation-error-modal .alert {
+        text-align: left;
+    }
 </style>
 @endpush
 
@@ -950,17 +1156,274 @@
         uploadImagesToServer(files);
     });
 
-    // Upload media (images and videos) immediately to server
+    //Media upload functions with progress tracking.........Start
+    // Constants
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+    const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB for images
+    const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
+
+    // Upload media with individual file progress tracking
     function uploadImagesToServer(files) {
         if (files.length === 0) return;
 
+        // Validate files before upload
+        const validation = validateFiles(files);
+
+        if (!validation.valid) {
+            showFileValidationError(validation.errors);
+            return;
+        }
+
+        // Upload files individually with progress tracking
+        uploadFilesWithProgress(validation.validFiles);
+    }
+
+    // Validate files before upload
+    function validateFiles(files) {
+        const validFiles = [];
+        const errors = [];
+        const oversizedFiles = [];
+        const invalidTypes = [];
+
+        Array.from(files).forEach(file => {
+            const fileSize = file.size;
+            const fileName = file.name;
+            const fileType = file.type;
+
+            // Check file type
+            const isImage = fileType.startsWith('image/');
+            const isVideo = fileType.startsWith('video/');
+
+            if (!isImage && !isVideo) {
+                invalidTypes.push({
+                    name: fileName,
+                    reason: 'Invalid file type. Only images and videos are allowed.'
+                });
+                return;
+            }
+
+            // Check file size
+            const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+            const maxSizeLabel = isVideo ? '50MB' : '2MB';
+
+            if (fileSize > maxSize) {
+                oversizedFiles.push({
+                    name: fileName,
+                    size: formatBytes(fileSize),
+                    maxSize: maxSizeLabel,
+                    type: isVideo ? 'Video' : 'Image'
+                });
+                return;
+            }
+
+            // File is valid
+            validFiles.push(file);
+        });
+
+        // Compile errors
+        if (oversizedFiles.length > 0) {
+            errors.push({
+                type: 'size',
+                files: oversizedFiles
+            });
+        }
+
+        if (invalidTypes.length > 0) {
+            errors.push({
+                type: 'type',
+                files: invalidTypes
+            });
+        }
+
+        return {
+            valid: errors.length === 0,
+            validFiles: validFiles,
+            errors: errors
+        };
+    }
+
+    // Show validation errors
+    function showFileValidationError(errors) {
+        let errorHtml = '<div class="text-start">';
+
+        errors.forEach(error => {
+            if (error.type === 'size') {
+                errorHtml += `
+                    <div class="alert alert-danger mb-3">
+                        <strong><i class="bi bi-exclamation-triangle-fill"></i> Files Too Large (${error.files.length})</strong>
+                        <ul class="mb-0 mt-2">
+                            ${error.files.map(f => `
+                                <li>
+                                    <strong>${f.name}</strong><br>
+                                    <small class="text-muted">
+                                        ${f.type}: ${f.size} (Max: ${f.maxSize})
+                                    </small>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            if (error.type === 'type') {
+                errorHtml += `
+                    <div class="alert alert-warning mb-3">
+                        <strong><i class="bi bi-file-earmark-x"></i> Invalid File Types (${error.files.length})</strong>
+                        <ul class="mb-0 mt-2">
+                            ${error.files.map(f => `
+                                <li>
+                                    <strong>${f.name}</strong><br>
+                                    <small class="text-muted">${f.reason}</small>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+        });
+
+        errorHtml += `
+            <div class="alert alert-info mb-0">
+                <strong><i class="bi bi-info-circle"></i> File Requirements:</strong><br>
+                <small>
+                    • <strong>Images:</strong> PNG, JPG, GIF, WEBP (Max: 2MB each)<br>
+                    • <strong>Videos:</strong> MP4, MOV, AVI, WMV, FLV, WEBM (Max: 50MB each)
+                </small>
+            </div>
+        </div>`;
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Upload Validation Failed',
+            html: errorHtml,
+            confirmButtonColor: '#5B914C',
+            width: '600px',
+            customClass: {
+                popup: 'validation-error-modal'
+            }
+        });
+    }
+
+    // Upload files with individual progress tracking
+    function uploadFilesWithProgress(files) {
+        if (files.length === 0) return;
+
+        const uploadId = 'upload-' + Date.now();
+        const totalFiles = files.length;
+        let completedFiles = 0;
+        let failedFiles = 0;
+        const uploadResults = [];
+
+        // Create upload widget
+        createUploadWidget(uploadId, totalFiles, files);
+
+        // Upload each file individually
+        files.forEach((file, index) => {
+            const fileId = `file-${index}`;
+
+            uploadSingleFile(file, fileId, uploadId, (result) => {
+                if (result.success) {
+                    completedFiles++;
+                    uploadResults.push(result.media);
+
+                    // Update file status
+                    updateFileStatus(uploadId, fileId, 'success', result.media);
+                } else {
+                    failedFiles++;
+                    updateFileStatus(uploadId, fileId, 'error', null, result.error);
+                }
+
+                // Update overall progress
+                const overallProgress = Math.round(((completedFiles + failedFiles) / totalFiles) * 100);
+                updateOverallProgress(uploadId, completedFiles, failedFiles, totalFiles, overallProgress);
+
+                // Check if all files processed
+                if (completedFiles + failedFiles === totalFiles) {
+                    finalizeUpload(uploadId, uploadResults, completedFiles, failedFiles, totalFiles);
+                }
+            });
+        });
+    }
+
+    // Create floating upload widget (Google Drive style)
+    function createUploadWidget(uploadId, totalFiles, files) {
+        const widget = `
+            <div id="${uploadId}" class="upload-widget">
+                <div class="upload-widget-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><i class="bi bi-cloud-upload"></i> Uploading ${totalFiles} file(s)</strong>
+                        </div>
+                        <div class="upload-actions">
+                            <button class="btn-widget-minimize" onclick="toggleUploadWidget('${uploadId}')">
+                                <i class="bi bi-dash-lg"></i>
+                            </button>
+                            <button class="btn-widget-close" onclick="cancelUpload('${uploadId}')">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Overall Progress -->
+                    <div class="overall-progress mt-2">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small id="${uploadId}-status">Preparing...</small>
+                            <small id="${uploadId}-percentage">0%</small>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-success"
+                                id="${uploadId}-bar"
+                                role="progressbar"
+                                style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="upload-widget-body" id="${uploadId}-body">
+                    <div class="upload-files-list" id="${uploadId}-files">
+                        ${files.map((file, index) => `
+                            <div class="upload-file-item" id="${uploadId}-file-${index}">
+                                <div class="file-info">
+                                    <i class="bi bi-${file.type.startsWith('video/') ? 'play-circle' : 'image'} text-muted"></i>
+                                    <span class="file-name">${file.name}</span>
+                                    <span class="file-size text-muted">${formatBytes(file.size)}</span>
+                                </div>
+                                <div class="file-progress">
+                                    <div class="progress" style="height: 4px;">
+                                        <div class="progress-bar"
+                                            id="${uploadId}-file-${index}-bar"
+                                            role="progressbar"
+                                            style="width: 0%"></div>
+                                    </div>
+                                    <span class="file-status" id="${uploadId}-file-${index}-status">
+                                        <i class="bi bi-hourglass-split text-muted"></i> Waiting...
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing upload widgets (optional)
+        // $('.upload-widget').remove();
+
+        // Append to body
+        $('body').append(widget);
+
+        // Animate in
+        setTimeout(() => {
+            $(`#${uploadId}`).addClass('show');
+        }, 100);
+    }
+
+    // Upload single file with progress
+    function uploadSingleFile(file, fileId, uploadId, callback) {
         const formData = new FormData();
         formData.append('session_id', sessionId);
         formData.append('_token', $('meta[name="csrf-token"]').attr('content'));
-
-        Array.from(files).forEach(file => {
-            formData.append('images[]', file);
-        });
+        formData.append('images[]', file);
 
         $.ajax({
             url: '/admin/products/temp-images/upload',
@@ -968,77 +1431,230 @@
             data: formData,
             processData: false,
             contentType: false,
-            beforeSend: function() {
-                Swal.fire({
-                    title: 'Uploading Media...',
-                    text: 'Please wait',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
+            xhr: function() {
+                const xhr = new window.XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 100);
+                        updateFileProgress(uploadId, fileId, percentComplete);
                     }
-                });
+                }, false);
+
+                return xhr;
             },
             success: function(response) {
-                Swal.close();
-                if (response.success) {
-                    response.media.forEach(media => {
-                        let mediaHtml = '';
-
-                        if (media.is_video) {
-                            // Video preview
-                            mediaHtml = `
-                                <div class="image-preview-container" data-path="${media.path}">
-                                    <div class="video-preview-wrapper" style="position: relative;">
-                                        <video class="image-preview" controls>
-                                            <source src="${media.url}" type="${media.mime_type}">
-                                            Your browser does not support the video tag.
-                                        </video>
-                                        <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
-                                            <i class="bi bi-play-circle"></i> Video
-                                        </span>
-                                        ${media.duration ? `<span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">${media.duration}</span>` : ''}
-                                        <span class="badge bg-secondary" style="position: absolute; bottom: 5px; left: 5px;">
-                                            ${media.file_size}
-                                        </span>
-                                    </div>
-                                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this)">
-                                        <i class="bi bi-x"></i>
-                                    </button>
-                                </div>
-                            `;
-                        } else {
-                            // Image preview
-                            mediaHtml = `
-                                <div class="image-preview-container" data-path="${media.path}">
-                                    <img src="${media.url}" class="image-preview" alt="${media.name}">
-                                    <span class="badge bg-secondary" style="position: absolute; bottom: 5px; left: 5px;">
-                                        ${media.file_size}
-                                    </span>
-                                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this)">
-                                        <i class="bi bi-x"></i>
-                                    </button>
-                                </div>
-                            `;
-                        }
-
-                        $('#galleryPreview').append(mediaHtml);
+                if (response.success && response.media.length > 0) {
+                    callback({
+                        success: true,
+                        media: response.media[0]
                     });
-
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Uploaded!',
-                        text: `${response.media.length} file(s) uploaded successfully`,
-                        timer: 1500,
-                        showConfirmButton: false
+                } else {
+                    callback({
+                        success: false,
+                        error: 'Upload failed'
                     });
                 }
             },
             error: function(xhr) {
-                Swal.fire('Error!', xhr.responseJSON?.message || 'Failed to upload media', 'error');
+                let errorMsg = 'Upload failed';
+
+                if (xhr.status === 422 && xhr.responseJSON?.errors) {
+                    const errors = xhr.responseJSON.errors;
+                    errorMsg = Object.values(errors).flat()[0] || errorMsg;
+                } else if (xhr.responseJSON?.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+
+                callback({
+                    success: false,
+                    error: errorMsg
+                });
             }
         });
     }
 
+    // Update individual file progress
+    function updateFileProgress(uploadId, fileId, percentage) {
+        $(`#${uploadId}-${fileId}-bar`).css('width', percentage + '%');
+        $(`#${uploadId}-${fileId}-status`).html(`
+            <i class="bi bi-upload text-primary"></i> ${percentage}%
+        `);
+    }
+
+    // Update file status (success/error)
+    function updateFileStatus(uploadId, fileId, status, media, error) {
+        const statusElement = $(`#${uploadId}-${fileId}-status`);
+        const progressBar = $(`#${uploadId}-${fileId}-bar`);
+        const fileItem = $(`#${uploadId}-${fileId}`);
+
+        if (status === 'success') {
+            progressBar.removeClass('bg-primary').addClass('bg-success');
+            statusElement.html('<i class="bi bi-check-circle-fill text-success"></i> Complete');
+            fileItem.addClass('success');
+
+            // Add to gallery preview
+            if (media) {
+                addMediaToGallery(media);
+            }
+        } else {
+            progressBar.removeClass('bg-primary').addClass('bg-danger');
+            statusElement.html(`<i class="bi bi-x-circle-fill text-danger"></i> ${error || 'Failed'}`);
+            fileItem.addClass('error');
+        }
+    }
+
+    // Update overall progress
+    function updateOverallProgress(uploadId, completed, failed, total, percentage) {
+        $(`#${uploadId}-bar`).css('width', percentage + '%');
+        $(`#${uploadId}-percentage`).text(percentage + '%');
+
+        const statusText = failed > 0
+            ? `${completed} completed, ${failed} failed of ${total}`
+            : `${completed} of ${total} uploaded`;
+
+        $(`#${uploadId}-status`).text(statusText);
+    }
+
+    // Add media to gallery preview
+    function addMediaToGallery(media) {
+        let mediaHtml = '';
+
+        if (media.is_video) {
+            mediaHtml = `
+                <div class="image-preview-container" data-path="${media.path}">
+                    <div class="video-preview-wrapper" style="position: relative;">
+                        <video class="image-preview" controls preload="metadata">
+                            <source src="${media.url}" type="${media.mime_type}">
+                        </video>
+                        <span class="badge bg-primary" style="position: absolute; top: 5px; left: 5px;">
+                            <i class="bi bi-play-circle"></i> Video
+                        </span>
+                        ${media.duration ? `<span class="badge bg-dark" style="position: absolute; top: 5px; right: 40px;">${media.duration}</span>` : ''}
+                        <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
+                            ${media.file_size}
+                        </span>
+                    </div>
+                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this)">
+                        <i class="bi bi-x"></i>
+                    </button>
+                    <small class="d-block text-center text-muted mt-1" style="font-size: 0.75rem;">${media.name}</small>
+                </div>
+            `;
+        } else {
+            mediaHtml = `
+                <div class="image-preview-container" data-path="${media.path}">
+                    <img src="${media.url}" class="image-preview" alt="${media.name}">
+                    <span class="badge bg-secondary" style="position: absolute; bottom: 35px; left: 5px;">
+                        ${media.file_size}
+                    </span>
+                    <button type="button" class="remove-image" onclick="deleteGalleryImage('${media.path}', this)">
+                        <i class="bi bi-x"></i>
+                    </button>
+                    <small class="d-block text-center text-muted mt-1" style="font-size: 0.75rem;">${media.name}</small>
+                </div>
+            `;
+        }
+
+        $('#galleryPreview').append(mediaHtml);
+    }
+
+    // Finalize upload
+    function finalizeUpload(uploadId, uploadResults, completed, failed, total) {
+        // Update widget header
+        $(`#${uploadId} .upload-widget-header strong`).html(
+            `<i class="bi bi-${failed === 0 ? 'check-circle-fill text-success' : 'exclamation-triangle-fill text-warning'}"></i>
+            ${failed === 0 ? 'Upload Complete' : 'Upload Finished with Errors'}`
+        );
+
+        // Change minimize button to close
+        $(`#${uploadId} .btn-widget-minimize`).remove();
+
+        // Auto-close after delay if all successful
+        if (failed === 0) {
+            setTimeout(() => {
+                closeUploadWidget(uploadId);
+            }, 3000);
+        }
+
+        // Show toast notification
+        showUploadToast(completed, failed, total);
+    }
+
+    // Show toast notification
+    function showUploadToast(completed, failed, total) {
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
+        });
+
+        if (failed === 0) {
+            Toast.fire({
+                icon: 'success',
+                title: `${completed} file(s) uploaded successfully!`
+            });
+        } else {
+            Toast.fire({
+                icon: 'warning',
+                title: `${completed} succeeded, ${failed} failed`
+            });
+        }
+    }
+
+    // Toggle widget minimize/maximize
+    function toggleUploadWidget(uploadId) {
+        $(`#${uploadId}`).toggleClass('minimized');
+        const icon = $(`#${uploadId} .btn-widget-minimize i`);
+
+        if ($(`#${uploadId}`).hasClass('minimized')) {
+            icon.removeClass('bi-dash-lg').addClass('bi-chevron-up');
+        } else {
+            icon.removeClass('bi-chevron-up').addClass('bi-dash-lg');
+        }
+    }
+
+    // Cancel/Close upload widget
+    function cancelUpload(uploadId) {
+        Swal.fire({
+            title: 'Close upload progress?',
+            text: 'Upload progress will be hidden',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#5B914C',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, close it',
+            cancelButtonText: 'Keep open'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                closeUploadWidget(uploadId);
+            }
+        });
+    }
+
+    // Close upload widget
+    function closeUploadWidget(uploadId) {
+        $(`#${uploadId}`).removeClass('show');
+        setTimeout(() => {
+            $(`#${uploadId}`).remove();
+        }, 300);
+    }
+
+    // Helper: Format bytes
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+    //Media upload functions with progress tracking.........Ends
     // ==================== TAGS FUNCTIONALITY ====================
     let selectedTags = [];
     let tagSearchTimeout;
