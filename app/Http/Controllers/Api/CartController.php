@@ -156,9 +156,25 @@ class CartController extends Controller
 
                 // ✅ CALCULATE TAX FOR TOTAL QUANTITY
                 $itemSubtotal = $itemPrice * $validated['quantity'];
-                $taxAmount = $product->is_taxable ? round(($itemSubtotal * $taxRate) / 100, 2) : 0;
-                $priceAfterTax = $product->is_taxable ? round($itemPrice + (($itemPrice * $taxRate) / 100), 2) : $itemPrice;
-                $subtotalAfterTax = $priceAfterTax * $validated['quantity'];
+
+                // Calculate based on tax type
+                if ($product->is_taxable) {
+                    if ($product->tax_type === 'inclusive') {
+                        // Tax is already included in price
+                        $taxAmount = round($itemSubtotal - ($itemSubtotal / (1 + ($taxRate / 100))), 2);
+                        $priceAfterTax = $itemPrice; // Price already includes tax
+                        $subtotalAfterTax = $itemSubtotal; // Subtotal already includes tax
+                    } else {
+                        // Tax is exclusive
+                        $taxAmount = round(($itemSubtotal * $taxRate) / 100, 2);
+                        $priceAfterTax = round($itemPrice + (($itemPrice * $taxRate) / 100), 2);
+                        $subtotalAfterTax = $priceAfterTax * $validated['quantity'];
+                    }
+                } else {
+                    $taxAmount = 0;
+                    $priceAfterTax = $itemPrice;
+                    $subtotalAfterTax = $itemSubtotal;
+                }
 
                 // Get currency details
                 $currencyCode = $product->curency ?? 'SAR';
@@ -176,6 +192,7 @@ class CartController extends Controller
                     'product_currency' => $currencyCode,
                     'quantity' => $validated['quantity'],
                     'is_taxable' => $product->is_taxable,
+                    'tax_type' => $product->tax_type,
                     'tax_rate' => $taxRate,
                     'tax_amount' => $taxAmount,  // ✅ NOW SHOWS TOTAL TAX (10 × 4 = 40)
                     'price_after_tax' => $priceAfterTax,  // ✅ PER UNIT PRICE WITH TAX (110)
@@ -632,7 +649,9 @@ class CartController extends Controller
     {
         $subtotal = 0.0;
         $taxAmount = 0.0;
+        $includedTaxAmount = 0.0;
         $totalItems = 0;
+        $taxBreakdown = [];
 
         foreach ($cart as $item) {
             // ✅ ENSURE ALL VALUES ARE NUMERIC
@@ -644,29 +663,63 @@ class CartController extends Controller
             $subtotal += $itemSubtotal;
             $totalItems += $quantity;
 
+            // Inside foreach ($cart as $item)
             if (isset($item['is_taxable']) && $item['is_taxable']) {
-                $taxAmount += $itemSubtotal * ($taxRate / 100);
+                $taxRate = isset($item['tax_rate']) ? (float) $item['tax_rate'] : 0.0;
+                $taxType = $item['tax_type'] ?? 'exclusive';
+
+                if ($taxType === 'inclusive') {
+                    $includedTax = $itemSubtotal - ($itemSubtotal / (1 + ($taxRate / 100)));
+                    $includedTaxAmount += $includedTax;
+
+                    // ADD THIS: Track tax by rate
+                    if (!isset($taxBreakdown[$taxRate])) {
+                        $taxBreakdown[$taxRate] = 0;
+                    }
+                    $taxBreakdown[$taxRate] += $includedTax;
+                } else {
+                    $tax = $itemSubtotal * ($taxRate / 100);
+                    $taxAmount += $tax;
+                }
+            }
+
+        }
+
+        // Build tax statement
+        $taxStatement = null;
+        if ($includedTaxAmount > 0) {
+            $uniqueRates = array_keys($taxBreakdown);
+
+            if (count($uniqueRates) === 1) {
+                // All products have same tax rate - show with percentage
+                $rate = $uniqueRates[0];
+                $taxStatement = "(includes " . format_amount($includedTaxAmount) . " SAR VAT " . number_format($rate, 0) . "%)";
+            } else {
+                // Multiple tax rates - show total only without percentage
+                $taxStatement = "(includes " . format_amount($includedTaxAmount) . " SAR)";
             }
         }
 
         $total = $subtotal + $taxAmount;
 
         return [
-            'subtotal' => round($subtotal, 2), // ✅ NUMERIC, NOT FORMATTED
-            'tax_amount' => round($taxAmount, 2),
+            'subtotal' => round($subtotal, 2),
+            'tax_amount' => round($taxAmount, 2), // Only exclusive tax
+            'included_tax_amount' => round($includedTaxAmount ?? 0, 2),
             'shipping_amount' => 0.0,
             'discount_amount' => 0.0,
-            'total_amount' => round($total, 2),
+            'total_amount' => round($total, 2), // subtotal + exclusive tax only
             'total_items' => $totalItems,
             'currency' => store_currency_symbol(),
-            // ✅ ADD FORMATTED VERSIONS FOR DISPLAY
             'formatted' => [
                 'subtotal' => format_amount($subtotal),
                 'tax_amount' => format_amount($taxAmount),
+                'included_tax_amount' => format_amount($includedTaxAmount ?? 0),
                 'shipping_amount' => format_amount(0),
                 'discount_amount' => format_amount(0),
                 'total_amount' => format_amount($total),
-            ]
+            ],
+            'tax_statement' => $taxStatement
         ];
     }
 
@@ -766,9 +819,25 @@ class CartController extends Controller
 
             // ✅ CALCULATE TAX FOR TOTAL QUANTITY
             $itemSubtotal = $itemPrice * $quantity;
-            $taxAmount = $product->is_taxable ? round(($itemSubtotal * $taxRate) / 100, 2) : 0;
-            $priceAfterTax = $product->is_taxable ? round($itemPrice + (($itemPrice * $taxRate) / 100), 2) : $itemPrice;
-            $subtotalAfterTax = $priceAfterTax * $quantity;
+
+            // Calculate based on tax type
+            if ($product->is_taxable) {
+                if ($product->tax_type === 'inclusive') {
+                    // Tax is already included in price
+                    $taxAmount = round($itemSubtotal - ($itemSubtotal / (1 + ($taxRate / 100))), 2);
+                    $priceAfterTax = $itemPrice; // Price already includes tax
+                    $subtotalAfterTax = $itemSubtotal; // Subtotal already includes tax
+                } else {
+                    // Tax is exclusive
+                    $taxAmount = round(($itemSubtotal * $taxRate) / 100, 2);
+                    $priceAfterTax = round($itemPrice + (($itemPrice * $taxRate) / 100), 2);
+                    $subtotalAfterTax = $priceAfterTax * $quantity;
+                }
+            } else {
+                $taxAmount = 0;
+                $priceAfterTax = $itemPrice;
+                $subtotalAfterTax = $itemSubtotal;
+            }
 
             // Get currency details
             $currencyCode = $product->curency ?? 'SAR';
@@ -781,6 +850,7 @@ class CartController extends Controller
             $item['regular_price'] = $regularPrice;
             $item['product_currency'] = $currencyCode;
             $item['tax_rate'] = $taxRate;
+            $item['tax_type'] = $product->tax_type;
             $item['tax_amount'] = $taxAmount;  // ✅ NOW SHOWS TOTAL TAX
             $item['price_after_tax'] = $priceAfterTax;
             $item['max_quantity'] = $variant
