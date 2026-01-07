@@ -431,6 +431,7 @@ class ProductsController extends Controller
             $query = Product::query()
                 ->select(['id', 'name', 'slug', 'sku', 'barcode', 'short_description'])
                 ->active()
+                ->available()
                 ->where(function($q) use ($searchTerm) {
                     $q->where('name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('slug', 'LIKE', "%{$searchTerm}%")
