@@ -482,23 +482,67 @@ $(document).ready(function() {
     $('.remove-image').on('click', function() {
         const field = $(this).data('field');
         const imageContainer = $(this).closest('.existing-image');
+        const categoryId = $('input[name="category_id"]').val();
 
         Swal.fire({
             title: 'Remove Image?',
-            text: "This will remove the image when you save.",
+            text: "This will permanently remove the image.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, remove it'
+            confirmButtonText: 'Yes, remove it',
+            cancelButtonText: 'Cancel'
         }).then((result) => {
             if (result.isConfirmed) {
-                imageContainer.remove();
-                $('<input>').attr({
-                    type: 'hidden',
-                    name: `remove_${field}`,
-                    value: '1'
-                }).appendTo('#categoryForm');
+                // Show loading
+                Swal.fire({
+                    title: 'Removing...',
+                    text: 'Please wait',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                // Send AJAX request to remove image
+                $.ajax({
+                    url: `/admin/categories/${categoryId}/remove-image`,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        field: field
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Remove the image container from DOM
+                            imageContainer.fadeOut(300, function() {
+                                $(this).remove();
+                            });
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Removed!',
+                                text: response.message,
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message
+                            });
+                        }
+                    },
+                    error: function(xhr) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: xhr.responseJSON?.message || 'Failed to remove image'
+                        });
+                    }
+                });
             }
         });
     });

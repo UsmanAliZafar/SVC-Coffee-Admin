@@ -43,6 +43,7 @@ class PermissionSeeder extends Seeder
             'notifications' => ['read', 'update', 'delete'],
             'contact_us'=>['read', 'update', 'delete'],
             'newsletters'=>['create', 'read', 'update', 'delete' ],
+            'tags'=>['create', 'read', 'update', 'delete' ],
         ];
 
         // Create permissions

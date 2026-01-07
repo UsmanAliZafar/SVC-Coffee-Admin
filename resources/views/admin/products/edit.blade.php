@@ -1073,7 +1073,7 @@
                             <i class="bi bi-info-circle"></i> <strong>Supported Formats:</strong>
                             <ul class="mb-0 mt-2">
                                 <li><strong>Images:</strong> PNG, JPG, GIF, WEBP up to 2MB each</li>
-                                <li><strong>Videos:</strong> MP4, MOV, AVI, WMV, FLV, WEBM up to 50MB each</li>
+                                <li><strong>Videos:</strong> MP4, MOV, AVI, FLV, WEBM up to 50MB each</li>
                             </ul>
                         </div>
                         <div class="dropzone-area" id="dropzoneArea">

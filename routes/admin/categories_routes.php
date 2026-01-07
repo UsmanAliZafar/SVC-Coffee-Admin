@@ -36,7 +36,8 @@ Route::prefix('categories')->name('categories.')->group(function () {
     Route::middleware('admin.permission:categories.update')->group(function () {
         Route::get('/{id}/edit', [CategoriesController::class, 'edit'])->name('edit');
         Route::put('/{id}', [CategoriesController::class, 'update'])->name('update');
-
+        // Remove category image
+        Route::post('/{id}/remove-image', [CategoriesController::class, 'removeImage'])->name('remove-image');
         // Reorder categories
         Route::post('/reorder', [CategoriesController::class, 'reorder'])->name('reorder');
 

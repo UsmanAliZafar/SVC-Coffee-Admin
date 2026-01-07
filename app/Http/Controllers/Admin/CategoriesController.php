@@ -351,6 +351,50 @@ class CategoriesController extends Controller
         }
     }
 
+    /**
+     * Remove category image
+     */
+    public function removeImage(Request $request, $id)
+    {
+        try {
+            $category = ProductsCategories::findOrFail($id);
+
+            $field = $request->input('field');
+            $allowedFields = ['image', 'banner_image', 'icon', 'thumbnail'];
+
+            if (!in_array($field, $allowedFields)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid image field'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // Delete file from storage
+            if ($category->$field) {
+                Storage::disk('public')->delete($category->$field);
+            }
+
+            // Update database
+            $category->update([$field => null]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Image removed successfully!'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove image: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function updateUrl(Request $request, $id)
     {
         try {
