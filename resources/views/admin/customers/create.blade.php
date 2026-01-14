@@ -232,17 +232,9 @@
                                 <label for="billing_country" class="form-label">Country</label>
                                 <select class="form-select" id="billing_country" name="billing_country">
                                     <option value="">Select Country</option>
-                                    <option value="United States">United States</option>
-                                    <option value="Canada">Canada</option>
-                                    <option value="United Kingdom">United Kingdom</option>
-                                    <option value="Australia">Australia</option>
-                                    <option value="Pakistan" selected>Pakistan</option>
-                                    <option value="India">India</option>
-                                    <option value="China">China</option>
-                                    <option value="Germany">Germany</option>
-                                    <option value="France">France</option>
-                                    <option value="Japan">Japan</option>
-                                    <option value="Other">Other</option>
+                                    @foreach($countries as $country)
+                                        <option value="{{ $country }}">{{ $country }}</option>
+                                    @endforeach
                                 </select>
                                 <div class="invalid-feedback"></div>
                             </div>
@@ -301,17 +293,9 @@
                                 <label for="shipping_country" class="form-label">Country</label>
                                 <select class="form-select" id="shipping_country" name="shipping_country">
                                     <option value="">Select Country</option>
-                                    <option value="United States">United States</option>
-                                    <option value="Canada">Canada</option>
-                                    <option value="United Kingdom">United Kingdom</option>
-                                    <option value="Australia">Australia</option>
-                                    <option value="Pakistan" selected>Pakistan</option>
-                                    <option value="India">India</option>
-                                    <option value="China">China</option>
-                                    <option value="Germany">Germany</option>
-                                    <option value="France">France</option>
-                                    <option value="Japan">Japan</option>
-                                    <option value="Other">Other</option>
+                                    @foreach($countries as $country)
+                                        <option value="{{ $country }}">{{ $country }}</option>
+                                    @endforeach
                                 </select>
                                 <div class="invalid-feedback"></div>
                             </div>
@@ -550,6 +534,20 @@
 
 <script>
 $(document).ready(function() {
+    $('#billing_country').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search Country...',
+        allowClear: true,
+        width: '100%'
+    });
+    $('#shipping_country').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search Country...',
+        allowClear: true,
+        width: '100%'
+    });
+
+    //
     let tagsArray = [];
 
     // Password toggle visibility

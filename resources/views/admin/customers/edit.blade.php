@@ -320,17 +320,9 @@
                                 <label for="billing_country" class="form-label">Country</label>
                                 <select class="form-select" id="billing_country" name="billing_country">
                                     <option value="">Select Country</option>
-                                    <option value="United States" {{ old('billing_country', $customer->billing_country) == 'United States' ? 'selected' : '' }}>United States</option>
-                                    <option value="Canada" {{ old('billing_country', $customer->billing_country) == 'Canada' ? 'selected' : '' }}>Canada</option>
-                                    <option value="United Kingdom" {{ old('billing_country', $customer->billing_country) == 'United Kingdom' ? 'selected' : '' }}>United Kingdom</option>
-                                    <option value="Australia" {{ old('billing_country', $customer->billing_country) == 'Australia' ? 'selected' : '' }}>Australia</option>
-                                    <option value="Pakistan" {{ old('billing_country', $customer->billing_country) == 'Pakistan' ? 'selected' : '' }}>Pakistan</option>
-                                    <option value="India" {{ old('billing_country', $customer->billing_country) == 'India' ? 'selected' : '' }}>India</option>
-                                    <option value="China" {{ old('billing_country', $customer->billing_country) == 'China' ? 'selected' : '' }}>China</option>
-                                    <option value="Germany" {{ old('billing_country', $customer->billing_country) == 'Germany' ? 'selected' : '' }}>Germany</option>
-                                    <option value="France" {{ old('billing_country', $customer->billing_country) == 'France' ? 'selected' : '' }}>France</option>
-                                    <option value="Japan" {{ old('billing_country', $customer->billing_country) == 'Japan' ? 'selected' : '' }}>Japan</option>
-                                    <option value="Other" {{ old('billing_country', $customer->billing_country) == 'Other' ? 'selected' : '' }}>Other</option>
+                                    @foreach($countries as $country)
+                                        <option value="{{ $country }}" {{ old('billing_country', $customer->billing_country) == $country ? 'selected' : '' }} >{{ $country }}</option>
+                                    @endforeach
                                 </select>
                                 <div class="invalid-feedback"></div>
                             </div>
@@ -389,17 +381,9 @@
                                 <label for="shipping_country" class="form-label">Country</label>
                                 <select class="form-select" id="shipping_country" name="shipping_country">
                                     <option value="">Select Country</option>
-                                    <option value="United States" {{ old('shipping_country', $customer->shipping_country) == 'United States' ? 'selected' : '' }}>United States</option>
-                                    <option value="Canada" {{ old('shipping_country', $customer->shipping_country) == 'Canada' ? 'selected' : '' }}>Canada</option>
-                                    <option value="United Kingdom" {{ old('shipping_country', $customer->shipping_country) == 'United Kingdom' ? 'selected' : '' }}>United Kingdom</option>
-                                    <option value="Australia" {{ old('shipping_country', $customer->shipping_country) == 'Australia' ? 'selected' : '' }}>Australia</option>
-                                    <option value="Pakistan" {{ old('shipping_country', $customer->shipping_country) == 'Pakistan' ? 'selected' : '' }}>Pakistan</option>
-                                    <option value="India" {{ old('shipping_country', $customer->shipping_country) == 'India' ? 'selected' : '' }}>India</option>
-                                    <option value="China" {{ old('shipping_country', $customer->shipping_country) == 'China' ? 'selected' : '' }}>China</option>
-                                    <option value="Germany" {{ old('shipping_country', $customer->shipping_country) == 'Germany' ? 'selected' : '' }}>Germany</option>
-                                    <option value="France" {{ old('shipping_country', $customer->shipping_country) == 'France' ? 'selected' : '' }}>France</option>
-                                    <option value="Japan" {{ old('shipping_country', $customer->shipping_country) == 'Japan' ? 'selected' : '' }}>Japan</option>
-                                    <option value="Other" {{ old('shipping_country', $customer->shipping_country) == 'Other' ? 'selected' : '' }}>Other</option>
+                                    @foreach($countries as $country)
+                                        <option value="{{ $country }}" {{ old('billing_country', $customer->shipping_country) == $country ? 'selected' : '' }} >{{ $country }}</option>
+                                    @endforeach
                                 </select>
                                 <div class="invalid-feedback"></div>
                             </div>
@@ -671,6 +655,18 @@
 
 <script>
 $(document).ready(function() {
+    $('#billing_country').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search Country...',
+        allowClear: true,
+        width: '100%'
+    });
+    $('#shipping_country').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search Country...',
+        allowClear: true,
+        width: '100%'
+    });
     // Password toggle visibility
     $('.password-toggle').on('click', function() {
         const targetId = $(this).data('target');

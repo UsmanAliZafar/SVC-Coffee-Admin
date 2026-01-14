@@ -302,6 +302,13 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
+// Initialize Vendor Select2
+    $('#country').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search Country...',
+        allowClear: true,
+        width: '100%'
+    });
     // Handle form submission
     $('#createVendorForm').on('submit', function(e) {
         e.preventDefault();

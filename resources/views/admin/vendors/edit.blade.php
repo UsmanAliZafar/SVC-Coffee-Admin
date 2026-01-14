@@ -348,6 +348,12 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
+    $('#country').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search Country...',
+        allowClear: true,
+        width: '100%'
+    });
     // Handle form submission
     $('#editVendorForm').on('submit', function(e) {
         e.preventDefault();
