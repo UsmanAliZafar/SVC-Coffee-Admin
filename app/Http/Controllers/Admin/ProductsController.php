@@ -1318,7 +1318,7 @@ class ProductsController extends Controller
                 'required',
                 'file',
                 'mimes:jpeg,png,jpg,gif,webp,mp4,mov,avi,wmv,flv,webm',
-                'max:51200' // 50MB max for videos
+                'max:262144' // 250MB max for videos
             ]
         ], [
             'images.*.mimes' => 'File must be an image (jpeg, png, jpg, gif, webp) or video (mp4, mov, avi, wmv, flv, webm)',

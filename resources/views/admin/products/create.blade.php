@@ -950,7 +950,7 @@
                             <i class="bi bi-info-circle"></i> <strong>Note:</strong> Media files are uploaded immediately when selected. They will be linked to this product when you submit the form.
                             <ul class="mb-0 mt-2">
                                 <li><strong>Images:</strong> PNG, JPG, GIF, WEBP up to 2MB each</li>
-                                <li><strong>Videos:</strong> MP4, MOV, AVI FLV, WEBM up to 50MB each</li>
+                                <li><strong>Videos:</strong> MP4, MOV, AVI FLV, WEBM up to 250MB each</li>
                             </ul>
                         </div>
                         <div class="dropzone-area" id="dropzoneArea">
@@ -1465,9 +1465,9 @@
 
     //Media upload functions with progress tracking.........Start
     // Constants
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+    const MAX_FILE_SIZE = 250 * 1024 * 1024; // 250MB in bytes
     const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB for images
-    const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
+    const MAX_VIDEO_SIZE = 250 * 1024 * 1024; // 250MB for videos
 
     // Upload media with individual file progress tracking
     function uploadImagesToServer(files) {
@@ -1594,7 +1594,7 @@
                 <strong><i class="bi bi-info-circle"></i> File Requirements:</strong><br>
                 <small>
                     • <strong>Images:</strong> PNG, JPG, GIF, WEBP (Max: 2MB each)<br>
-                    • <strong>Videos:</strong> MP4, MOV, AVI, WMV, FLV, WEBM (Max: 50MB each)
+                    • <strong>Videos:</strong> MP4, MOV, AVI, WMV, FLV, WEBM (Max: 250MB each)
                 </small>
             </div>
         </div>`;
