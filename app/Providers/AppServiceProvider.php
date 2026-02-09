@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use App\Models\StoreSetting;
 use App\Models\Order;
 use App\Observers\OrderObserver;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // if ($this->app->environment(['local', 'production'])) {
+        //     URL::forceScheme('https');
+        // }
         Order::observe(OrderObserver::class);
         try {
             // Only run if store_settings table exists (to avoid migration errors)
