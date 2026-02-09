@@ -2,6 +2,8 @@
 <html>
 <head>
     <title>Redirecting to Payment Gateway...</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -18,6 +20,7 @@
             padding: 40px;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 12px;
+            max-width: 500px;
         }
         .spinner {
             border: 5px solid #f3f3f3;
@@ -32,48 +35,73 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        h2 {
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        p {
+            margin-bottom: 5px;
+            opacity: 0.9;
+        }
+        .payment-info {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            text-align: left;
+        }
+        .payment-info div {
+            margin-bottom: 8px;
+        }
+        .payment-info strong {
+            display: inline-block;
+            width: 100px;
+        }
+        .countdown {
+            margin-top: 15px;
+            font-size: 16px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="loader">
         <div class="spinner"></div>
-        <h2>Redirecting to Payment Gateway...</h2>
-        <p>Please wait...</p>
+        <h2>Redirecting to Payment Gateway</h2>
+        <p>Please wait, do not close this window...</p>
+
+        <div class="payment-info">
+            <div><strong>Payment ID:</strong> {{ $payment_id }}</div>
+            <div><strong>Track ID:</strong> {{ $track_id }}</div>
+            <div><strong>Status:</strong> Pending</div>
+        </div>
+
+        <div class="countdown">
+            Redirecting in <span id="countdown">2</span> seconds...
+        </div>
     </div>
 
     <script>
-        // Payment data as JSON
-        const paymentData = {
-            "id": "{{ $tranportal_id }}",
-            "trandata": "{{ $trandata }}",
-            "responseURL": "{{ $response_url }}",
-            "errorURL": "{{ $error_url }}"
-        };
+        // Countdown timer
+        let seconds = 2;
+        const countdownElement = document.getElementById('countdown');
 
-        console.log('Sending payment request:', paymentData);
+        const timer = setInterval(() => {
+            seconds--;
+            if (countdownElement) {
+                countdownElement.textContent = seconds;
+            }
+            if (seconds <= 0) {
+                clearInterval(timer);
+            }
+        }, 1000);
 
-        // Send JSON POST request
-        fetch("{{ $payment_url }}", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(paymentData)
-        })
-        .then(response => {
-            console.log('Response status:', response.status);
-            return response.text();
-        })
-        .then(html => {
-            // Replace current page with payment gateway response
-            document.open();
-            document.write(html);
-            document.close();
-        })
-        .catch(error => {
-            console.error('Payment request failed:', error);
-            document.body.innerHTML = '<div class="loader"><h2>Error</h2><p>Failed to redirect to payment gateway. Please try again.</p></div>';
-        });
+        // Auto-redirect to payment page
+        setTimeout(function() {
+            console.log('Redirecting to:', "{{ $payment_url }}");
+            window.location.href = "{{ $payment_url }}";
+        }, 2000);
     </script>
 </body>
 </html>

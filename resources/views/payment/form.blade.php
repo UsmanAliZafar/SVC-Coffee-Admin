@@ -317,12 +317,23 @@
 
         // Form submission with loading state
         document.getElementById('paymentForm').addEventListener('submit', function(e) {
-            const btn = document.getElementById('payBtn');
-            const overlay = document.getElementById('loadingOverlay');
+            // Get browser information
+            const browserInfo = {
+                java_enabled: navigator.javaEnabled().toString(),
+                language: navigator.language || 'en',
+                color_depth: screen.colorDepth.toString(),
+                screen_height: screen.height.toString(),
+                screen_width: screen.width.toString(),
+                timezone: new Date().getTimezoneOffset().toString(),
+                js_enabled: 'true'
+            };
 
-            btn.disabled = true;
-            btn.textContent = 'Processing...';
-            overlay.classList.add('active');
+            // Add to form data
+            const browserInfoField = document.createElement('input');
+            browserInfoField.type = 'hidden';
+            browserInfoField.name = 'browser_info';
+            browserInfoField.value = JSON.stringify(browserInfo);
+            this.appendChild(browserInfoField);
         });
 
         // Auto-format mobile number

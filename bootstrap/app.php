@@ -35,6 +35,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.guest' => \App\Http\Middleware\RedirectIfAdminAuthenticated::class,
             'api.key' => \App\Http\Middleware\ApiKeyAuth::class,
         ]);
+
+    })
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->validateCsrfTokens(except: [
+            '/arb/callback',
+            '/arb/error',
+            '/arb/webhook',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

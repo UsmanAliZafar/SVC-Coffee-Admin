@@ -29,58 +29,110 @@ class ARBPaymentService
             // Prepare trandata
             $trandata = $this->prepareTrandata($paymentData);
 
-            Log::info('ARB Payment - Trandata Prepared', [
-                'trackid' => $trandata['trackid'] ?? 'N/A',
-                'amount' => $trandata['amt'] ?? 'N/A',
-                'terminal_id' => $trandata['terminalId'] ?? 'N/A'
-            ]);
+            Log::info('========================================');
+            Log::info('📋 ARB PAYMENT - TRANDATA PREPARED');
+            Log::info('========================================');
+            Log::info('Track ID: ' . ($trandata['trackId'] ?? 'N/A'));
+            Log::info('Amount: ' . ($trandata['amt'] ?? 'N/A'));
+            Log::info('Currency: ' . ($trandata['currencyCode'] ?? 'N/A'));
+            Log::info('Customer Email: ' . ($trandata['cust_email'] ?? 'N/A'));
+            Log::info('----------------------------------------');
 
             // Convert to JSON array format as per ARB specifications
-            $trandataArray = [$trandata]; // Wrap in array [{...}]
-            $trandataString = json_encode($trandataArray);
+            $trandataArray = [$trandata];
+            $trandataString = json_encode($trandataArray, JSON_PRETTY_PRINT);
 
-            Log::info('ARB Payment - Trandata JSON String', [
-                'length' => strlen($trandataString),
-                'sample' => substr($trandataString, 0, 200),
-                'format' => 'JSON Array'
-            ]);
+            Log::info('📄 PLAIN TRANDATA (JSON ARRAY FORMAT)');
+            Log::info('========================================');
+            Log::info('COPY THIS FOR TESTING:');
+            Log::info('========================================');
+            Log::info($trandataString);
+            Log::info('========================================');
+            Log::info('Length: ' . strlen($trandataString) . ' characters');
+            Log::info('----------------------------------------');
 
             // Encrypt trandata (returns HEX string)
             $encryptedTrandata = $this->encryptAES($trandataString, $this->config['resource_key']);
 
-            Log::info('ARB Payment - Trandata Encrypted', [
-                'encrypted_length' => strlen($encryptedTrandata),
-                'encrypted_sample' => substr($encryptedTrandata, 0, 100),
-                'is_hex' => ctype_xdigit(urldecode($encryptedTrandata))
-            ]);
+            Log::info('🔐 ENCRYPTED TRANDATA');
+            Log::info('========================================');
+            Log::info('COPY THIS FOR POSTMAN:');
+            Log::info('========================================');
+            Log::info($encryptedTrandata);
+            Log::info('========================================');
+            Log::info('Length: ' . strlen($encryptedTrandata) . ' characters');
+            Log::info('Is Valid HEX: ' . (ctype_xdigit(urldecode($encryptedTrandata)) ? 'YES' : 'NO'));
+            Log::info('----------------------------------------');
 
-            // Build complete URL with query parameters (GET request)
-            $queryParams = [
-                'trandata' => $encryptedTrandata,
-                'errorURL' => config('arb-payment.error_url'),
-                'responseURL' => config('arb-payment.response_url'),
-                'tranportalId' => $this->config['tranportal_id'],
-                'tranportalPassword' => $this->config['tranportal_password']
+            // Test decryption
+            $decryptedTest = $this->decryptAES($encryptedTrandata, $this->config['resource_key']);
+            $encryptionValid = ($decryptedTest === $trandataString);
+
+            Log::info('✅ ENCRYPTION VERIFICATION');
+            Log::info('========================================');
+            Log::info('Encryption Valid: ' . ($encryptionValid ? 'YES ✅' : 'NO ❌'));
+            if (!$encryptionValid) {
+                Log::error('Original Length: ' . strlen($trandataString));
+                Log::error('Decrypted Length: ' . strlen($decryptedTest));
+                Log::error('Decrypted Sample: ' . substr($decryptedTest, 0, 200));
+            }
+            Log::info('----------------------------------------');
+
+            // Build request payload
+            $requestPayload = [
+                [
+                    'id' => $this->config['tranportal_id'],
+                    'trandata' => $encryptedTrandata,
+                    'responseURL' => config('arb-payment.response_url'),
+                    'errorURL' => config('arb-payment.error_url')
+                ]
             ];
 
-            $paymentUrl = $this->config['payment_url'] . '?' . http_build_query($queryParams);
+            Log::info('📦 REQUEST PAYLOAD FOR ARB GATEWAY');
+            Log::info('========================================');
+            Log::info('COPY THIS COMPLETE JSON FOR POSTMAN:');
+            Log::info('========================================');
+            Log::info(json_encode($requestPayload, JSON_PRETTY_PRINT));
+            Log::info('========================================');
+            Log::info('Endpoint: ' . $this->config['payment_url']);
+            Log::info('Method: POST');
+            Log::info('Content-Type: application/json');
+            Log::info('----------------------------------------');
 
-            Log::info('ARB Payment - Payment URL Generated', [
-                'url_length' => strlen($paymentUrl),
-                'base_url' => $this->config['payment_url']
-            ]);
+            // cURL command for quick testing
+            $curlCommand = $this->generateCurlCommand(
+                $this->config['payment_url'],
+                $requestPayload
+            );
+
+            Log::info('🔧 CURL COMMAND FOR TESTING');
+            Log::info('========================================');
+            Log::info('COPY THIS TO TEST IN TERMINAL:');
+            Log::info('========================================');
+            Log::info($curlCommand);
+            Log::info('========================================');
+
+            Log::info('✅ Payment Token Generation Complete');
+            Log::info('========================================');
 
             return [
-                'payment_url' => $paymentUrl,
+                'request_payload' => $requestPayload,
+                'payment_url' => $this->config['payment_url'],
                 'trandata' => $encryptedTrandata,
-                'query_params' => $queryParams
+                'plain_trandata' => $trandataString,
+                'curl_command' => $curlCommand
             ];
 
         } catch (Exception $e) {
-            Log::error('ARB Payment - Token Generation Error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('========================================');
+            Log::error('❌ ARB PAYMENT - TOKEN GENERATION ERROR');
+            Log::error('========================================');
+            Log::error('Error Message: ' . $e->getMessage());
+            Log::error('Error File: ' . $e->getFile());
+            Log::error('Error Line: ' . $e->getLine());
+            Log::error('Stack Trace:');
+            Log::error($e->getTraceAsString());
+            Log::error('========================================');
             throw $e;
         }
     }
@@ -93,15 +145,12 @@ class ARBPaymentService
         // Generate track ID if not provided
         $trackId = $data['track_id'] ?? 'TRK-' . time() . '-' . uniqid();
 
-        // IMPORTANT: According to ARB documentation, password and id
-        // MUST be INSIDE the encrypted trandata (as JSON shows)
-
         return [
             // Amount and Action
             'amt' => number_format($data['amount'], 2, '.', ''),
             'action' => '1', // 1 = Purchase
 
-            // Portal Credentials - INSIDE trandata (as per document)
+            // Portal Credentials - INSIDE trandata
             'password' => $this->config['tranportal_password'],
             'id' => $this->config['tranportal_id'],
 
@@ -129,7 +178,7 @@ class ARBPaymentService
     }
 
     /**
-     * Encrypt data using AES-256-CBC (WordPress plugin method)
+     * Encrypt data using AES-256-CBC
      */
     public function encryptAES(string $str, string $key): string
     {
@@ -157,7 +206,7 @@ class ARBPaymentService
     }
 
     /**
-     * Decrypt data using AES-256-CBC (WordPress plugin method)
+     * Decrypt data using AES-256-CBC
      */
     public function decryptAES(string $code, string $key): string
     {
@@ -182,13 +231,15 @@ class ARBPaymentService
         return $this->pkcs5_unpad($decrypted);
     }
 
-    /**
-     * Handle callback response from payment gateway
-     */
     public function handleCallback(array $callbackData): array
     {
         try {
-            Log::info('ARB Callback Received - Raw Data', $callbackData);
+            Log::info('========================================');
+            Log::info('📥 ARB CALLBACK RECEIVED');
+            Log::info('========================================');
+            Log::info('Raw Callback Data:');
+            Log::info(json_encode($callbackData, JSON_PRETTY_PRINT));
+            Log::info('----------------------------------------');
 
             $result = [
                 'success' => false,
@@ -198,15 +249,27 @@ class ARBPaymentService
 
             // Check if trandata exists
             if (!empty($callbackData['trandata'])) {
+                Log::info('🔓 DECRYPTING CALLBACK TRANDATA');
+                Log::info('----------------------------------------');
+                Log::info('Encrypted Trandata (first 100 chars):');
+                Log::info(substr($callbackData['trandata'], 0, 100));
+                Log::info('----------------------------------------');
+
                 // Decrypt trandata
                 $decryptedData = $this->decryptAES(
                     $callbackData['trandata'],
                     $this->config['resource_key']
                 );
 
-                Log::info('ARB Callback - Decrypted Data (Raw)', [
-                    'decrypted' => substr($decryptedData, 0, 500)
-                ]);
+                // URL decode the decrypted data
+                $decryptedData = urldecode($decryptedData);
+
+                Log::info('📄 DECRYPTED CALLBACK DATA');
+                Log::info('========================================');
+                Log::info('COPY THIS DECRYPTED DATA:');
+                Log::info('========================================');
+                Log::info($decryptedData);
+                Log::info('========================================');
 
                 // Parse JSON array format
                 $transactionDataArray = json_decode($decryptedData, true);
@@ -215,15 +278,22 @@ class ARBPaymentService
                 if (is_array($transactionDataArray) && isset($transactionDataArray[0])) {
                     // Array format: [{...}]
                     $transactionData = $transactionDataArray[0];
+                    Log::info('✅ Parsed as JSON Array');
                 } elseif (is_array($transactionDataArray)) {
                     // Object format: {...}
                     $transactionData = $transactionDataArray;
+                    Log::info('✅ Parsed as JSON Object');
                 } else {
-                    // Fallback: try query string format for backward compatibility
+                    // Fallback: try query string format
                     parse_str($decryptedData, $transactionData);
+                    Log::info('✅ Parsed as Query String');
                 }
 
-                Log::info('ARB Callback - Parsed Transaction Data', $transactionData);
+                Log::info('----------------------------------------');
+                Log::info('📋 PARSED TRANSACTION DATA');
+                Log::info('========================================');
+                Log::info(json_encode($transactionData, JSON_PRETTY_PRINT));
+                Log::info('========================================');
 
                 $result['data'] = $transactionData;
 
@@ -233,15 +303,20 @@ class ARBPaymentService
                     if ($resultLower === 'captured' || $resultLower === 'successful' || $resultLower === 'success') {
                         $result['success'] = true;
                         $result['message'] = 'Transaction successful';
+                        Log::info('✅ Transaction Status: SUCCESS');
                     } else {
                         $result['message'] = $transactionData['result'];
+                        Log::warning('⚠️ Transaction Status: ' . $transactionData['result']);
                     }
                 } else {
                     $result['message'] = $transactionData['errorText'] ?? 'Transaction failed';
+                    Log::error('❌ Transaction Failed: ' . $result['message']);
                 }
             } else {
                 // Handle error response (no trandata)
-                Log::warning('ARB Callback - No trandata found', $callbackData);
+                Log::warning('⚠️ NO TRANDATA IN CALLBACK');
+                Log::warning('Error Response Received:');
+                Log::warning(json_encode($callbackData, JSON_PRETTY_PRINT));
 
                 $result['message'] = $callbackData['ErrorText'] ?? 'Transaction failed';
                 $result['data'] = [
@@ -251,40 +326,122 @@ class ARBPaymentService
                 ];
             }
 
-            Log::info('ARB Callback Processed', [
-                'success' => $result['success'],
-                'message' => $result['message']
-            ]);
+            Log::info('========================================');
+            Log::info('📊 CALLBACK PROCESSING RESULT');
+            Log::info('========================================');
+            Log::info('Success: ' . ($result['success'] ? 'YES ✅' : 'NO ❌'));
+            Log::info('Message: ' . $result['message']);
+            Log::info('========================================');
 
             return $result;
 
         } catch (Exception $e) {
-            Log::error('ARB Callback Handling Error', [
-                'error' => $e->getMessage(),
-                'callback_data' => $callbackData,
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('========================================');
+            Log::error('❌ ARB CALLBACK HANDLING ERROR');
+            Log::error('========================================');
+            Log::error('Error: ' . $e->getMessage());
+            Log::error('Callback Data:');
+            Log::error(json_encode($callbackData, JSON_PRETTY_PRINT));
+            Log::error('Stack Trace:');
+            Log::error($e->getTraceAsString());
+            Log::error('========================================');
             throw $e;
         }
     }
 
-    // ==========================================
-    // Helper Functions (from WordPress plugin)
-    // ==========================================
+    /**
+     * Parse payment response from initial token generation
+     */
+    public function parsePaymentResponse(array $response): array
+    {
+        try {
+            Log::info('========================================');
+            Log::info('🔍 PARSING ARB GATEWAY RESPONSE');
+            Log::info('========================================');
+            Log::info('Raw Response:');
+            Log::info(json_encode($response, JSON_PRETTY_PRINT));
+            Log::info('----------------------------------------');
+
+            if (isset($response[0])) {
+                $responseData = $response[0];
+
+                // Status "1" means success
+                if (isset($responseData['status']) && $responseData['status'] == '1') {
+                    // Parse result: "paymentId:paymentPageUrl"
+                    if (isset($responseData['result'])) {
+                        $parts = explode(':', $responseData['result'], 2);
+                        $paymentId = $parts[0] ?? null;
+                        $baseUrl = $parts[1] ?? null;
+
+                        // Frame payment URL with PaymentID parameter
+                        $paymentPageUrl = $baseUrl . '?PaymentID=' . $paymentId;
+
+                        return [
+                            'success' => true,
+                            'payment_id' => $paymentId,
+                            'payment_page_url' => $paymentPageUrl,
+                            'status' => $responseData['status']
+                        ];
+                    }
+                }
+
+                // Error response
+                $errorResult = [
+                    'success' => false,
+                    'error' => $responseData['error'] ?? 'Unknown error',
+                    'error_text' => $responseData['errorText'] ?? 'Payment initiation failed',
+                    'status' => $responseData['status'] ?? null
+                ];
+
+                Log::error('❌ PAYMENT INITIATION FAILED');
+                Log::error('========================================');
+                Log::error('Error Code: ' . $errorResult['error']);
+                Log::error('Error Text: ' . $errorResult['error_text']);
+                Log::error('Status: ' . $errorResult['status']);
+                Log::error('========================================');
+
+                return $errorResult;
+            }
+
+            throw new Exception('Invalid response format');
+
+        } catch (Exception $e) {
+            Log::error('========================================');
+            Log::error('❌ RESPONSE PARSING ERROR');
+            Log::error('========================================');
+            Log::error('Error: ' . $e->getMessage());
+            Log::error('Response Data:');
+            Log::error(json_encode($response, JSON_PRETTY_PRINT));
+            Log::error('========================================');
+            throw $e;
+        }
+    }
 
     /**
-     * PKCS5 Padding
+     * Generate cURL command for testing
      */
+    protected function generateCurlCommand(string $url, array $payload): string
+    {
+        $json = json_encode($payload);
+        $json = str_replace("'", "'\\''", $json); // Escape single quotes
+
+        return "curl --location '$url' \\\n" .
+               "--header 'Content-Type: application/json' \\\n" .
+               "--header 'X-FORWARDED-FOR: 203.0.113.195' \\\n" .
+               "--data '$json'";
+    }
+
+    // ==========================================
+    // Helper Functions
+    // ==========================================
+
     private function pkcs5_pad(string $text): string
     {
-        $blocksize = 16; // AES block size
+        $blocksize = 16;
         $pad = $blocksize - (strlen($text) % $blocksize);
         return $text . str_repeat(chr($pad), $pad);
     }
 
-    /**
-     * PKCS5 Unpadding
-     */
     private function pkcs5_unpad(string $text)
     {
         $pad = ord($text[strlen($text) - 1]);
@@ -300,9 +457,6 @@ class ARBPaymentService
         return substr($text, 0, -1 * $pad);
     }
 
-    /**
-     * Convert byte array to HEX string
-     */
     private function byteArray2Hex(array $byteArray): string
     {
         $chars = array_map("chr", $byteArray);
@@ -310,18 +464,12 @@ class ARBPaymentService
         return bin2hex($bin);
     }
 
-    /**
-     * Convert HEX string to byte array
-     */
     private function hex2ByteArray(string $hexString): array
     {
         $string = hex2bin($hexString);
         return unpack('C*', $string);
     }
 
-    /**
-     * Convert byte array to string
-     */
     private function byteArray2String(array $byteArray): string
     {
         $chars = array_map("chr", $byteArray);
