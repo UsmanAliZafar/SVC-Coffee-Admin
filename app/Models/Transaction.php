@@ -40,6 +40,7 @@ class Transaction extends Model
     protected $fillable = [
         'transaction_number',
         'order_id',
+        'track_id',
         'customer_id',
         'transaction_type',
         'payment_gateway',
@@ -50,6 +51,9 @@ class Transaction extends Model
         'net_amount',
         'status_key_code',
         'gateway_transaction_id',
+        'arb_payment_id',
+        'arb_transaction_id',
+        'auth_resp_code',
         'gateway_order_id',
         'gateway_status',
         'gateway_response',
@@ -64,6 +68,8 @@ class Transaction extends Model
         'bank_account_number',
         'bank_reference_number',
         'authorization_code',
+        'ref_number',
+        'arb_paid_at',
         'authorized_at',
         'captured_at',
         'refund_transaction_id',
@@ -101,6 +107,7 @@ class Transaction extends Model
         'next_retry_at',
         'created_by',
         'updated_by',
+
     ];
 
     /**

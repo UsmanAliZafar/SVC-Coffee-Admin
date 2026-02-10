@@ -11,12 +11,42 @@ use Illuminate\Support\Facades\Log;
 class ApiKeyAuth
 {
     /**
+     * The URIs that should be excluded from API key validation.
+     * These are typically payment gateway callbacks that don't send API keys.
+     *
+     * @var array<int, string>
+     */
+    protected $except = [
+        'arb/callback',
+        'arb/error',
+        'arb/webhook',
+        'arb-checkout/callback',
+        'arb-checkout/error',
+        'arb-checkout/payment/callback',
+        'api/arb/callback',
+        'api/arb/error',
+        'api/arb-checkout/callback',
+        'api/arb-checkout/error',
+    ];
+
+    /**
      * Handle an incoming request.
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Check if the current route should be excluded from API key validation
+        if ($this->inExceptArray($request)) {
+            Log::info('API key validation bypassed for payment gateway callback', [
+                'path' => $request->path(),
+                'ip' => $request->ip(),
+                'method' => $request->method()
+            ]);
+
+            return $next($request);
+        }
+
         // Get API key from request header
         $apiKey = $request->header('X-API-Key');
 
@@ -100,5 +130,26 @@ class ApiKeyAuth
         $request->merge(['authenticated_api_key' => $apiKey]);
 
         return $next($request);
+    }
+
+    /**
+     * Determine if the request has a URI that should pass through API key validation.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return bool
+     */
+    protected function inExceptArray($request)
+    {
+        foreach ($this->except as $except) {
+            if ($except !== '/') {
+                $except = trim($except, '/');
+            }
+
+            if ($request->is($except)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

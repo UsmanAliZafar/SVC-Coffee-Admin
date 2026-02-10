@@ -33,6 +33,12 @@ class CheckoutController extends Controller
      */
     public function createOrder(Request $request): JsonResponse
     {
+        if ($request->input('payment_method') === 'online') {
+            return response()->json([
+                'success' => false,
+                'message' => 'For online payments, use ARB initiation endpoint instead',
+            ], 400);
+        }
         try {
             $validated = $request->validate([
                 'cart_id' => 'required|string',
@@ -68,7 +74,7 @@ class CheckoutController extends Controller
                 // Order details
                 'shipping_method' => 'required|string',
                 'payment_method' => 'required|string|in:cod,online,bank_transfer',
-                'payment_gateway' => 'nullable|string|in:stripe,paypal,razorpay',
+                'payment_gateway' => 'nullable|string|in:stripe,paypal,razorpay,arb',
                 'customer_notes' => 'nullable|string',
                 'coupon_code' => 'nullable|string',
 
@@ -240,11 +246,11 @@ class CheckoutController extends Controller
                 'billing_country' => $validated['billing_country'] ?? $validated['shipping_country'],
 
                 'shipping_method' => $validated['shipping_method'],
-                'shipping_amount' => $shippingAmount, // ✅ Use calculated shipping
-                'shipping_calculation_type' => $validated['shipping_calculation_type'] ?? null, // ✅ NEW
+                'shipping_amount' => $shippingAmount, // Use calculated shipping
+                'shipping_calculation_type' => $validated['shipping_calculation_type'] ?? null,
 
                 'payment_method' => $validated['payment_method'],
-                'payment_gateway' => $validated['payment_gateway'] ?? null,
+                'payment_gateway' => $validated['payment_gateway'] ?? 'arb',
                 'customer_notes' => $validated['customer_notes'] ?? null,
 
                 'order_source' => 'web',
@@ -591,10 +597,15 @@ class CheckoutController extends Controller
 
             } else {
                 // Online Payment Transaction
-                $transactionData['payment_gateway'] = $validated['payment_gateway'] ?? 'stripe';
+                $transactionData['payment_gateway'] = 'arb'; // Assuming ARB for online payments
                 $transactionData['status_key_code'] = 'TRANSACTION_PENDING';
                 $transactionData['gateway_status'] = 'awaiting_payment';
                 $transactionData['notes'] = 'Online payment - Awaiting customer payment confirmation';
+
+                //Generate track_id for ARB
+                if ($validated['payment_gateway'] === 'arb') {
+                    $transactionData['track_id'] = 'TRK-' . time() . '-' . uniqid();
+                }
             }
 
             return Transaction::create($transactionData);
@@ -655,6 +666,13 @@ class CheckoutController extends Controller
                 'gateway_status' => $validated['gateway_status'],
                 'gateway_response' => $validated['gateway_response'] ?? null,
                 'completed_at' => now(),
+
+                // ARB specific fields
+                'arb_payment_id' => $validated['arb_payment_id'] ?? null,
+                'arb_transaction_id' => $validated['arb_transaction_id'] ?? null,
+                'auth_resp_code' => $validated['auth_resp_code'] ?? null,
+                'ref_number' => $validated['ref_number'] ?? null,
+                'arb_paid_at' => $validated['arb_paid_at'] ?? now(),
             ]);
 
             // Update order payment status
