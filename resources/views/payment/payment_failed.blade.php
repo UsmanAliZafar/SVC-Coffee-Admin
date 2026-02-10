@@ -297,72 +297,87 @@
     </div>
 
     <script>
-        // Auto-close countdown timer (10 seconds for error page)
-        let countdown = 10;
-        const countdownElement = document.getElementById('countdown');
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-close countdown timer
+            let countdown = 10;
+            const countdownElement = document.getElementById('countdown');
+            const container = document.querySelector('.success-container'); // Change to '.error-container' for failed page
+            const countdownBadge = document.querySelector('.countdown-badge');
+            let countdownInterval;
+            let isPaused = false;
 
-        const countdownInterval = setInterval(() => {
-            countdown--;
-            countdownElement.textContent = countdown;
+            function startCountdown() {
+                countdownInterval = setInterval(() => {
+                    countdown--;
+                    countdownElement.textContent = countdown;
 
-            if (countdown <= 0) {
-                clearInterval(countdownInterval);
-                closeWindow();
-            }
-        }, 1000);
-
-        // Close window function
-        function closeWindow() {
-            // Try to close the window
-            window.close();
-
-            // If window.close() doesn't work (some browsers block it)
-            // Try to redirect to opener if exists
-            if (window.opener) {
-                window.opener.postMessage({
-                    type: 'PAYMENT_FAILED',
-                    data: {
-                        status: '{{ $status ?? "failed" }}',
-                        message: '{{ $message ?? "" }}',
-                        trackId: '{{ $trackId ?? "" }}',
-                        canRetry: {{ $canRetry ?? 'true' }}
+                    if (countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        closeWindow();
                     }
-                }, '*');
+                }, 1000);
+            }
+
+            // Close window function
+            function closeWindow() {
                 window.close();
-            } else {
-                // Fallback: redirect to checkout or home
-                window.location.href = '{{ url('/checkout') }}';
-            }
-        }
 
-        // Retry payment function
-        function retryPayment() {
-            if (window.opener) {
-                window.opener.postMessage({
-                    type: 'PAYMENT_RETRY',
-                    data: {
-                        trackId: '{{ $trackId ?? "" }}'
-                    }
-                }, '*');
-                window.close();
-            } else {
-                // Redirect to checkout page
-                window.location.href = '{{ url('/checkout') }}';
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'PAYMENT_SUCCESS', // Change to 'PAYMENT_FAILED' for failed page
+                        data: @json(session('transaction_data', []))
+                    }, '*');
+                    window.close();
+                } else {
+                    window.location.href = '{{ url('/') }}'; // Change to '/checkout' for failed page
+                }
             }
-        }
 
-        // Listen for ESC key to close
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                closeWindow();
+            // Retry payment function (Only for failed page)
+            function retryPayment() {
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'PAYMENT_RETRY',
+                        data: {
+                            trackId: '{{ $trackId ?? "" }}'
+                        }
+                    }, '*');
+                    window.close();
+                } else {
+                    window.location.href = '{{ url('/checkout') }}';
+                }
             }
-        });
 
-        // Pause countdown on hover
-        const container = document.querySelector('.error-container');
-        container.addEventListener('mouseenter', () => {
-            clearInterval(countdownInterval);
-            document.querySelector('.countdown-badge').innerHTML = 'Auto-close paused';
+            // Make functions global so onclick handlers can access them
+            window.closeWindow = closeWindow;
+            window.retryPayment = retryPayment; // Only for failed page
+
+            // Start countdown
+            startCountdown();
+
+            // Pause/resume on hover
+            container.addEventListener('mouseenter', () => {
+                if (!isPaused) {
+                    clearInterval(countdownInterval);
+                    isPaused = true;
+                    countdownBadge.innerHTML = 'Auto-close paused';
+                }
+            });
+
+            container.addEventListener('mouseleave', () => {
+                if (isPaused && countdown > 0) {
+                    isPaused = false;
+                    countdownBadge.innerHTML = `Auto-closing in <span id="countdown">${countdown}</span>s`;
+                    startCountdown();
+                }
+            });
+
+            // Listen for ESC key to close
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    closeWindow();
+                }
+            });
         });
     </script>
 </body>
