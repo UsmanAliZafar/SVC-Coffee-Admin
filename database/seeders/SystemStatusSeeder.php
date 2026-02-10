@@ -392,6 +392,20 @@ class SystemStatusSeeder extends Seeder
                 'is_default' => false,
                 'is_final' => true,
             ],
+             [
+                'module' => 'order_items',
+                'name' => 'Confirmed',
+                'key_code' => 'ITEM_CONFIRMED',
+                'slug' => 'confirmed',
+                'color' => '#b19b9d',
+                'bg_color' => '#f8d7da',
+                'icon' => 'bi-arrow-return-left',
+                'description' => 'Item has been confirmed',
+                'order' => 7,
+                'is_active' => true,
+                'is_default' => false,
+                'is_final' => true,
+            ],
 
             // ============================================
             // CUSTOMERS MODULE STATUSES
