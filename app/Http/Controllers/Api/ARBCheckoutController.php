@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use App\Services\NotificationService;
+use App\Services\OrderCreationService;
 //
 use App\Models\Transaction;
 use App\Models\Order;
@@ -22,11 +23,13 @@ class ARBCheckoutController extends Controller
 {
     protected $arbService;
     protected $notificationService;
+    protected $orderService;
 
-    public function __construct(ARBPaymentService $arbService)
+    public function __construct(ARBPaymentService $arbService,OrderCreationService $orderService)
     {
         $this->arbService = $arbService;
         $this->notificationService = app(NotificationService::class);
+        $this->orderService = $orderService;
     }
 
     /**
@@ -158,16 +161,18 @@ class ARBCheckoutController extends Controller
     /**
      * ARB Callback Handler
      * POST /api/arb-checkout/callback
-     */
+    */
     public function handleCallback(Request $request)
     {
         try {
-            Log::info('ARB Checkout Callback', $request->all());
+            Log::info('========================================');
+            Log::info('📥 ARB CHECKOUT CALLBACK RECEIVED');
+            Log::info('========================================');
+            Log::info('Raw Callback Data:', $request->all());
 
             $callbackResult = $this->arbService->handleCallback($request->all());
 
             $trackId = $callbackResult['data']['trackId'] ?? null;
-            $arbPaymentId = $callbackResult['data']['paymentId'] ?? null;
 
             if (!$trackId) {
                 return response()->json([
@@ -176,57 +181,115 @@ class ARBCheckoutController extends Controller
                 ], 400);
             }
 
-            // Retrieve pending payment data
+            // Retrieve pending payment data from cache
             $pendingData = Cache::get("pending_payment:{$trackId}");
 
             if (!$pendingData) {
-                Log::error('Pending payment data not found', ['track_id' => $trackId]);
+                Log::error('❌ Pending payment data not found', ['track_id' => $trackId]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Payment session expired or not found'
                 ], 404);
             }
 
+            Log::info('✅ Pending payment data retrieved', [
+                'track_id' => $trackId,
+                'cart_id' => $pendingData['cart_id'],
+            ]);
+
+            // Start database transaction
             DB::beginTransaction();
 
             if ($callbackResult['success']) {
-                // PAYMENT SUCCESSFUL - CREATE ORDER
+                Log::info('========================================');
+                Log::info('✅ PAYMENT SUCCESSFUL - CREATING ORDER');
+                Log::info('========================================');
 
-                // Get cart data
+                // ============================================================
+                // GET CART DATA
+                // ============================================================
                 $cart = Cache::get("cart:{$pendingData['cart_id']}", []);
                 $cartMeta = Cache::get("cart_meta:{$pendingData['cart_id']}", []);
 
                 if (empty($cart)) {
                     DB::rollBack();
+                    Log::error('❌ Cart is empty or expired', ['cart_id' => $pendingData['cart_id']]);
                     return response()->json([
                         'success' => false,
                         'message' => 'Cart is empty or expired'
                     ], 400);
                 }
 
-                // Calculate totals from cart
-                $subtotal = 0;
-                $taxAmount = 0;
-                $discountAmount = 0;
+                Log::info('✅ Cart data retrieved', [
+                    'items_count' => count($cart),
+                ]);
 
-                foreach ($cart as $item) {
-                    $itemSubtotal = $item['price'] * $item['quantity'];
-                    $subtotal += $itemSubtotal;
+                // ============================================================
+                // CALCULATE TOTALS USING SERVICE
+                // ============================================================
+                $totals = $this->orderService->calculateCartTotals($cart);
 
-                    if ($item['is_taxable']) {
-                        $taxAmount += $itemSubtotal * ($item['tax_rate'] / 100);
-                    }
-                }
+                Log::info('========================================');
+                Log::info('📊 TAX CALCULATION BREAKDOWN');
+                Log::info('========================================');
+                Log::info('Subtotal: ' . $totals['subtotal'] . ' SAR (includes any inclusive tax)');
+                Log::info('Exclusive Tax (to add): ' . $totals['tax_amount'] . ' SAR');
+                Log::info('Inclusive Tax (for display): ' . $totals['included_tax_amount'] . ' SAR');
+                Log::info('Tax Statement: ' . ($totals['tax_statement'] ?? 'N/A'));
+                Log::info('========================================');
 
                 // Get discount from coupon
+                $discountAmount = 0;
                 if (isset($cartMeta['coupon'])) {
                     $discountAmount = $cartMeta['coupon']['discount_amount'] ?? 0;
+                    Log::info('💰 Coupon discount applied', [
+                        'code' => $cartMeta['coupon']['code'],
+                        'discount' => $discountAmount,
+                    ]);
                 }
 
-                $totalAmount = $subtotal + $taxAmount + $pendingData['shipping_amount'] - $discountAmount;
+                // Calculate final total
+                $totalAmount = $this->orderService->calculateFinalTotal(
+                    $totals,
+                    (float) $pendingData['shipping_amount'],
+                    (float) $discountAmount
+                );
 
-                // 1. CREATE ORDER
-                $orderData = [
+                Log::info('💵 Final total calculated', [
+                    'total_amount' => $totalAmount,
+                ]);
+
+                // ============================================================
+                // VERIFY PAYMENT AMOUNT
+                // ============================================================
+                $paidAmount = isset($callbackResult['data']['amt']) ? (float) $callbackResult['data']['amt'] : 0;
+
+                Log::info('========================================');
+                Log::info('💰 AMOUNT VERIFICATION');
+                Log::info('========================================');
+                Log::info('Expected: ' . $totalAmount);
+                Log::info('Paid: ' . $paidAmount);
+                Log::info('Match: ' . (abs($totalAmount - $paidAmount) < 0.01 ? 'YES ✅' : 'NO ❌'));
+                Log::info('========================================');
+
+                if (abs($totalAmount - $paidAmount) > 0.01) {
+                    Log::warning('⚠️ PAYMENT AMOUNT MISMATCH', [
+                        'track_id' => $trackId,
+                        'expected' => $totalAmount,
+                        'paid' => $paidAmount,
+                        'difference' => $paidAmount - $totalAmount,
+                    ]);
+                }
+
+                // ============================================================
+                // CREATE ORDER USING SERVICE
+                // ============================================================
+                Log::info('========================================');
+                Log::info('🛒 CREATING ORDER');
+                Log::info('========================================');
+
+                try {
+                    $order = $this->orderService->createOrder([
                     'customer_id' => null,
                     'guest_email' => $pendingData['customer_email'],
                     'guest_name' => $pendingData['customer_name'],
@@ -255,17 +318,18 @@ class ARBCheckoutController extends Controller
                     'payment_method' => 'online',
                     'payment_gateway' => 'arb',
                     'shipping_method' => $pendingData['shipping_method'],
-                    'shipping_amount' => $pendingData['shipping_amount'],
+                    'shipping_amount' => (float) $pendingData['shipping_amount'],
                     'shipping_calculation_type' => $pendingData['shipping_calculation_type'],
 
+                    'order_source' => 'web',
                     'currency' => 'SAR',
-                    'subtotal' => $subtotal,
-                    'tax_amount' => $taxAmount,
+                    'subtotal' => $totals['subtotal'],
+                    'tax_amount' => $totals['tax_amount'],
                     'discount_amount' => $discountAmount,
                     'discount_code' => $pendingData['coupon_code'],
                     'total_amount' => $totalAmount,
 
-                    'status_key_code' => 'ORDER_CONFIRMED',
+                    'status_key_code' => 'ORDER_CONFIRMED', // ✅ DEDUCT STOCK IMMEDIATELY
                     'payment_status_key_code' => 'PAYMENT_PAID',
                     'confirmed_at' => now(),
 
@@ -276,104 +340,40 @@ class ARBCheckoutController extends Controller
                         'free_shipping' => true,
                         'free_shipping_reason' => $pendingData['free_shipping_reason']
                     ]) : null,
-                ];
+                ], $cart, $cartMeta);
 
-                $order = Order::create($orderData);
+                } catch (\Exception $orderError) {
+                    DB::rollBack();
 
-                // 2. CREATE ORDER ITEMS
-                $defaultWarehouse = \App\Models\Warehouse::where('is_default', true)->first();
+                    Log::error('========================================');
+                    Log::error('❌ ORDER CREATION FAILED');
+                    Log::error('========================================');
+                    Log::error('Error Message: ' . $orderError->getMessage());
+                    Log::error('Error Line: ' . $orderError->getLine());
+                    Log::error('Error File: ' . $orderError->getFile());
+                    Log::error('========================================');
 
-                foreach ($cart as $item) {
-                    $product = Product::find($item['product_id']);
-                    $variant = !empty($item['variant_id'])
-                        ? \App\Models\ProductVariant::find($item['variant_id'])
-                        : null;
-
-                    $itemSubtotal = $item['price'] * $item['quantity'];
-                    $itemTaxAmount = $item['is_taxable']
-                        ? ($itemSubtotal * ($item['tax_rate'] / 100))
-                        : 0;
-
-                    OrderItem::create([
-                        'order_id' => $order->id,
-                        'product_id' => $product->id,
-                        'product_variant_id' => $variant ? $variant->id : null,
-                        'product_name' => $item['name'],
-                        'product_sku' => $item['sku'],
-                        'product_description' => $product->short_description,
-                        'product_image' => $item['image'],
-                        'quantity' => $item['quantity'],
-                        'unit_price' => $item['price'],
-                        'cost_price' => $variant ? $variant->cost_price : $product->cost_price,
-                        'subtotal' => $itemSubtotal,
-                        'tax_amount' => $itemTaxAmount,
-                        'tax_rate' => $item['tax_rate'],
-                        'is_taxable' => $item['is_taxable'],
-                        'total' => $itemSubtotal + $itemTaxAmount,
-                        'status_key_code' => 'ITEM_CONFIRMED',
-                        'warehouse_id' => $defaultWarehouse ? $defaultWarehouse->id : null,
-                    ]);
+                    // Return error as JSON for debugging
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Order creation failed',
+                        'error' => $orderError->getMessage(),
+                        'line' => $orderError->getLine(),
+                        'file' => basename($orderError->getFile()),
+                    ], 500);
                 }
 
-                // 3. DEDUCT STOCK
-                foreach ($cart as $item) {
-                    $product = Product::find($item['product_id']);
+                Log::info('========================================');
+                Log::info('✅ ORDER CREATED SUCCESSFULLY');
+                Log::info('========================================');
+                Log::info('Order Number: ' . $order->order_number);
+                Log::info('Order ID: ' . $order->id);
+                Log::info('Total: ' . $order->total_amount . ' ' . $order->currency);
+                Log::info('========================================');
 
-                    if (!$product || !$product->track_inventory) {
-                        continue;
-                    }
-
-                    $variant = !empty($item['variant_id'])
-                        ? \App\Models\ProductVariant::find($item['variant_id'])
-                        : null;
-
-                    $quantityNeeded = $item['quantity'];
-
-                    $warehouseStocks = \App\Models\ProductWarehouseStock::where('product_id', $product->id)
-                        ->where('variant_id', $variant ? $variant->id : null)
-                        ->where('available_quantity', '>', 0)
-                        ->join('warehouses', 'product_warehouse_stock.warehouse_id', '=', 'warehouses.id')
-                        ->select('product_warehouse_stock.*', 'warehouses.name as warehouse_name', 'warehouses.is_default')
-                        ->orderBy('warehouses.is_default', 'desc')
-                        ->orderBy('warehouses.priority', 'desc')
-                        ->get();
-
-                    $remainingQuantity = $quantityNeeded;
-                    $fulfillmentDetails = [];
-
-                    foreach ($warehouseStocks as $warehouseStock) {
-                        if ($remainingQuantity <= 0) break;
-
-                        $deductQty = min($remainingQuantity, $warehouseStock->available_quantity);
-
-                        if ($warehouseStock->reduceStock($deductQty)) {
-                            $fulfillmentDetails[] = [
-                                'warehouse_id' => $warehouseStock->warehouse_id,
-                                'warehouse_name' => $warehouseStock->warehouse_name,
-                                'quantity' => $deductQty,
-                                'action' => 'DEDUCTED',
-                            ];
-
-                            $remainingQuantity -= $deductQty;
-                        }
-                    }
-
-                    $orderItem = OrderItem::where('order_id', $order->id)
-                        ->where('product_id', $product->id)
-                        ->where('product_variant_id', $variant ? $variant->id : null)
-                        ->first();
-
-                    if ($orderItem) {
-                        $orderItem->update([
-                            'stock_deducted' => true,
-                            'stock_deducted_at' => now(),
-                            'warehouse_id' => $fulfillmentDetails[0]['warehouse_id'] ?? null,
-                            'fulfillment_details' => $fulfillmentDetails,
-                        ]);
-                    }
-                }
-
-                // 4. CREATE TRANSACTION RECORD
+                // ============================================================
+                // CREATE TRANSACTION RECORD
+                // ============================================================
                 $transaction = Transaction::create([
                     'order_id' => $order->id,
                     'customer_id' => $order->customer_id,
@@ -396,7 +396,6 @@ class ARBCheckoutController extends Controller
                     'card_last_four' => isset($callbackResult['data']['card'])
                         ? substr($callbackResult['data']['card'], -4)
                         : null,
-                    // ✅ FIX: Convert array to JSON string
                     'gateway_response' => json_encode($callbackResult['data']),
                     'gateway_status' => 'captured',
 
@@ -414,7 +413,13 @@ class ARBCheckoutController extends Controller
                     'user_agent' => $request->userAgent(),
                 ]);
 
-                // 5. RECORD COUPON USAGE
+                Log::info('✅ Transaction record created', [
+                    'transaction_number' => $transaction->transaction_number,
+                ]);
+
+                // ============================================================
+                // RECORD COUPON USAGE
+                // ============================================================
                 if (!empty($pendingData['coupon_code'])) {
                     $coupon = Coupon::where('code', $pendingData['coupon_code'])->first();
                     if ($coupon) {
@@ -427,29 +432,53 @@ class ARBCheckoutController extends Controller
                             orderTotal: $order->total_amount,
                             ipAddress: $request->ip()
                         );
+
+                        Log::info('✅ Coupon usage recorded', [
+                            'code' => $coupon->code,
+                        ]);
                     }
                 }
 
-                // 6. CLEAR CART
+                // ============================================================
+                // CLEAR CART AND PENDING DATA
+                // ============================================================
                 Cache::forget("cart:{$pendingData['cart_id']}");
                 Cache::forget("cart_meta:{$pendingData['cart_id']}");
-
-                // 7. CLEAR PENDING PAYMENT DATA
                 Cache::forget("pending_payment:{$trackId}");
 
+                Log::info('✅ Cache cleared');
+
+                // Commit transaction
                 DB::commit();
 
-                // 8. SEND NOTIFICATIONS
-                app(NotificationService::class)->notify('order_created', [
-                    'order_id' => $order->id,
-                    'order_number' => $order->order_number,
-                    'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
-                    'customer_name' => $order->guest_name,
-                    'customer_email' => $order->guest_email,
-                ]);
+                Log::info('========================================');
+                Log::info('✅ DATABASE TRANSACTION COMMITTED');
+                Log::info('========================================');
 
-                app(NotificationService::class)->notifyCustomer('order_confirmed', $order);
+                // ============================================================
+                // SEND NOTIFICATIONS
+                // ============================================================
+                try {
+                    app(NotificationService::class)->notify('order_created', [
+                        'order_id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'total_amount' => $order->currency . ' ' . number_format($order->total_amount, 2),
+                        'customer_name' => $order->guest_name,
+                        'customer_email' => $order->guest_email,
+                    ]);
 
+                    app(NotificationService::class)->notifyCustomer('order_confirmed', $order);
+
+                    Log::info('✅ Notifications sent');
+                } catch (\Exception $e) {
+                    Log::warning('⚠️ Notification sending failed (non-critical)', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                // ============================================================
+                // STORE TRANSACTION DATA FOR SUCCESS PAGE
+                // ============================================================
                 session()->put('transaction_data', [
                     'amt' => $order->total_amount,
                     'currency' => $order->currency,
@@ -461,32 +490,59 @@ class ARBCheckoutController extends Controller
                     'trackId' => $trackId,
                 ]);
 
-                // Return blade view instead of JSON
+                Log::info('========================================');
+                Log::info('✅ PAYMENT PROCESSING COMPLETE');
+                Log::info('========================================');
+
+                // ============================================================
+                // RETURN SUCCESS BLADE VIEW
+                // ============================================================
                 return view('payment.payment_success', [
                     'order' => $order,
                     'transaction' => $transaction,
                 ]);
+
             } else {
-                // PAYMENT FAILED
+                // ============================================================
+                // PAYMENT FAILED OR CANCELLED
+                // ============================================================
+                Log::warning('========================================');
+                Log::warning('❌ PAYMENT FAILED OR CANCELLED');
+                Log::warning('========================================');
+                Log::warning('Message: ' . ($callbackResult['message'] ?? 'Unknown'));
+                Log::warning('========================================');
+
                 DB::rollBack();
 
-                return response()->json([
-                    'success' => false,
-                    'message' => $callbackResult['message'],
-                    'data' => [
-                        'can_retry' => true,
-                        'track_id' => $trackId,
-                    ]
-                ], 400);
+                // Determine if it's a cancellation or failure
+                $isCancelled = stripos($callbackResult['message'], 'cancel') !== false;
+
+                // Return blade view
+                return view('payment.payment_failed', [
+                    'status' => $isCancelled ? 'cancelled' : 'failed',
+                    'subtitle' => $isCancelled
+                        ? 'You have cancelled the payment'
+                        : 'Your payment could not be processed',
+                    'message' => $callbackResult['message'] ?? 'Payment transaction failed',
+                    'trackId' => $trackId,
+                    'canRetry' => true,
+                    'errorCode' => $callbackResult['data']['error_code'] ?? null,
+                ]);
             }
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('ARB Callback Error', [
-                'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile()
-            ]);
+
+            Log::error('========================================');
+            Log::error('❌ ARB CALLBACK ERROR');
+            Log::error('========================================');
+            Log::error('Error: ' . $e->getMessage());
+            Log::error('Line: ' . $e->getLine());
+            Log::error('File: ' . $e->getFile());
+            Log::error('========================================');
+            Log::error('Stack Trace:');
+            Log::error($e->getTraceAsString());
+            Log::error('========================================');
 
             return response()->json([
                 'success' => false,
@@ -494,6 +550,24 @@ class ARBCheckoutController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function handleError(Request $request)
+    {
+        Log::warning('ARB Error Callback', $request->all());
+
+        $trackId = $request->input('trackId') ?? $request->input('track_id');
+        $errorMessage = $request->input('ErrorText') ?? $request->input('errorText') ?? 'Payment failed';
+        $errorCode = $request->input('Error') ?? $request->input('error');
+
+        return view('payment.payment_failed', [
+            'status' => 'failed',
+            'subtitle' => 'Transaction could not be completed',
+            'message' => $errorMessage,
+            'trackId' => $trackId,
+            'canRetry' => true,
+            'errorCode' => $errorCode,
+        ]);
     }
     /**
      * Check Payment Status

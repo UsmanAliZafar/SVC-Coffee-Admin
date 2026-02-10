@@ -943,7 +943,7 @@ class Order extends Model
         $this->update([
             'subtotal' => $subtotal,
             'tax_amount' => $taxAmount,
-            'total_amount' => $totalAmount,
+            // 'total_amount' => $totalAmount,
         ]);
     }
 

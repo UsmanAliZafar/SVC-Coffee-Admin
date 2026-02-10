@@ -17,12 +17,13 @@ Route::prefix('arb')->name('arb.')->group(function () {
         ->name('initiate');
 
     // ARB callback
-    // Route::post('/callback', [ARBCheckoutController::class, 'handleCallback'])
-    //     ->name('callback');
     Route::match(['get', 'post'], '/callback', [ARBCheckoutController::class, 'handleCallback'])
         ->name('callback');
 
     // Check payment status
     Route::get('/status/{track_id}', [ARBCheckoutController::class, 'checkStatus'])
         ->name('status');
+
+    Route::match(['get', 'post'], '/error', [ARBCheckoutController::class, 'handleError'])
+        ->name('error');
 });

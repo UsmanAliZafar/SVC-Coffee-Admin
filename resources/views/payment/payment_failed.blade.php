@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Successful</title>
+    <title>Payment Failed</title>
     <style>
         * {
             margin: 0;
@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #5B914C 0%, #4a7a3d 100%);
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -21,7 +21,7 @@
             padding: 20px;
         }
 
-        .success-container {
+        .error-container {
             background: white;
             border-radius: 12px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
@@ -59,7 +59,7 @@
             position: absolute;
             top: 15px;
             left: 15px;
-            background: #5B914C;
+            background: #dc3545;
             color: white;
             padding: 8px 15px;
             border-radius: 20px;
@@ -67,10 +67,10 @@
             font-weight: 600;
         }
 
-        .success-icon {
+        .error-icon {
             width: 80px;
             height: 80px;
-            background: #5B914C;
+            background: #dc3545;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -88,7 +88,7 @@
             }
         }
 
-        .success-icon svg {
+        .error-icon svg {
             width: 50px;
             height: 50px;
             stroke: white;
@@ -96,16 +96,6 @@
             fill: none;
             stroke-linecap: round;
             stroke-linejoin: round;
-            animation: checkmark 0.8s ease;
-        }
-
-        @keyframes checkmark {
-            0% {
-                stroke-dasharray: 0, 100;
-            }
-            100% {
-                stroke-dasharray: 100, 0;
-            }
         }
 
         h1 {
@@ -120,8 +110,9 @@
             margin-bottom: 30px;
         }
 
-        .transaction-details {
-            background: #f8f9fa;
+        .error-details {
+            background: #fff5f5;
+            border: 1px solid #feb2b2;
             border-radius: 8px;
             padding: 20px;
             margin: 30px 0;
@@ -132,7 +123,7 @@
             display: flex;
             justify-content: space-between;
             padding: 12px 0;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid #fed7d7;
         }
 
         .detail-row:last-child {
@@ -151,9 +142,15 @@
             font-weight: bold;
         }
 
-        .amount-highlight {
-            color: #5B914C;
-            font-size: 24px;
+        .error-message {
+            color: #dc3545;
+            font-size: 16px;
+            font-weight: 600;
+            background: #fff5f5;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
+            margin: 20px 0;
         }
 
         .btn-group {
@@ -184,6 +181,15 @@
             background: #4a7a3d;
         }
 
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
         .btn-secondary {
             background: #f0f0f0;
             color: #333;
@@ -193,47 +199,32 @@
             background: #e0e0e0;
         }
 
-        .receipt-note {
+        .help-note {
             margin-top: 20px;
             padding: 15px;
-            background: #e8f5e9;
+            background: #e3f2fd;
             border-radius: 8px;
-            color: #2e7d32;
+            color: #1565c0;
             font-size: 14px;
         }
 
-        .print-receipt {
-            margin-top: 15px;
-            color: #5B914C;
-            text-decoration: none;
-            font-size: 14px;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .print-receipt:hover {
+        .help-note a {
+            color: #1565c0;
             text-decoration: underline;
         }
 
-        @media print {
-            body {
-                background: white;
-            }
-            .btn-group,
-            .print-receipt,
-            .close-button,
-            .countdown-badge {
-                display: none;
+        @media (max-width: 600px) {
+            .btn-group {
+                flex-direction: column;
             }
         }
     </style>
 </head>
 <body>
-    <div class="success-container">
+    <div class="error-container">
         <!-- Countdown Badge -->
         <div class="countdown-badge">
-            Auto-closing in <span id="countdown">5</span>s
+            Auto-closing in <span id="countdown">10</span>s
         </div>
 
         <!-- Close Button -->
@@ -241,103 +232,73 @@
             ×
         </button>
 
-        <div class="success-icon">
+        <div class="error-icon">
             <svg viewBox="0 0 24 24">
-                <polyline points="20 6 9 17 4 12"></polyline>
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
         </div>
 
-        <h1>Payment Successful!</h1>
-        <p class="subtitle">Thank you for your payment</p>
+        <h1>Payment {{ ucfirst(strtolower($status ?? 'Failed')) }}</h1>
+        <p class="subtitle">{{ $subtitle ?? 'Your payment could not be processed' }}</p>
 
-        <div class="transaction-details">
-            @if(session('transaction_data'))
-                @php
-                    $data = session('transaction_data');
-                @endphp
+        @if($message)
+        <div class="error-message">
+            {{ $message }}
+        </div>
+        @endif
 
-                <div class="detail-row">
-                    <span class="detail-label">Amount Paid</span>
-                    <span class="detail-value amount-highlight">
-                        {{ number_format($data['amt'] ?? 0, 2) }} {{ $data['currency'] ?? 'SAR' }}
-                    </span>
-                </div>
-
-                @if(isset($data['transId']))
-                <div class="detail-row">
-                    <span class="detail-label">Transaction ID</span>
-                    <span class="detail-value">{{ $data['transId'] }}</span>
-                </div>
-                @endif
-
-                @if(isset($data['paymentId']))
-                <div class="detail-row">
-                    <span class="detail-label">Payment ID</span>
-                    <span class="detail-value">{{ $data['paymentId'] }}</span>
-                </div>
-                @endif
-
-                @if(isset($data['ref']))
-                <div class="detail-row">
-                    <span class="detail-label">Reference Number</span>
-                    <span class="detail-value">{{ $data['ref'] }}</span>
-                </div>
-                @endif
-
-                @if(isset($data['authCode']))
-                <div class="detail-row">
-                    <span class="detail-label">Authorization Code</span>
-                    <span class="detail-value">{{ $data['authCode'] }}</span>
-                </div>
-                @endif
-
-                @if(isset($data['cardType']))
-                <div class="detail-row">
-                    <span class="detail-label">Payment Method</span>
-                    <span class="detail-value">{{ $data['cardType'] }}</span>
-                </div>
-                @endif
-
-                @if(isset($data['trackId']))
-                <div class="detail-row">
-                    <span class="detail-label">Order Reference</span>
-                    <span class="detail-value">{{ $data['trackId'] }}</span>
-                </div>
-                @endif
-
-                <div class="detail-row">
-                    <span class="detail-label">Date & Time</span>
-                    <span class="detail-value">{{ now()->format('M d, Y h:i A') }}</span>
-                </div>
-            @else
-                <div class="detail-row">
-                    <span class="detail-label">Status</span>
-                    <span class="detail-value">Payment Completed</span>
-                </div>
+        <div class="error-details">
+            @if($trackId)
+            <div class="detail-row">
+                <span class="detail-label">Transaction Reference</span>
+                <span class="detail-value">{{ $trackId }}</span>
+            </div>
             @endif
+
+            @if(isset($errorCode))
+            <div class="detail-row">
+                <span class="detail-label">Error Code</span>
+                <span class="detail-value">{{ $errorCode }}</span>
+            </div>
+            @endif
+
+            <div class="detail-row">
+                <span class="detail-label">Date & Time</span>
+                <span class="detail-value">{{ now()->format('M d, Y h:i A') }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">Status</span>
+                <span class="detail-value" style="color: #dc3545;">{{ ucfirst($status ?? 'Failed') }}</span>
+            </div>
         </div>
 
-        <div class="receipt-note">
-            📧 A confirmation email has been sent to your registered email address.
+        @if($canRetry ?? true)
+        <div class="help-note">
+            💡 You can retry your payment or choose a different payment method.
         </div>
-
-        <a href="#" onclick="window.print(); return false;" class="print-receipt">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                <rect x="6" y="14" width="12" height="8"></rect>
-            </svg>
-            Print Receipt
-        </a>
+        @else
+        <div class="help-note">
+            ⚠️ Please contact our support team for assistance with this transaction.
+        </div>
+        @endif
 
         <div class="btn-group">
-            <button onclick="closeWindow()" class="btn btn-primary">Close Window</button>
+            @if($canRetry ?? true)
+            <button onclick="retryPayment()" class="btn btn-primary">
+                Try Again
+            </button>
+            @endif
+            <button onclick="closeWindow()" class="btn btn-secondary">
+                Close Window
+            </button>
         </div>
     </div>
 
     <script>
-        // Auto-close countdown timer
-        let countdown = 5;
+        // Auto-close countdown timer (10 seconds for error page)
+        let countdown = 10;
         const countdownElement = document.getElementById('countdown');
 
         const countdownInterval = setInterval(() => {
@@ -359,13 +320,34 @@
             // Try to redirect to opener if exists
             if (window.opener) {
                 window.opener.postMessage({
-                    type: 'PAYMENT_SUCCESS',
-                    data: @json(session('transaction_data', []))
+                    type: 'PAYMENT_FAILED',
+                    data: {
+                        status: '{{ $status ?? "failed" }}',
+                        message: '{{ $message ?? "" }}',
+                        trackId: '{{ $trackId ?? "" }}',
+                        canRetry: {{ $canRetry ?? 'true' }}
+                    }
                 }, '*');
                 window.close();
             } else {
-                // Fallback: redirect to home
-                window.location.href = '{{ url('/') }}';
+                // Fallback: redirect to checkout or home
+                window.location.href = '{{ url('/checkout') }}';
+            }
+        }
+
+        // Retry payment function
+        function retryPayment() {
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'PAYMENT_RETRY',
+                    data: {
+                        trackId: '{{ $trackId ?? "" }}'
+                    }
+                }, '*');
+                window.close();
+            } else {
+                // Redirect to checkout page
+                window.location.href = '{{ url('/checkout') }}';
             }
         }
 
@@ -377,7 +359,7 @@
         });
 
         // Pause countdown on hover
-        const container = document.querySelector('.success-container');
+        const container = document.querySelector('.error-container');
         container.addEventListener('mouseenter', () => {
             clearInterval(countdownInterval);
             document.querySelector('.countdown-badge').innerHTML = 'Auto-close paused';
