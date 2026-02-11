@@ -102,7 +102,8 @@ class CheckoutController extends Controller
             // CALCULATE TOTALS FROM CART ITEMS (NOT FROM STORE SETTINGS)
             // ============================================================
             $subtotal = 0;
-            $taxAmount = 0;
+            $taxAmount = 0; // ✅ Only EXCLUSIVE tax (to be added to total)
+            $includedTaxAmount = 0; // ✅ For display only (already in price)
             $totalWeight = 0;
             $totalVolume = 0;
             $itemCount = 0;
@@ -112,9 +113,21 @@ class CheckoutController extends Controller
                 $subtotal += $itemSubtotal;
                 $itemCount += $item['quantity'];
 
-                // ✅ Use item-level tax (from cart)
+                // ✅ Handle both inclusive and exclusive tax
                 if ($item['is_taxable']) {
-                    $taxAmount += $itemSubtotal * ($item['tax_rate'] / 100);
+                    $taxType = $item['tax_type'] ?? 'exclusive'; // ✅ Check tax type
+                    $taxRate = $item['tax_rate'] ?? 0;
+
+                    if ($taxType === 'inclusive') {
+                        // ✅ Tax ALREADY in price - extract for DISPLAY ONLY
+                        $includedTax = $itemSubtotal - ($itemSubtotal / (1 + ($taxRate / 100)));
+                        $includedTaxAmount += $includedTax;
+
+                        // ✅ DO NOT ADD TO taxAmount (it's already in subtotal!)
+                    } else {
+                        // ✅ Exclusive tax - MUST be added to total
+                        $taxAmount += $itemSubtotal * ($taxRate / 100);
+                    }
                 }
 
                 // Get product for weight/volume
@@ -286,9 +299,27 @@ class CheckoutController extends Controller
                     : null;
 
                 $itemSubtotal = $item['price'] * $item['quantity'];
-                $itemTaxAmount = $item['is_taxable']
-                    ? ($itemSubtotal * ($item['tax_rate'] / 100))
-                    : 0;
+
+                // ✅ CALCULATE TAX BASED ON TYPE (INCLUSIVE/EXCLUSIVE)
+                $itemTaxAmount = 0;
+                $itemTotal = $itemSubtotal; // Start with subtotal
+
+                if ($item['is_taxable']) {
+                    $taxType = $item['tax_type'] ?? 'exclusive';
+                    $taxRate = $item['tax_rate'] ?? 0;
+
+                    if ($taxType === 'inclusive') {
+                        // ✅ Tax ALREADY in price - extract for DISPLAY only
+                        $itemTaxAmount = $itemSubtotal - ($itemSubtotal / (1 + ($taxRate / 100)));
+                        // ✅ Item total = subtotal (tax already included, don't add again!)
+                        $itemTotal = $itemSubtotal;
+                    } else {
+                        // ✅ Exclusive tax - MUST be added to item total
+                        $itemTaxAmount = $itemSubtotal * ($taxRate / 100);
+                        // ✅ Item total = subtotal + tax
+                        $itemTotal = $itemSubtotal + $itemTaxAmount;
+                    }
+                }
 
                 OrderItem::create([
                     'order_id' => $order->id,
@@ -301,11 +332,11 @@ class CheckoutController extends Controller
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['price'],
                     'cost_price' => $variant ? $variant->cost_price : $product->cost_price,
-                    'subtotal' => $itemSubtotal,
-                    'tax_amount' => $itemTaxAmount,
-                    'tax_rate' => $item['tax_rate'],
+                    'subtotal' => round($itemSubtotal, 2),
+                    'tax_amount' => round($itemTaxAmount, 2), // ✅ Correct tax amount
+                    'tax_rate' => $item['tax_rate'] ?? 0,
                     'is_taxable' => $item['is_taxable'],
-                    'total' => $itemSubtotal + $itemTaxAmount,
+                    'total' => round($itemTotal, 2), // ✅ Correct total
                     'status_key_code' => 'ITEM_PENDING',
                     'warehouse_id' => $defaultWarehouse->id,
                 ]);
@@ -567,7 +598,7 @@ class CheckoutController extends Controller
                 'payment_method' => $validated['payment_method'],
                 'amount' => $order->total_amount,
                 'currency' => $order->currency,
-                'fee' => 0, // Calculate gateway fee if applicable
+                'fee' => 0,
 
                 // Billing information from order
                 'billing_name' => $order->billing_first_name . ' ' . $order->billing_last_name,
@@ -595,15 +626,22 @@ class CheckoutController extends Controller
                 $transactionData['gateway_status'] = 'pending_payment';
                 $transactionData['notes'] = 'Cash on Delivery - Payment will be collected upon delivery';
 
+            } elseif ($validated['payment_method'] === 'bank_transfer') {
+                // ✅ BANK TRANSFER - ADD THIS BLOCK
+                $transactionData['payment_gateway'] = 'manual';
+                $transactionData['status_key_code'] = 'TRANSACTION_PENDING';
+                $transactionData['gateway_status'] = 'awaiting_payment';
+                $transactionData['notes'] = 'Bank Transfer - Awaiting payment confirmation';
+
             } else {
                 // Online Payment Transaction
-                $transactionData['payment_gateway'] = 'arb'; // Assuming ARB for online payments
+                $transactionData['payment_gateway'] = $validated['payment_gateway'] ?? 'arb';
                 $transactionData['status_key_code'] = 'TRANSACTION_PENDING';
                 $transactionData['gateway_status'] = 'awaiting_payment';
                 $transactionData['notes'] = 'Online payment - Awaiting customer payment confirmation';
 
                 //Generate track_id for ARB
-                if ($validated['payment_gateway'] === 'arb') {
+                if (($validated['payment_gateway'] ?? 'arb') === 'arb') {
                     $transactionData['track_id'] = 'TRK-' . time() . '-' . uniqid();
                 }
             }

@@ -25,9 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if ($this->app->environment(['local', 'production'])) {
-            URL::forceScheme('https');
-        }
+        // if ($this->app->environment(['local', 'production'])) {
+        //     URL::forceScheme('https');
+        // }
         Order::observe(OrderObserver::class);
         try {
             // Only run if store_settings table exists (to avoid migration errors)
