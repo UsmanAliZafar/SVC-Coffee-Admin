@@ -57,24 +57,6 @@
                     Your order is now being prepared for shipment. We'll send you tracking information once it ships.
                 </p>
             </div>
-
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{{ $invoiceUrl }}" style="display: inline-block; padding: 14px 30px; background-color: #5B914C; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600;">
-                    Download Invoice
-                </a>
-            </div>
-
-            <div style="text-align: center; margin-top: 30px;">
-                <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">Need help?</p>
-                <p style="margin: 0;">
-                    <a href="mailto:{{ config('mail.from.address') }}" style="color: #5B914C; text-decoration: none; font-weight: 600;">Contact Support</a>
-                </p>
-            </div>
-        </div>
-
-        <div style="background-color: #f8f9fa; padding: 30px 20px; text-align: center; border-top: 1px solid #e9ecef;">
-            <p style="margin: 0 0 10px 0; font-weight: 600; color: #333;">{{ config('app.name') }}</p>
-            <p style="margin: 0; font-size: 12px; color: #999;">© {{ date('Y') }} {{ config('app.name') }}</p>
         </div>
     </div>
 </body>

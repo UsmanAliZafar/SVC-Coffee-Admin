@@ -1,13 +1,21 @@
 <?php
 
+// Path: routes/web.php
+
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\EmailPreviewController;
+
+Route::prefix('admin/email-preview')
+    ->name('admin.email-preview.')
+    ->group(function () {
+        Route::get('/',        [EmailPreviewController::class, 'index'])->name('index');
+        Route::get('/{email}', [EmailPreviewController::class, 'show'])->name('show');
+    });
 
 Route::get('/', function () {
-    // Redirect to admin login or show 404-style landing
     return view('errors.404');
 });
 
-// Catch all other routes that don't exist
 Route::fallback(function () {
     return view('errors.404');
 });
