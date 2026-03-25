@@ -1,4 +1,9 @@
-{{-- resources/views/emails/newsletter-verification.blade.php --}}
+{{-- Path: resources/views/emails/newsletter-verification.blade.php --}}
+
+@php
+    $storeName  = store_settings('store_name')  ?: config('app.name');
+    $storeEmail = store_settings('store_email') ?: config('mail.from.address');
+@endphp
 
 <!DOCTYPE html>
 <html lang="en">
@@ -144,9 +149,9 @@
         </div>
 
         <div class="footer">
-            <p><strong>Need help?</strong> Contact our support team at {{ config('mail.from.address') }}</p>
+            <p><strong>Need help?</strong> Contact our support team at {{ $storeEmail }}</p>
             <p style="margin: 10px 0; font-size: 12px;">
-                © {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+                © {{ date('Y') }} {{ $storeName }}. All rights reserved.
             </p>
             <p style="font-size: 12px; color: #999;">
                 This email was sent to {{ $newsletter->email }} because you requested to subscribe to our newsletter.

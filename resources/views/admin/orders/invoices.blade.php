@@ -99,26 +99,6 @@
         </div>
     </div>
 
-    {{-- Quick Actions --}}
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <h6 class="card-title mb-3">Quick Actions</h6>
-            <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-outline-primary btn-sm" id="bulkDownloadBtn">
-                    <i class="bi bi-download"></i> Bulk Download
-                </button>
-                {{-- <button class="btn btn-outline-success btn-sm" id="bulkEmailBtn">
-                    <i class="bi bi-envelope"></i> Bulk Email
-                </button> --}}
-                <button class="btn btn-outline-info btn-sm" id="exportBtn">
-                    <i class="bi bi-file-earmark-excel"></i> Export to Excel
-                </button>
-                <button class="btn btn-outline-secondary btn-sm" id="printBtn">
-                    <i class="bi bi-printer"></i> Print List
-                </button>
-            </div>
-        </div>
-    </div>
 
     {{-- Invoices Table --}}
     <div class="card border-0 shadow-sm">
@@ -211,27 +191,6 @@
                         {{-- DataTable will populate this --}}
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </div>
-
-    {{-- Bulk Actions Bar --}}
-    <div class="position-fixed bottom-0 start-50 translate-middle-x mb-4 d-none" id="bulkActionsBar" style="z-index: 1050;">
-        <div class="card shadow-lg border-0">
-            <div class="card-body py-2 px-4">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="fw-bold"><span id="selectedCount">0</span> selected</span>
-                    <div class="vr"></div>
-                    <button type="button" class="btn btn-sm btn-primary" id="downloadSelectedBtn">
-                        <i class="bi bi-download"></i> Download
-                    </button>
-                    {{-- <button type="button" class="btn btn-sm btn-success" id="emailSelectedBtn">
-                        <i class="bi bi-envelope"></i> Email
-                    </button> --}}
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="clearSelection">
-                        Clear
-                    </button>
-                </div>
             </div>
         </div>
     </div>
