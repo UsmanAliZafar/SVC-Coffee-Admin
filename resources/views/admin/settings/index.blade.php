@@ -673,7 +673,7 @@
                                         @enderror
                                     </div>
 
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-md-6 mb-3 d-none">
                                         <label for="default_shipping_cost" class="form-label">
                                             Default Shipping Cost <span class="text-danger">*</span>
                                         </label>
