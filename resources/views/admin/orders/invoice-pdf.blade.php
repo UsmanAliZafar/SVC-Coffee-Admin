@@ -11,6 +11,8 @@
     $storeCountry = store_settings('store_country') ?: null;
     $storeTagline = store_settings('store_tagline') ?: null;
 
+    // Currency handled by store_currency_symbol() helper inline
+
     // Build address line
     $addressParts = array_filter([$storeAddress, $storeCity, $storeState, $storeZip]);
     $storeFullAddress = implode(', ', $addressParts);
@@ -526,9 +528,9 @@
                     @endif
                 </td>
                 <td style="text-align:center">{{ $item->quantity }}</td>
-                <td style="text-align:right">{{ store_currency_symbol() }} {{ number_format($item->unit_price, 2) }}</td>
-                <td style="text-align:right">{{ store_currency_symbol() }} {{ number_format($item->tax_amount, 2) }}</td>
-                <td>{{ store_currency_symbol() }} {{ number_format($item->total, 2) }}</td>
+                <td style="text-align:right">SAR {{ $item->unit_price }}</td>
+                <td style="text-align:right">SAR {{ $item->tax_amount }}</td>
+                <td>SAR {{ $item->total }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -541,25 +543,25 @@
             <table class="totals-table">
                 <tr>
                     <td>Subtotal</td>
-                    <td>{{ store_currency_symbol() }} {{ number_format($order->subtotal, 2) }}</td>
+                    <td>SAR {{ $order->subtotal }}</td>
                 </tr>
                 @if($order->discount_amount > 0)
                 <tr>
                     <td>Discount @if($order->discount_code)({{ $order->discount_code }})@endif</td>
-                    <td style="color:#b91c1c">− {{ store_currency_symbol() }} {{ number_format($order->discount_amount, 2) }}</td>
+                    <td style="color:#b91c1c">− SAR {{ $order->discount_amount }}</td>
                 </tr>
                 @endif
                 <tr>
                     <td>Tax ({{ number_format($order->tax_rate ?? 0, 2) }}%)</td>
-                    <td>{{ store_currency_symbol() }} {{ number_format($order->tax_amount, 2) }}</td>
+                    <td>SAR {{ $order->tax_amount }}</td>
                 </tr>
                 <tr>
                     <td>Shipping</td>
-                    <td>{{ store_currency_symbol() }} {{ number_format($order->shipping_amount, 2) }}</td>
+                    <td>SAR {{ $order->shipping_amount }}</td>
                 </tr>
                 <tr class="grand-total">
                     <td>Total</td>
-                    <td>{{ store_currency_symbol() }} {{ number_format($order->total_amount, 2) }}</td>
+                    <td>SAR {{ $order->total_amount }}</td>
                 </tr>
             </table>
         </div>
@@ -578,9 +580,9 @@
             @endif
             <strong>Status:</strong> <span class="badge {{ $paymentStatusClass }}">{{ $paymentStatusLabel }}</span>
             @if($order->isPaid())
-                <br><strong>Paid Amount:</strong> {{ store_currency_symbol() }} {{ number_format($order->total_amount, 2) }}
+                <br><strong>Paid Amount:</strong> SAR {{ $order->total_amount }}
             @elseif($order->payment_status_key_code === 'PAYMENT_PARTIALLY_PAID')
-                <br><strong>Amount Due:</strong> {{ store_currency_symbol() }} {{ number_format($order->total_amount - $order->getTotalPaid(), 2) }}
+                <br><strong>Amount Due:</strong> SAR {{ $order->total_amount - $order->getTotalPaid() }}
             @endif
         </div>
     </div>
