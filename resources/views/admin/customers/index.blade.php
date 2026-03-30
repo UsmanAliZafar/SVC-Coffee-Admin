@@ -249,11 +249,11 @@
                         <i class="bi bi-table text-primary"></i> Customers List
                     </h5>
                 </div>
-                <div class="col-auto">
+                {{-- <div class="col-auto">
                     <button type="button" class="btn btn-sm btn-outline-primary" id="bulkActionsBtn" disabled>
                         <i class="bi bi-gear-fill"></i> <span id="bulkActionText">Bulk Actions</span>
                     </button>
-                </div>
+                </div> --}}
             </div>
         </div>
 

@@ -195,9 +195,9 @@
                         <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#priorityModal">
                             <i class="bi bi-flag"></i> Update Priority
                         </button>
-                        <a href="mailto:{{ $contact->email }}?subject=Re: {{ $contact->subject }}" class="btn btn-success">
+                        {{-- <a href="mailto:{{ $contact->email }}?subject=Re: {{ $contact->subject }}" class="btn btn-success">
                             <i class="bi bi-reply-fill"></i> Reply via Email
-                        </a>
+                        </a> --}}
                         @if(auth('admin')->user()->hasPermission('contact_us.delete'))
                             <button type="button" class="btn btn-danger" id="delete-contact-btn">
                                 <i class="bi bi-trash"></i> Delete Message

@@ -985,7 +985,7 @@
                                     </div>
                                 </div>
 
-                                <div class="row">
+                                {{-- <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" id="enable_regional_rates"
@@ -997,7 +997,7 @@
                                         </div>
                                         <small class="text-muted">Zone-based shipping rates for different regions</small>
                                     </div>
-                                </div>
+                                </div> --}}
                             </div>
                         </div>
 

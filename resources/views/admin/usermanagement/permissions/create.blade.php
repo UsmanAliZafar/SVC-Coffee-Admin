@@ -225,9 +225,9 @@
                                         <a href="{{ route('admin.permissions.index') }}" class="btn btn-secondary">
                                             <i class="bi bi-arrow-left me-1"></i>Back to Permissions
                                         </a>
-                                        <a href="{{ route('admin.permissions.bulk-create') }}" class="btn btn-outline-info ms-2">
+                                        {{-- <a href="{{ route('admin.permissions.bulk-create') }}" class="btn btn-outline-info ms-2">
                                             <i class="bi bi-plus-square me-1"></i>Bulk Create Instead
-                                        </a>
+                                        </a> --}}
                                     </div>
                                     <div>
                                         <button type="reset" class="btn btn-outline-secondary me-2">

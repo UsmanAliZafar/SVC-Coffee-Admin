@@ -162,16 +162,16 @@ class CustomersController extends Controller
                     $actions .= '<button type="button" class="btn btn-outline-info sync-customer-btn" data-id="' . $customer->id . '" title="Sync Orders"><i class="bi bi-arrow-repeat"></i></button>';
 
                     // Toggle status button
-                    if ($customer->isActive()) {
-                        $actions .= '<button type="button" class="btn btn-outline-danger toggle-status-btn" data-id="' . $customer->id . '" data-action="block" title="Block"><i class="bi bi-lock"></i></button>';
-                    } else {
-                        $actions .= '<button type="button" class="btn btn-outline-success toggle-status-btn" data-id="' . $customer->id . '" data-action="activate" title="Activate"><i class="bi bi-unlock"></i></button>';
-                    }
+                    // if ($customer->isActive()) {
+                    //     $actions .= '<button type="button" class="btn btn-outline-danger toggle-status-btn" data-id="' . $customer->id . '" data-action="block" title="Block"><i class="bi bi-lock"></i></button>';
+                    // } else {
+                    //     $actions .= '<button type="button" class="btn btn-outline-success toggle-status-btn" data-id="' . $customer->id . '" data-action="activate" title="Activate"><i class="bi bi-unlock"></i></button>';
+                    // }
                 }
 
-                if (auth('admin')->user()->hasPermission('customers.delete')) {
-                    $actions .= '<button type="button" class="btn btn-outline-danger delete-customer" data-id="' . $customer->id . '" title="Delete"><i class="bi bi-trash"></i></button>';
-                }
+                // if (auth('admin')->user()->hasPermission('customers.delete')) {
+                //     $actions .= '<button type="button" class="btn btn-outline-danger delete-customer" data-id="' . $customer->id . '" title="Delete"><i class="bi bi-trash"></i></button>';
+                // }
 
                 $actions .= '</div>';
                 return $actions;

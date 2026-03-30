@@ -271,11 +271,11 @@
                                 <i class="bi bi-box-seam text-primary"></i> Shipping
                             </a>
                         </li>
-                        <li>
+                        {{-- <li>
                             <a href="{{ route('admin.orders.refunds') }}" class="{{ request()->routeIs('admin.orders.refunds') ? 'active' : '' }}">
                                 <i class="bi bi-arrow-counterclockwise text-warning"></i> Refunds
                             </a>
-                        </li>
+                        </li> --}}
                         <li>
                             <a href="{{ route('admin.orders.with-notes') }}" class="{{ request()->routeIs('admin.orders.with-notes') ? 'active' : '' }}">
                                 <i class="bi bi-sticky text-muted"></i> With Notes
