@@ -3087,4 +3087,48 @@ class OrdersController extends Controller
             return null;
         }
     }
+
+    /**
+     * Send invoice email to customer
+     */
+    public function sendInvoiceEmail(Request $request, $id): JsonResponse
+    {
+        $order = Order::with(['customer', 'items.product'])->findOrFail($id);
+
+        $validated = $request->validate([
+            'to_email' => 'required|email|max:255',
+            'subject'  => 'required|string|max:255',
+            'message'  => 'required|string|max:5000',
+        ]);
+
+        try {
+            \App\Jobs\SendOrderInvoiceJob::dispatch(
+                order:   $order,
+                toEmail: $validated['to_email'],
+                subject: $validated['subject'],
+                message: $validated['message'],
+            );
+
+            Log::info('📧 Invoice email job dispatched', [
+                'order' => $order->order_number,
+                'to'    => $validated['to_email'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Invoice email has been queued and will be sent shortly.',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('❌ Failed to dispatch invoice email job', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send email: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

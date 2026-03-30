@@ -657,6 +657,71 @@
         </div>
     </div>
 </div>
+
+{{-- Send Invoice Email Modal --}}
+{{-- Send Invoice Email Modal --}}
+<div class="modal fade" id="sendEmailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-envelope text-info"></i>
+                    Send Invoice Email
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="sendEmailForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">To <span class="text-danger">*</span></label>
+                        <input type="email"
+                               class="form-control"
+                               id="emailTo"
+                               name="to_email"
+                               value="{{ $order->getCustomerEmail() }}"
+                               required>
+                        <div class="form-text">You can change this to any email address.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Subject <span class="text-danger">*</span></label>
+                        <input type="text"
+                               class="form-control"
+                               id="emailSubject"
+                               name="subject"
+                               value="Invoice for Order #{{ $order->order_number }}"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Message <span class="text-danger">*</span></label>
+                        <textarea class="form-control"
+                                  id="emailMessage"
+                                  name="message"
+                                  rows="5"
+                                  required>Please find your invoice for order #{{ $order->order_number }} attached to this email.
+
+Order Total: {{ $order->getFormattedTotal() }}
+Order Date: {{ $order->created_at->format('F d, Y') }}
+
+Thank you for your business!</textarea>
+                    </div>
+
+                    <div class="alert alert-info py-2 mb-0">
+                        <i class="bi bi-paperclip"></i>
+                        The invoice PDF (<strong>invoice-{{ $order->order_number }}.pdf</strong>) will be automatically attached.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info text-white" id="confirmSendEmail">
+                    <i class="bi bi-send"></i> Send Invoice
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('styles')
@@ -836,8 +901,54 @@ $(document).ready(function() {
     });
 
     // Send Email
-    $('#sendEmailBtn').on('click', function() {
-        Swal.fire('Coming Soon', 'Email sending functionality will be implemented', 'info');
+    $('#sendEmailBtn').on('click', function () {
+        $('#sendEmailModal').modal('show');
+    });
+
+    // Confirm Send
+    $('#confirmSendEmail').on('click', function () {
+        const $btn = $(this);
+        const toEmail  = $('#emailTo').val().trim();
+        const subject  = $('#emailSubject').val().trim();
+        const message  = $('#emailMessage').val().trim();
+
+        if (!toEmail || !subject || !message) {
+            Swal.fire('Validation Error', 'Please fill in all fields.', 'warning');
+            return;
+        }
+
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Sending...');
+
+        $.ajax({
+            url: '{{ route("admin.orders.send-invoice-email", $order->id) }}',
+            type: 'POST',
+            data: {
+                to_email : toEmail,
+                subject  : subject,
+                message  : message,
+                _token   : '{{ csrf_token() }}'
+            },
+            success: function (response) {
+                $('#sendEmailModal').modal('hide');
+                Swal.fire({
+                    icon : 'success',
+                    title: 'Email Queued!',
+                    text : response.message,
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+            },
+            error: function (xhr) {
+                Swal.fire({
+                    icon : 'error',
+                    title: 'Failed!',
+                    text : xhr.responseJSON?.message || 'Failed to send email.'
+                });
+            },
+            complete: function () {
+                $btn.prop('disabled', false).html('<i class="bi bi-send"></i> Send Invoice');
+            }
+        });
     });
 
     // Print Order

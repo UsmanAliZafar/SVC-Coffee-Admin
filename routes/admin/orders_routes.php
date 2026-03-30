@@ -69,6 +69,8 @@ Route::prefix('orders')->name('orders.')->group(function () {
         Route::post('/bulk-update-payment-status', [OrdersController::class, 'bulkUpdatePaymentStatus'])->name('bulk-update-payment-status');
         //Single quick status update (from index page)
         Route::post('/{id}/quick-update-status', [OrdersController::class, 'quickUpdateStatus'])->name('quick-update-status');
+
+        Route::post('/{id}/send-invoice-email', [OrdersController::class, 'sendInvoiceEmail'])->name('send-invoice-email');
     });
 
     // Delete order
