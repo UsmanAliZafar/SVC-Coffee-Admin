@@ -11,7 +11,21 @@
     $storeCountry = store_settings('store_country') ?: null;
     $storeTagline = store_settings('store_tagline') ?: null;
 
-    // Currency handled by store_currency_symbol() helper inline
+    // Use ISO currency code (ASCII-safe for DomPDF — avoids ? from Unicode symbols)
+    $currencyCode = $order->currency ?? store_currency_code();
+
+    // Tax: sum from order items (works for both inclusive and exclusive tax)
+    $itemTaxTotal = $order->items->sum('tax_amount');
+
+    // Tax rate: use order-level if set, otherwise fall back to first taxable item's rate
+    $taxRate = ($order->tax_rate > 0)
+        ? (float) $order->tax_rate
+        : (float) ($order->items->where('is_taxable', true)->first()?->tax_rate ?? 0);
+
+    // Grand total: use stored value; fallback recalculate if 0
+    $grandTotal = $order->total_amount > 0
+        ? (float) $order->total_amount
+        : round((float)$order->subtotal + $itemTaxTotal + (float)$order->shipping_amount - (float)$order->discount_amount, 2);
 
     // Build address line
     $addressParts = array_filter([$storeAddress, $storeCity, $storeState, $storeZip]);
@@ -433,8 +447,8 @@
             @endif
             <div class="brand-details">
                 @if($storeFullAddress){{ $storeFullAddress }}@if($storeCountry), {{ $storeCountry }}@endif<br>@endif
-                @if($storePhone)📞 {{ $storePhone }}<br>@endif
-                @if($storeEmail)✉ <a href="mailto:{{ $storeEmail }}">{{ $storeEmail }}</a>@endif
+                @if($storePhone)Tel: {{ $storePhone }}<br>@endif
+                @if($storeEmail)Email: <a href="mailto:{{ $storeEmail }}">{{ $storeEmail }}</a>@endif
             </div>
         </div>
 
@@ -477,8 +491,8 @@
                     @if($order->billing_address_line2){{ $order->billing_address_line2 }}<br>@endif
                     {{ $order->billing_city }}, {{ $order->billing_state }} {{ $order->billing_postal_code }}<br>
                     {{ $order->billing_country }}<br>
-                    @if($order->billing_phone)📞 {{ $order->billing_phone }}<br>@endif
-                    ✉ {{ $order->getCustomerEmail() }}
+                    @if($order->billing_phone)Tel: {{ $order->billing_phone }}<br>@endif
+                    Email: {{ $order->getCustomerEmail() }}
                 </div>
             </div>
         </div>
@@ -493,7 +507,7 @@
                     @if($order->shipping_address_line2){{ $order->shipping_address_line2 }}<br>@endif
                     {{ $order->shipping_city }}, {{ $order->shipping_state }} {{ $order->shipping_postal_code }}<br>
                     {{ $order->shipping_country }}<br>
-                    @if($order->shipping_phone)📞 {{ $order->shipping_phone }}@endif
+                    @if($order->shipping_phone)Tel: {{ $order->shipping_phone }}@endif
                 </div>
             </div>
         </div>
@@ -528,9 +542,9 @@
                     @endif
                 </td>
                 <td style="text-align:center">{{ $item->quantity }}</td>
-                <td style="text-align:right">SAR {{ $item->unit_price }}</td>
-                <td style="text-align:right">SAR {{ $item->tax_amount }}</td>
-                <td>SAR {{ $item->total }}</td>
+                <td style="text-align:right">{{ $currencyCode }} {{ number_format($item->unit_price, 2) }}</td>
+                <td style="text-align:right">{{ $currencyCode }} {{ number_format($item->tax_amount, 2) }}</td>
+                <td>{{ $currencyCode }} {{ number_format($item->total, 2) }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -543,25 +557,29 @@
             <table class="totals-table">
                 <tr>
                     <td>Subtotal</td>
-                    <td>SAR {{ $order->subtotal }}</td>
+                    <td>{{ $currencyCode }} {{ number_format($order->subtotal, 2) }}</td>
                 </tr>
                 @if($order->discount_amount > 0)
                 <tr>
                     <td>Discount @if($order->discount_code)({{ $order->discount_code }})@endif</td>
-                    <td style="color:#b91c1c">− SAR {{ $order->discount_amount }}</td>
+                    <td style="color:#b91c1c">- {{ $currencyCode }} {{ number_format($order->discount_amount, 2) }}</td>
                 </tr>
                 @endif
+                @if($itemTaxTotal > 0)
                 <tr>
-                    <td>Tax ({{ number_format($order->tax_rate ?? 0, 2) }}%)</td>
-                    <td>SAR {{ $order->tax_amount }}</td>
+                    <td>Tax @if($taxRate > 0)({{ number_format($taxRate, 0) }}%)@endif</td>
+                    <td>{{ $currencyCode }} {{ number_format($itemTaxTotal, 2) }}</td>
                 </tr>
+                @endif
+                @if($order->shipping_amount > 0)
                 <tr>
                     <td>Shipping</td>
-                    <td>SAR {{ $order->shipping_amount }}</td>
+                    <td>{{ $currencyCode }} {{ number_format($order->shipping_amount, 2) }}</td>
                 </tr>
+                @endif
                 <tr class="grand-total">
                     <td>Total</td>
-                    <td>SAR {{ $order->total_amount }}</td>
+                    <td>{{ $currencyCode }} {{ number_format($grandTotal, 2) }}</td>
                 </tr>
             </table>
         </div>
@@ -580,9 +598,9 @@
             @endif
             <strong>Status:</strong> <span class="badge {{ $paymentStatusClass }}">{{ $paymentStatusLabel }}</span>
             @if($order->isPaid())
-                <br><strong>Paid Amount:</strong> SAR {{ $order->total_amount }}
+                <br><strong>Paid Amount:</strong> {{ $currencyCode }} {{ number_format($grandTotal, 2) }}
             @elseif($order->payment_status_key_code === 'PAYMENT_PARTIALLY_PAID')
-                <br><strong>Amount Due:</strong> SAR {{ $order->total_amount - $order->getTotalPaid() }}
+                <br><strong>Amount Due:</strong> {{ $currencyCode }} {{ number_format($grandTotal - $order->getTotalPaid(), 2) }}
             @endif
         </div>
     </div>
